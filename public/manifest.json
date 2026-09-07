@@ -1,12 +1,12 @@
 {
-  "name": "3D Furniture Mockup Builder iPad App",
-  "short_name": "3D Furniture",
+  "name": "3D Woodworking",
+  "short_name": "3D Woodworking",
   "start_url": "/",
   "display": "standalone",
   "orientation": "landscape",
   "background_color": "#0f1117",
   "theme_color": "#0f1117",
-  "description": "Touch-first 3D furniture mockup design application specifically crafted for iPad.",
+  "description": "Touch-first 3D woodworking and parametric design application.",
   "icons": [
     {
       "src": "/favicon.svg",

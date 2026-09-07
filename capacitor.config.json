@@ -1,6 +1,6 @@
 {
-  "appId": "com.antigravity.furniture3d",
-  "appName": "3D Furniture Mockup",
+  "appId": "com.antigravity.woodworking3d",
+  "appName": "3D Woodworking",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {

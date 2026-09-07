@@ -150,7 +150,7 @@ export const HomeScreen: React.FC = () => {
       {/* Header */}
       <header className="home-header">
         <div>
-          <h1>3D Furniture Studio</h1>
+          <h1>3D Woodworking</h1>
           <div className="subtitle">Precision Woodworking & Parametric 3D Mockup Builder</div>
         </div>
 
@@ -591,7 +591,7 @@ export const HomeScreen: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-main)' }}>
-                Mastering the 3D Furniture Studio
+                Mastering 3D Woodworking
               </h3>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
                 Quick tips and gestures for building realistic woodworking mockups on iPad and desktop.

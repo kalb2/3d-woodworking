@@ -121,7 +121,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) =
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FolderOpen size={24} color="#e09f3e" />
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Furniture Projects Manager</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>3D Woodworking Projects Manager</h2>
               {statusMessage && (
                 <span style={{ fontSize: 12, color: '#e09f3e', fontWeight: 600 }}>{statusMessage}</span>
               )}

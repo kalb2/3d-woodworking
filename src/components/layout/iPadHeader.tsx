@@ -132,7 +132,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         <button
           className="glass-panel glass-button"
           onClick={() => {
-            const name = prompt('Enter new furniture project name:', `Project ${projects.length + 1}`);
+            const name = prompt('Enter new woodworking project name:', `Project ${projects.length + 1}`);
             if (name) createProject(name);
           }}
           title="New Project (starts with cube)"
