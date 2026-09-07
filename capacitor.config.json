@@ -1,0 +1,12 @@
+{
+  "appId": "com.antigravity.furniture3d",
+  "appName": "3D Furniture Mockup",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

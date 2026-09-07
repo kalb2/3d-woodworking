@@ -1,0 +1,18 @@
+{
+  "name": "3D Furniture Mockup Builder iPad App",
+  "short_name": "3D Furniture",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "description": "Touch-first 3D furniture mockup design application specifically crafted for iPad.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
