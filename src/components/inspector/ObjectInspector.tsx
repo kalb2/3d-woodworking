@@ -1,8 +1,13 @@
 import React from 'react';
 import { RotateCw, Copy, Trash2, Type } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
+import { useAppStore } from '../../state/useAppStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
 
 export const ObjectInspector: React.FC = () => {
+  const isPhone = useIsPhone();
+  const { overlays, setOverlayOpen } = useAppStore();
   const {
     projects,
     activeProjectId,
@@ -14,7 +19,7 @@ export const ObjectInspector: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
-  if (!currentProject || !selectedObjectId) return null;
+  if (!overlays.inspector || !currentProject || !selectedObjectId) return null;
 
   const object = currentProject.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
@@ -77,16 +82,18 @@ export const ObjectInspector: React.FC = () => {
 
   return (
     <div
-      className="glass-panel"
+      className="glass-panel project-overlay project-overlay-inspector"
+      data-testid="overlay-inspector"
       style={{
         position: 'absolute',
-        top: 88,
-        right: 16,
-        width: 320,
+        top: isPhone ? 72 : 88,
+        right: isPhone ? 8 : 16,
+        left: isPhone ? 8 : 'auto',
+        width: isPhone ? 'auto' : 320,
         borderRadius: 16,
-        zIndex: 15,
+        zIndex: 16,
         padding: 16,
-        maxHeight: 'calc(100vh - 120px)',
+        maxHeight: isPhone ? 'calc(100vh - 140px)' : 'calc(100vh - 120px)',
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
@@ -94,8 +101,8 @@ export const ObjectInspector: React.FC = () => {
       }}
     >
       {/* Object Header & Rename */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
           <Type size={16} color="#e09f3e" />
           <input
             className="glass-input"
@@ -104,6 +111,7 @@ export const ObjectInspector: React.FC = () => {
             style={{ fontWeight: 600, fontSize: 14 }}
           />
         </div>
+        <OverlayDismissButton onDismiss={() => setOverlayOpen('inspector', false)} />
       </div>
 
       {/* DIMENSIONS SECTION */}

@@ -173,6 +173,32 @@ html, body, #root {
   animation: snapPulse 1.2s infinite ease-in-out;
 }
 
+.overlay-dismiss-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  min-height: 36px;
+  min-width: 36px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary-glow);
+  color: var(--accent-primary);
+}
+
+.overlay-dismiss-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+.overlay-launch-tab {
+  position: absolute;
+  z-index: 21;
+  padding: 10px 12px;
+  min-height: 42px;
+  pointer-events: auto;
+}
+
 /* ============================================
    HOME SCREEN STYLES
    ============================================ */

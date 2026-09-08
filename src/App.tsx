@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Box, Palette, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
 import { useAppStore } from './state/useAppStore';
+import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
 import { IPadHeader } from './components/layout/iPadHeader';
+import { OverlayLaunchTab } from './components/layout/OverlayChrome';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { MaterialPicker } from './components/inspector/MaterialPicker';
@@ -11,8 +14,16 @@ import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
 
 export const App: React.FC = () => {
-  const { loadProjects } = useProjectStore();
-  const { currentView, loadPreferences } = useAppStore();
+  const { loadProjects, selectedObjectId } = useProjectStore();
+  const {
+    currentView,
+    loadPreferences,
+    overlays,
+    openOverlay,
+    resetOverlaysForLayout,
+    setOverlayOpen,
+  } = useAppStore();
+  const isPhone = useIsPhone();
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isCutListOpen, setIsCutListOpen] = useState(false);
 
@@ -21,9 +32,22 @@ export const App: React.FC = () => {
     loadPreferences();
   }, [loadProjects, loadPreferences]);
 
+  useEffect(() => {
+    if (currentView !== 'editor') return;
+    resetOverlaysForLayout(isPhone);
+  }, [currentView, isPhone, resetOverlaysForLayout]);
+
+  useEffect(() => {
+    if (currentView !== 'editor' || !isPhone || selectedObjectId) return;
+    setOverlayOpen('inspector', false);
+    setOverlayOpen('materials', false);
+  }, [selectedObjectId, isPhone, currentView, setOverlayOpen]);
+
   if (currentView === 'home') {
     return <HomeScreen />;
   }
+
+  const hasSelection = Boolean(selectedObjectId);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
@@ -35,6 +59,33 @@ export const App: React.FC = () => {
         onOpenProjectModal={() => setIsProjectModalOpen(true)}
         onOpenCutList={() => setIsCutListOpen(true)}
       />
+
+      {!overlays.sidebar && (
+        <OverlayLaunchTab
+          label="Shapes"
+          icon={<Box size={16} color="#e09f3e" />}
+          placement="left"
+          onOpen={() => openOverlay('sidebar', isPhone)}
+        />
+      )}
+
+      {!overlays.inspector && hasSelection && (
+        <OverlayLaunchTab
+          label="Properties"
+          icon={<SlidersHorizontal size={16} color="#e09f3e" />}
+          placement="right-top"
+          onOpen={() => openOverlay('inspector', isPhone)}
+        />
+      )}
+
+      {!overlays.materials && hasSelection && (
+        <OverlayLaunchTab
+          label="Finish"
+          icon={<Palette size={16} color="#e09f3e" />}
+          placement="right-bottom"
+          onOpen={() => openOverlay('materials', isPhone)}
+        />
+      )}
 
       {/* Left Drawer Navigation (Shapes, Templates, Scene) */}
       <SidebarNav />
