@@ -59,7 +59,7 @@ export const SidebarNav: React.FC = () => {
         top: isPhone ? 72 : 88,
         left: isPhone ? 8 : 16,
         bottom: isPhone ? 16 : 24,
-        width: isPhone ? 'min(300px, calc(100vw - 16px))' : 280,
+        width: isPhone ? 'min(280px, calc(100vw - 56px))' : 280,
         borderRadius: 16,
         zIndex: 15,
         display: 'flex',

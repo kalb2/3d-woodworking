@@ -101,8 +101,12 @@ export const ObjectInspector: React.FC = () => {
       }}
     >
       {/* Object Header & Rename */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Part properties</span>
+          <OverlayDismissButton onDismiss={() => setOverlayOpen('inspector', false)} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Type size={16} color="#e09f3e" />
           <input
             className="glass-input"
@@ -111,7 +115,6 @@ export const ObjectInspector: React.FC = () => {
             style={{ fontWeight: 600, fontSize: 14 }}
           />
         </div>
-        <OverlayDismissButton onDismiss={() => setOverlayOpen('inspector', false)} />
       </div>
 
       {/* DIMENSIONS SECTION */}
