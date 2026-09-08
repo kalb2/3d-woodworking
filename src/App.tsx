@@ -49,6 +49,7 @@ export const App: React.FC = () => {
 
   const hasSelection = Boolean(selectedObjectId);
   const anyOverlayOpen = overlays.sidebar || overlays.inspector || overlays.materials;
+  const showLaunchers = !isPhone || !anyOverlayOpen;
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
@@ -61,7 +62,7 @@ export const App: React.FC = () => {
         onOpenCutList={() => setIsCutListOpen(true)}
       />
 
-      {!anyOverlayOpen && (
+      {showLaunchers && !overlays.sidebar && (
         <OverlayLaunchTab
           label="Shapes"
           icon={<Box size={16} color="#e09f3e" />}
@@ -70,7 +71,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {!anyOverlayOpen && hasSelection && (
+      {showLaunchers && !overlays.inspector && hasSelection && (
         <OverlayLaunchTab
           label="Properties"
           icon={<SlidersHorizontal size={16} color="#e09f3e" />}
@@ -79,7 +80,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {!anyOverlayOpen && hasSelection && (
+      {showLaunchers && !overlays.materials && hasSelection && (
         <OverlayLaunchTab
           label="Finish"
           icon={<Palette size={16} color="#e09f3e" />}
