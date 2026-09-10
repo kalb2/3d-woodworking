@@ -15,10 +15,15 @@ import {
   Layers
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
+import { useAppStore } from '../../state/useAppStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
 import type { ShapeType } from '../../types/furniture';
 
 export const SidebarNav: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'shapes' | 'templates' | 'scene'>('shapes');
+  const isPhone = useIsPhone();
+  const { overlays, setOverlayOpen } = useAppStore();
   const {
     addObject,
     addWoodPreset,
@@ -34,6 +39,8 @@ export const SidebarNav: React.FC = () => {
 
   const currentProject = projects.find(p => p.id === activeProjectId);
 
+  if (!overlays.sidebar) return null;
+
   const shapes: { type: ShapeType; label: string; icon: any }[] = [
     { type: 'bevel_top', label: 'Beveled Tabletop', icon: LayoutGrid },
     { type: 'cube', label: 'Box / Panel', icon: Box },
@@ -45,13 +52,14 @@ export const SidebarNav: React.FC = () => {
 
   return (
     <aside
-      className="glass-panel"
+      className="glass-panel project-overlay project-overlay-sidebar"
+      data-testid="overlay-sidebar"
       style={{
         position: 'absolute',
-        top: 88,
-        left: 16,
-        bottom: 24,
-        width: 280,
+        top: isPhone ? 72 : 88,
+        left: isPhone ? 8 : 16,
+        bottom: isPhone ? 16 : 24,
+        width: isPhone ? 'min(280px, calc(100vw - 56px))' : 280,
         borderRadius: 16,
         zIndex: 15,
         display: 'flex',
@@ -59,6 +67,17 @@ export const SidebarNav: React.FC = () => {
         overflow: 'hidden'
       }}
     >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '8px 10px 4px',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Shapes</span>
+        <OverlayDismissButton onDismiss={() => setOverlayOpen('sidebar', false)} />
+      </div>
+
       {/* Tab Switcher */}
       <div style={{
         display: 'flex',

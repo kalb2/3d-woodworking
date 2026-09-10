@@ -1,10 +1,15 @@
 import React from 'react';
 import { Palette, Sparkles, Droplet } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
+import { useAppStore } from '../../state/useAppStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PRESET_WOOD_MATERIALS } from '../../utils/woodTextureGenerator';
 import type { WoodSpecies } from '../../types/furniture';
 
 export const MaterialPicker: React.FC = () => {
+  const isPhone = useIsPhone();
+  const { overlays, setOverlayOpen } = useAppStore();
   const {
     projects,
     activeProjectId,
@@ -13,7 +18,7 @@ export const MaterialPicker: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
-  if (!currentProject || !selectedObjectId) return null;
+  if (!overlays.materials || !currentProject || !selectedObjectId) return null;
 
   const object = currentProject.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
@@ -61,25 +66,32 @@ export const MaterialPicker: React.FC = () => {
 
   return (
     <div
-      className="glass-panel"
+      className="glass-panel project-overlay project-overlay-materials"
+      data-testid="overlay-materials"
       style={{
         position: 'absolute',
-        bottom: 24,
-        right: 16,
-        width: 320,
+        bottom: isPhone ? 16 : 24,
+        right: isPhone ? 8 : 16,
+        left: isPhone ? 8 : 'auto',
+        width: isPhone ? 'auto' : 320,
         borderRadius: 16,
-        zIndex: 15,
+        zIndex: 16,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
-        gap: 12
+        gap: 12,
+        maxHeight: isPhone ? 'calc(100vh - 140px)' : 'none',
+        overflowY: isPhone ? 'auto' : 'visible'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
-        <Palette size={18} color="#e09f3e" />
-        <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Wood Finish & Materials
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <Palette size={18} color="#e09f3e" />
+          <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Wood Finish & Materials
+          </span>
+        </div>
+        <OverlayDismissButton onDismiss={() => setOverlayOpen('materials', false)} />
       </div>
 
       {/* WOOD SPECIES GRID */}

@@ -64,18 +64,51 @@ export function applyThemeVariables(accentColor: string) {
   root.style.setProperty('--accent-primary-subtle', hexToRgba(accentColor, 0.1));
 }
 
+export type OverlayId = 'sidebar' | 'inspector' | 'materials';
+
+export interface OverlayVisibility {
+  sidebar: boolean;
+  inspector: boolean;
+  materials: boolean;
+}
+
+const ALL_OVERLAYS_OPEN: OverlayVisibility = {
+  sidebar: true,
+  inspector: true,
+  materials: true,
+};
+
+const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
+  sidebar: false,
+  inspector: false,
+  materials: false,
+};
+
+function initialOverlayVisibility(): OverlayVisibility {
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    return { ...ALL_OVERLAYS_CLOSED };
+  }
+  return { ...ALL_OVERLAYS_OPEN };
+}
+
 interface AppState {
   currentView: 'home' | 'editor';
   preferences: AppPreferences;
+  overlays: OverlayVisibility;
 
   setView: (view: 'home' | 'editor') => void;
   updatePreferences: (updates: Partial<AppPreferences>) => void;
   loadPreferences: () => void;
+  setOverlayOpen: (id: OverlayId, open: boolean) => void;
+  openOverlay: (id: OverlayId, exclusive?: boolean) => void;
+  dismissOverlays: () => void;
+  resetOverlaysForLayout: (isPhone: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentView: 'home',
   preferences: { ...DEFAULT_PREFS },
+  overlays: initialOverlayVisibility(),
 
   setView: (view) => set({ currentView: view }),
 
@@ -110,4 +143,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       applyThemeVariables(DEFAULT_PREFS.accentColor);
     }
   },
+
+  setOverlayOpen: (id, open) =>
+    set((state) => ({
+      overlays: { ...state.overlays, [id]: open },
+    })),
+
+  openOverlay: (id, exclusive) =>
+    set((state) => {
+      if (!exclusive) {
+        return { overlays: { ...state.overlays, [id]: true } };
+      }
+      return {
+        overlays: {
+          sidebar: id === 'sidebar',
+          inspector: id === 'inspector',
+          materials: id === 'materials',
+        },
+      };
+    }),
+
+  dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED } }),
+
+  resetOverlaysForLayout: (isPhone) =>
+    set({ overlays: isPhone ? { ...ALL_OVERLAYS_CLOSED } : { ...ALL_OVERLAYS_OPEN } }),
 }));
