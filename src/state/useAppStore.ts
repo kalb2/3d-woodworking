@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isCompactChrome } from '../utils/compactLayout';
 
 const APP_PREFS_KEY = 'ipad_3d_furniture_app_prefs_v1';
 
@@ -85,7 +86,9 @@ const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
 };
 
 function initialOverlayVisibility(): OverlayVisibility {
-  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+  // Default closed on compact / native iPhone. Never trust a single innerWidth
+  // read — Capacitor WKWebView often reports a wide size on first evaluate.
+  if (typeof window === 'undefined' || isCompactChrome()) {
     return { ...ALL_OVERLAYS_CLOSED };
   }
   return { ...ALL_OVERLAYS_OPEN };
@@ -165,6 +168,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED } }),
 
-  resetOverlaysForLayout: (isPhone) =>
-    set({ overlays: isPhone ? { ...ALL_OVERLAYS_CLOSED } : { ...ALL_OVERLAYS_OPEN } }),
+  resetOverlaysForLayout: (isPhone) => {
+    if (isPhone) {
+      set({ overlays: { ...ALL_OVERLAYS_CLOSED } });
+      return;
+    }
+    // Do not force-open all three when compact detection is false.
+    // A false-wide WKWebView read is what stacked Shapes + props + finish
+    // on iPhone with no reachable dismiss.
+  },
 }));

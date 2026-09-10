@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportCutListCSV, exportProjectJSON, copyProjectToClipboard } from '../../utils/exportUtils';
 
 interface IPadHeaderProps {
@@ -47,6 +48,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
   } = useProjectStore();
 
   const { setView } = useAppStore();
+  const isPhone = useIsPhone();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
@@ -87,9 +89,10 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
   };
 
   return (
-    <header style={{
+    <header
+      className="editor-header"
+      style={{
       position: 'absolute',
-      top: 16,
       left: 16,
       right: 16,
       zIndex: 20,
@@ -101,7 +104,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       pointerEvents: 'none'
     }}>
       {/* Left section: Home Button, Project Switcher & Undo/Redo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', minWidth: 0, overflow: 'hidden' }}>
         {/* Back to Home Button */}
         <button
           className="glass-panel glass-button"
@@ -110,14 +113,14 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           style={{ padding: '10px 14px' }}
         >
           <Home size={18} color="#e09f3e" />
-          <span style={{ fontWeight: 600 }}>Home</span>
+          {!isPhone && <span style={{ fontWeight: 600 }}>Home</span>}
         </button>
 
         {/* Project Selector Button */}
         <button
           className="glass-panel glass-button"
           onClick={onOpenProjectModal}
-          style={{ minWidth: 180, justifyContent: 'space-between' }}
+          style={{ minWidth: isPhone ? 0 : 180, maxWidth: isPhone ? 160 : undefined, justifyContent: 'space-between' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FolderOpen size={18} color="#e09f3e" />
@@ -140,14 +143,14 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           <Plus size={18} />
         </button>
 
-        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
+        {!isPhone && <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />}
 
         {/* Undo / Redo */}
         <button
           className={`glass-panel glass-button ${!canUndo ? 'disabled' : ''}`}
           onClick={undo}
           disabled={!canUndo}
-          style={{ opacity: canUndo ? 1 : 0.4 }}
+          style={{ opacity: canUndo ? 1 : 0.4, display: isPhone ? 'none' : undefined }}
           title="Undo (Ctrl+Z)"
         >
           <Undo size={18} />
@@ -157,7 +160,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           className={`glass-panel glass-button ${!canRedo ? 'disabled' : ''}`}
           onClick={redo}
           disabled={!canRedo}
-          style={{ opacity: canRedo ? 1 : 0.4 }}
+          style={{ opacity: canRedo ? 1 : 0.4, display: isPhone ? 'none' : undefined }}
           title="Redo (Ctrl+Y)"
         >
           <Redo size={18} />
@@ -165,6 +168,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       </div>
 
       {/* Middle section: Gizmo Mode Controls (Move, Grab Resize, Rotate) */}
+      {!isPhone && (
       <div
         className="glass-panel"
         style={{
@@ -200,8 +204,10 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           <span>Rotate</span>
         </button>
       </div>
+      )}
 
       {/* Right section: Magnet Snap, Floor Toggle, Cut List & Export */}
+      {!isPhone && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
         {/* Floor Toggle Button */}
         <button
@@ -306,6 +312,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           )}
         </div>
       </div>
+      )}
     </header>
   );
 };

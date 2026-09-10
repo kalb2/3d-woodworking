@@ -56,12 +56,12 @@ export const SidebarNav: React.FC = () => {
       data-testid="overlay-sidebar"
       style={{
         position: 'absolute',
-        top: isPhone ? 72 : 88,
-        left: isPhone ? 8 : 16,
-        bottom: isPhone ? 16 : 24,
+        top: isPhone ? 'calc(72px + env(safe-area-inset-top, 0px))' : 88,
+        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 16,
+        bottom: isPhone ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 24,
         width: isPhone ? 'min(280px, calc(100vw - 56px))' : 280,
         borderRadius: 16,
-        zIndex: 15,
+        zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'

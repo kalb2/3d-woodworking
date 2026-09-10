@@ -70,18 +70,21 @@ export const MaterialPicker: React.FC = () => {
       data-testid="overlay-materials"
       style={{
         position: 'absolute',
-        bottom: isPhone ? 16 : 24,
-        right: isPhone ? 8 : 16,
-        left: isPhone ? 8 : 'auto',
+        bottom: isPhone ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 24,
+        right: isPhone ? 'calc(8px + env(safe-area-inset-right, 0px))' : 16,
+        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 'auto',
         width: isPhone ? 'auto' : 320,
         borderRadius: 16,
-        zIndex: 16,
+        zIndex: 40,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
-        maxHeight: isPhone ? 'calc(100vh - 140px)' : 'none',
-        overflowY: isPhone ? 'auto' : 'visible'
+        maxHeight: isPhone
+          ? 'calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+          : 'none',
+        overflowY: isPhone ? 'auto' : 'visible',
+        WebkitOverflowScrolling: isPhone ? 'touch' : undefined
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>

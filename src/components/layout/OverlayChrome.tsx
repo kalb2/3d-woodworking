@@ -1,12 +1,18 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Eye, X } from 'lucide-react';
 
 interface OverlayDismissButtonProps {
   onDismiss: () => void;
   label?: string;
 }
 
-/** Obvious iOS-style dismiss control for project overlays. */
+function fireDismiss(event: React.SyntheticEvent, onDismiss: () => void) {
+  event.preventDefault();
+  event.stopPropagation();
+  onDismiss();
+}
+
+/** Obvious dismiss control — pointerup so iOS WKWebView does not drop click. */
 export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   onDismiss,
   label = 'Done',
@@ -14,7 +20,8 @@ export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   <button
     type="button"
     className="glass-button overlay-dismiss-btn"
-    onClick={onDismiss}
+    onClick={(event) => fireDismiss(event, onDismiss)}
+    onPointerUp={(event) => fireDismiss(event, onDismiss)}
     aria-label={label}
     title={label}
     data-testid="overlay-dismiss"
@@ -37,26 +44,41 @@ export const OverlayLaunchTab: React.FC<OverlayLaunchTabProps> = ({
   icon,
   onOpen,
   placement,
-}) => {
-  const positionStyle: React.CSSProperties =
-    placement === 'left'
-      ? { top: 88, left: 8 }
-      : placement === 'right-top'
-        ? { top: 88, right: 8 }
-        : { bottom: 24, right: 8 };
+}) => (
+  <button
+    type="button"
+    className={`glass-panel glass-button overlay-launch-tab overlay-launch-tab-${placement}`}
+    onClick={(event) => fireDismiss(event, onOpen)}
+    onPointerUp={(event) => fireDismiss(event, onOpen)}
+    aria-label={`Open ${label}`}
+    title={`Open ${label}`}
+    data-testid={`overlay-launch-${label.toLowerCase()}`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
 
-  return (
-    <button
-      type="button"
-      className="glass-panel glass-button overlay-launch-tab"
-      style={positionStyle}
-      onClick={onOpen}
-      aria-label={`Open ${label}`}
-      title={`Open ${label}`}
-      data-testid={`overlay-launch-${label.toLowerCase()}`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-};
+interface CanvasReturnButtonProps {
+  onHide: () => void;
+}
+
+/**
+ * Always-on-top hide control. Sits in the iOS safe area, above the iPad header
+ * z-index, so Shapes / properties / finish can still be dismissed when Done
+ * is covered or the WKWebView dropped in-panel clicks.
+ */
+export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }) => (
+  <button
+    type="button"
+    className="glass-panel canvas-return-btn"
+    onClick={(event) => fireDismiss(event, onHide)}
+    onPointerUp={(event) => fireDismiss(event, onHide)}
+    aria-label="Hide menus"
+    title="Hide menus and return to the 3D canvas"
+    data-testid="canvas-return"
+  >
+    <Eye size={18} />
+    <span>Hide menus</span>
+  </button>
+);
