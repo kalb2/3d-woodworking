@@ -1,16 +1,10 @@
 import React from 'react';
 import { Eye, X } from 'lucide-react';
+import { fireReliableTap } from '../../utils/reliableTap';
 
 interface OverlayDismissButtonProps {
   onDismiss: () => void;
   label?: string;
-}
-
-/** pointerup + click so Capacitor WKWebView does not drop a synthesized click. */
-export function fireReliableTap(event: React.SyntheticEvent, action: () => void) {
-  event.preventDefault();
-  event.stopPropagation();
-  action();
 }
 
 /** Obvious dismiss control — pointerup so iOS WKWebView does not drop click. */

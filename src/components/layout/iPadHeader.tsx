@@ -23,7 +23,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportCutListCSV, exportProjectJSON, copyProjectToClipboard } from '../../utils/exportUtils';
-import { fireReliableTap } from './OverlayChrome';
+import { fireReliableTap } from '../../utils/reliableTap';
 
 interface IPadHeaderProps {
   onOpenProjectModal: () => void;
