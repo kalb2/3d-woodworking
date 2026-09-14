@@ -6,10 +6,11 @@ interface OverlayDismissButtonProps {
   label?: string;
 }
 
-function fireDismiss(event: React.SyntheticEvent, onDismiss: () => void) {
+/** pointerup + click so Capacitor WKWebView does not drop a synthesized click. */
+export function fireReliableTap(event: React.SyntheticEvent, action: () => void) {
   event.preventDefault();
   event.stopPropagation();
-  onDismiss();
+  action();
 }
 
 /** Obvious dismiss control — pointerup so iOS WKWebView does not drop click. */
@@ -20,8 +21,8 @@ export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   <button
     type="button"
     className="glass-button overlay-dismiss-btn"
-    onClick={(event) => fireDismiss(event, onDismiss)}
-    onPointerUp={(event) => fireDismiss(event, onDismiss)}
+    onClick={(event) => fireReliableTap(event, onDismiss)}
+    onPointerUp={(event) => fireReliableTap(event, onDismiss)}
     aria-label={label}
     title={label}
     data-testid="overlay-dismiss"
@@ -48,8 +49,8 @@ export const OverlayLaunchTab: React.FC<OverlayLaunchTabProps> = ({
   <button
     type="button"
     className={`glass-panel glass-button overlay-launch-tab overlay-launch-tab-${placement}`}
-    onClick={(event) => fireDismiss(event, onOpen)}
-    onPointerUp={(event) => fireDismiss(event, onOpen)}
+    onClick={(event) => fireReliableTap(event, onOpen)}
+    onPointerUp={(event) => fireReliableTap(event, onOpen)}
     aria-label={`Open ${label}`}
     title={`Open ${label}`}
     data-testid={`overlay-launch-${label.toLowerCase()}`}
@@ -72,8 +73,8 @@ export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }
   <button
     type="button"
     className="glass-panel canvas-return-btn"
-    onClick={(event) => fireDismiss(event, onHide)}
-    onPointerUp={(event) => fireDismiss(event, onHide)}
+    onClick={(event) => fireReliableTap(event, onHide)}
+    onPointerUp={(event) => fireReliableTap(event, onHide)}
     aria-label="Hide menus"
     title="Hide menus and return to the 3D canvas"
     data-testid="canvas-return"

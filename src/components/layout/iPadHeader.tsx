@@ -23,6 +23,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportCutListCSV, exportProjectJSON, copyProjectToClipboard } from '../../utils/exportUtils';
+import { fireReliableTap } from './OverlayChrome';
 
 interface IPadHeaderProps {
   onOpenProjectModal: () => void;
@@ -107,9 +108,13 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto', minWidth: 0, overflow: 'hidden' }}>
         {/* Back to Home Button */}
         <button
+          type="button"
           className="glass-panel glass-button"
-          onClick={() => setView('home')}
+          onClick={(event) => fireReliableTap(event, () => setView('home'))}
+          onPointerUp={(event) => fireReliableTap(event, () => setView('home'))}
           title="Back to Projects Home"
+          aria-label="Back to Projects Home"
+          data-testid="nav-home"
           style={{ padding: '10px 14px' }}
         >
           <Home size={18} color="#e09f3e" />
