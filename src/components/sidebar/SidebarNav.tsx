@@ -19,6 +19,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
 import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
+import { fireReliableTap } from '../../utils/reliableTap';
 import type { ShapeType } from '../../types/furniture';
 
 export const SidebarNav: React.FC = () => {
@@ -74,44 +75,44 @@ export const SidebarNav: React.FC = () => {
       }}
     >
       {isPhone && <PhoneSheetGrab />}
-      <div style={{
+      <div className={isPhone ? 'phone-sheet-header' : undefined} style={isPhone ? undefined : {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
         padding: '8px 10px 4px',
       }}>
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Shapes</span>
+        <span className={isPhone ? 'phone-sheet-title' : undefined} style={isPhone ? undefined : { fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Parts</span>
         <OverlayDismissButton onDismiss={() => setOverlayOpen('sidebar', false)} />
       </div>
 
       {/* Tab Switcher */}
-      <div style={{
+      <div className={isPhone ? 'phone-sheet-tabs' : undefined} style={isPhone ? undefined : {
         display: 'flex',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         padding: 6,
         gap: 4
       }}>
         <button
-          className={`glass-button ${activeTab === 'shapes' ? 'active' : ''}`}
+          className={isPhone ? `phone-sheet-tab${activeTab === 'shapes' ? ' is-active' : ''}` : `glass-button ${activeTab === 'shapes' ? 'active' : ''}`}
           onClick={() => setActiveTab('shapes')}
-          style={{ flex: 1, padding: '8px 4px', fontSize: 13 }}
+          style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Shapes</span>
         </button>
 
         <button
-          className={`glass-button ${activeTab === 'templates' ? 'active' : ''}`}
+          className={isPhone ? `phone-sheet-tab${activeTab === 'templates' ? ' is-active' : ''}` : `glass-button ${activeTab === 'templates' ? 'active' : ''}`}
           onClick={() => setActiveTab('templates')}
-          style={{ flex: 1, padding: '8px 4px', fontSize: 13 }}
+          style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Starters</span>
         </button>
 
         <button
-          className={`glass-button ${activeTab === 'scene' ? 'active' : ''}`}
+          className={isPhone ? `phone-sheet-tab${activeTab === 'scene' ? ' is-active' : ''}` : `glass-button ${activeTab === 'scene' ? 'active' : ''}`}
           onClick={() => setActiveTab('scene')}
-          style={{ flex: 1, padding: '8px 4px', fontSize: 13 }}
+          style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Scene ({currentProject?.objects.length || 0})</span>
         </button>
@@ -121,24 +122,29 @@ export const SidebarNav: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
         {/* SHAPES TAB */}
         {activeTab === 'shapes' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {!isPhone && (
             <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Basic Shapes
             </div>
+            )}
 
+            <div className={isPhone ? 'phone-shape-grid' : undefined} style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
             {shapes.map(({ type, label, icon: Icon }) => (
               <button
                 key={type}
-                className="glass-button"
-                onClick={() => addObject(type)}
-                style={{
+                type="button"
+                className={isPhone ? 'phone-shape-cell' : 'glass-button'}
+                onClick={isPhone ? undefined : () => addObject(type)}
+                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addObject(type)) : undefined}
+                style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
                   padding: '10px 12px',
                   background: 'rgba(255, 255, 255, 0.05)'
                 }}
               >
-                <div style={{
+                <div className={isPhone ? 'phone-shape-cell-icon' : undefined} style={isPhone ? undefined : {
                   width: 28,
                   height: 28,
                   borderRadius: 8,
@@ -148,26 +154,42 @@ export const SidebarNav: React.FC = () => {
                   justifyContent: 'center',
                   marginRight: 10
                 }}>
-                  <Icon size={16} color="#e09f3e" />
+                  <Icon size={isPhone ? 22 : 16} color={isPhone ? '#64748b' : '#e09f3e'} strokeWidth={isPhone ? 1.5 : 2} />
                 </div>
+                {isPhone ? (
+                  <span>{label.replace('Beveled ', '').replace(' / Panel', '').replace(' / Pole', '')}</span>
+                ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
                   <span style={{ fontSize: 10, color: '#9ca3af' }}>Click to spawn on canvas</span>
                 </div>
+                )}
               </button>
             ))}
+            </div>
 
             {/* Standard Lumber & Sheet Stock Presets */}
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#e09f3e', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12 }}>
+            <div style={{
+              fontSize: 12,
+              fontWeight: isPhone ? 500 : 600,
+              color: isPhone ? '#94a3b8' : '#e09f3e',
+              textTransform: isPhone ? 'none' : 'uppercase',
+              letterSpacing: isPhone ? 0 : 0.5,
+              marginTop: 8,
+              borderTop: isPhone ? '1px solid #eef2f6' : '1px solid rgba(255,255,255,0.08)',
+              paddingTop: 12
+            }}>
               Standard Wood Sizes
             </div>
 
             {STANDARD_WOOD_PRESETS.map((preset) => (
               <button
                 key={preset.id}
-                className="glass-button"
-                onClick={() => addWoodPreset(preset.id)}
-                style={{
+                type="button"
+                className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+                onClick={isPhone ? undefined : () => addWoodPreset(preset.id)}
+                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addWoodPreset(preset.id)) : undefined}
+                style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
                   padding: '10px 12px',
@@ -180,14 +202,14 @@ export const SidebarNav: React.FC = () => {
                   width: 28,
                   height: 28,
                   borderRadius: 8,
-                  background: 'rgba(224, 159, 62, 0.2)',
+                  background: isPhone ? '#f8fafc' : 'rgba(224, 159, 62, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: 10,
                   flexShrink: 0
                 }}>
-                  <Layers size={16} color="#e09f3e" />
+                  <Layers size={16} color={isPhone ? '#64748b' : '#e09f3e'} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', overflow: 'hidden' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', width: '100%' }}>

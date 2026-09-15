@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
+import { SELECTION_COLOR } from '../../theme/canvasSelection';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
@@ -29,7 +30,7 @@ const AXIS_COLORS = {
   y: '#10b981',  // green
   z: '#3b82f6',  // blue
 };
-const ACTIVE_COLOR = '#facc15'; // yellow highlight
+const ACTIVE_COLOR = SELECTION_COLOR;
 
 /* ======================================================================
    MOVE HANDLE — one per axis (fat arrow + invisible hit cylinder)

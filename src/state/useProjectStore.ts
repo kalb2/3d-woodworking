@@ -55,6 +55,29 @@ export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
 ];
 
 const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
+const LIGHT_STARTING_WOOD = PRESET_WOOD_MATERIALS.birch;
+
+function isStartingBoard(object: FurnitureObject): boolean {
+  return (
+    object.id === 'tabletop_1' ||
+    object.name === 'Starting Cube' ||
+    object.name === 'Table Top'
+  );
+}
+
+function withLightStartingWood(projects: FurnitureProject[]): FurnitureProject[] {
+  return projects.map((project) => ({
+    ...project,
+    objects: project.objects.map((object) => {
+      const species = object.material?.species;
+      const isDarkStart = species === 'walnut' || species === 'oak';
+      if (isStartingBoard(object) && isDarkStart) {
+        return { ...object, material: { ...LIGHT_STARTING_WOOD } };
+      }
+      return object;
+    }),
+  }));
+}
 
 const createInitialProject = (): FurnitureProject => ({
   id: 'proj_default',
@@ -70,7 +93,7 @@ const createInitialProject = (): FurnitureProject => ({
       dimensions: { length: 48, width: 24, height: 1.5 },
       position: { x: 0, y: 18, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.oak,
+      material: LIGHT_STARTING_WOOD,
       visible: true
     },
     {
@@ -177,12 +200,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const projects = withLightStartingWood(parsed);
           set({
-            projects: parsed,
-            activeProjectId: parsed[0].id,
-            historyStack: [[...parsed[0].objects]],
+            projects,
+            activeProjectId: projects[0].id,
+            historyStack: [[...projects[0].objects]],
             historyIndex: 0
           });
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+          } catch {
+            // keep the in-memory light starting wood even if persist fails
+          }
         }
       }
     } catch (err) {
@@ -211,7 +240,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       dimensions: { length: 12, width: 12, height: 12 },
       position: { x: 0, y: 6, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.oak,
+      material: LIGHT_STARTING_WOOD,
       visible: true
     };
 
@@ -327,7 +356,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
 
-    const defaultMaterial: WoodMaterial = PRESET_WOOD_MATERIALS.oak;
+    const defaultMaterial: WoodMaterial = LIGHT_STARTING_WOOD;
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
       name: customName || `${shape.charAt(0).toUpperCase() + shape.slice(1)} Component`,

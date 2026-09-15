@@ -1,6 +1,7 @@
 import React from 'react';
-import { Eye, X } from 'lucide-react';
+import { ChevronDown, Eye, X } from 'lucide-react';
 import { fireReliableTap } from '../../utils/reliableTap';
+import { useIsPhone } from '../../hooks/useIsPhone';
 
 export const PhoneSheetGrab: React.FC = () => (
   <div className="phone-sheet-grab" aria-hidden="true" />
@@ -15,20 +16,29 @@ interface OverlayDismissButtonProps {
 export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   onDismiss,
   label = 'Done',
-}) => (
-  <button
-    type="button"
-    className="glass-button overlay-dismiss-btn"
-    onClick={(event) => fireReliableTap(event, onDismiss)}
-    onPointerUp={(event) => fireReliableTap(event, onDismiss)}
-    aria-label={label}
-    title={label}
-    data-testid="overlay-dismiss"
-  >
-    <X size={16} />
-    <span>{label}</span>
-  </button>
-);
+}) => {
+  const isPhone = useIsPhone();
+  return (
+    <button
+      type="button"
+      className={isPhone ? 'phone-sheet-dismiss' : 'glass-button overlay-dismiss-btn'}
+      onClick={(event) => fireReliableTap(event, onDismiss)}
+      onPointerUp={(event) => fireReliableTap(event, onDismiss)}
+      aria-label={label}
+      title={label}
+      data-testid="overlay-dismiss"
+    >
+      {isPhone ? (
+        <ChevronDown size={22} strokeWidth={1.75} />
+      ) : (
+        <>
+          <X size={16} />
+          <span>{label}</span>
+        </>
+      )}
+    </button>
+  );
+};
 
 interface OverlayLaunchTabProps {
   label: string;
@@ -67,17 +77,20 @@ interface CanvasReturnButtonProps {
  * z-index, so Shapes / properties / finish can still be dismissed when Done
  * is covered or the WKWebView dropped in-panel clicks.
  */
-export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }) => (
-  <button
-    type="button"
-    className="glass-panel canvas-return-btn"
-    onClick={(event) => fireReliableTap(event, onHide)}
-    onPointerUp={(event) => fireReliableTap(event, onHide)}
-    aria-label="Hide menus"
-    title="Hide menus and return to the 3D canvas"
-    data-testid="canvas-return"
-  >
-    <Eye size={18} />
-    <span>Hide menus</span>
-  </button>
-);
+export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }) => {
+  const isPhone = useIsPhone();
+  return (
+    <button
+      type="button"
+      className={`canvas-return-btn${isPhone ? ' is-phone-quiet' : ' glass-panel'}`}
+      onClick={(event) => fireReliableTap(event, onHide)}
+      onPointerUp={(event) => fireReliableTap(event, onHide)}
+      aria-label="Hide menus"
+      title="Hide menus and return to the 3D canvas"
+      data-testid="canvas-return"
+    >
+      <Eye size={18} strokeWidth={1.75} />
+      <span>Hide menus</span>
+    </button>
+  );
+};

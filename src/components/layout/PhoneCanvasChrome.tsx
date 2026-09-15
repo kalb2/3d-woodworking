@@ -221,20 +221,20 @@ export const PhoneCanvasDock: React.FC<PhoneCanvasDockProps> = ({ hasSelection }
     icon: React.ReactNode;
     disabled?: boolean;
   }> = [
-    { id: 'sidebar', label: 'Parts', testId: 'overlay-launch-shapes', icon: <Box size={20} /> },
-    { id: 'tools', label: 'Tools', testId: 'overlay-launch-tools', icon: <Move size={20} /> },
+    { id: 'sidebar', label: 'Parts', testId: 'overlay-launch-shapes', icon: <Box size={20} strokeWidth={1.6} /> },
+    { id: 'tools', label: 'Tools', testId: 'overlay-launch-tools', icon: <Move size={20} strokeWidth={1.6} /> },
     {
       id: 'inspector',
       label: 'Properties',
       testId: 'overlay-launch-properties',
-      icon: <SlidersHorizontal size={20} />,
+      icon: <SlidersHorizontal size={20} strokeWidth={1.6} />,
       disabled: !hasSelection,
     },
     {
       id: 'materials',
       label: 'Finish',
       testId: 'overlay-launch-finish',
-      icon: <Palette size={20} />,
+      icon: <Palette size={20} strokeWidth={1.6} />,
       disabled: !hasSelection,
     },
   ];
