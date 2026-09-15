@@ -5,7 +5,7 @@ import { useAppStore } from './state/useAppStore';
 import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
 import { IPadHeader } from './components/layout/iPadHeader';
-import { OverlayLaunchTab } from './components/layout/OverlayChrome';
+import { CanvasReturnButton, OverlayLaunchTab } from './components/layout/OverlayChrome';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { MaterialPicker } from './components/inspector/MaterialPicker';
@@ -22,6 +22,7 @@ export const App: React.FC = () => {
     openOverlay,
     resetOverlaysForLayout,
     setOverlayOpen,
+    dismissOverlays,
   } = useAppStore();
   const isPhone = useIsPhone();
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -52,9 +53,21 @@ export const App: React.FC = () => {
   const showLaunchers = !isPhone || !anyOverlayOpen;
 
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
+    <div className="editor-root">
       {/* 3D Furniture Viewport */}
       <FurnitureCanvas />
+
+      {isPhone && anyOverlayOpen && (
+        <div
+          className="overlay-backdrop"
+          data-testid="overlay-backdrop"
+          onPointerUp={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dismissOverlays();
+          }}
+        />
+      )}
 
       {/* iPad Top Header Toolbar */}
       <IPadHeader
@@ -87,6 +100,10 @@ export const App: React.FC = () => {
           placement="right-bottom"
           onOpen={() => openOverlay('materials', isPhone)}
         />
+      )}
+
+      {anyOverlayOpen && (
+        <CanvasReturnButton onHide={dismissOverlays} />
       )}
 
       {/* Left Drawer Navigation (Shapes, Templates, Scene) */}

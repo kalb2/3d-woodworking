@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
+import { COMPACT_BREAKPOINT_PX, isCompactChrome } from '../utils/compactLayout';
 
-/** Matches iPhone portrait and other narrow viewports where stacked overlays bury the canvas. */
-export const PHONE_BREAKPOINT_PX = 768;
-
-function readIsPhone(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.innerWidth < PHONE_BREAKPOINT_PX;
-}
-
+/** iPhone / compact chrome — not just CSS innerWidth (unreliable in Capacitor WKWebView). */
 export function useIsPhone(): boolean {
-  const [isPhone, setIsPhone] = useState(readIsPhone);
+  const [isPhone, setIsPhone] = useState(isCompactChrome);
 
   useEffect(() => {
-    const media = window.matchMedia(`(max-width: ${PHONE_BREAKPOINT_PX - 1}px)`);
-    const sync = () => setIsPhone(media.matches);
+    const sync = () => setIsPhone(isCompactChrome());
     sync();
+
+    const media = window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT_PX - 1}px)`);
     media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
+    window.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', sync);
+    window.visualViewport?.addEventListener('resize', sync);
+
+    return () => {
+      media.removeEventListener('change', sync);
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('orientationchange', sync);
+      window.visualViewport?.removeEventListener('resize', sync);
+    };
   }, []);
 
   return isPhone;

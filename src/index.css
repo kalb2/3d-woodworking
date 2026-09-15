@@ -55,6 +55,7 @@
 html, body, #root {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background-color: var(--bg-dark);
   color: var(--text-main);
@@ -86,6 +87,9 @@ html, body, #root {
   font-weight: 500;
   font-size: 13.5px;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
@@ -175,14 +179,17 @@ html, body, #root {
 
 .overlay-dismiss-btn {
   flex-shrink: 0;
-  padding: 6px 10px;
-  min-height: 36px;
-  min-width: 36px;
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
   font-size: 13px;
   font-weight: 600;
   background: var(--accent-primary-subtle);
   border-color: var(--accent-primary-glow);
   color: var(--accent-primary);
+  touch-action: manipulation;
+  position: relative;
+  z-index: 2;
 }
 
 .overlay-dismiss-btn:hover {
@@ -193,10 +200,72 @@ html, body, #root {
 
 .overlay-launch-tab {
   position: absolute;
-  z-index: 21;
+  z-index: 45;
   padding: 10px 12px;
-  min-height: 42px;
+  min-height: 44px;
   pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.overlay-launch-tab-left {
+  top: calc(88px + env(safe-area-inset-top, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+}
+
+.overlay-launch-tab-right-top {
+  top: calc(88px + env(safe-area-inset-top, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+}
+
+.overlay-launch-tab-right-bottom {
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: rgba(15, 23, 42, 0.18);
+  touch-action: manipulation;
+}
+
+.canvas-return-btn {
+  position: absolute;
+  z-index: 60;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 18px;
+  min-height: 48px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  gap: 8px;
+  pointer-events: auto;
+  touch-action: manipulation;
+  background: var(--accent-primary);
+  color: #ffffff;
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 8px 24px var(--accent-primary-glow);
+}
+
+.editor-root {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+}
+
+.project-overlay {
+  z-index: 40;
+}
+
+.editor-header {
+  overflow: hidden;
+  max-width: 100%;
+  top: calc(12px + env(safe-area-inset-top, 0px));
 }
 
 /* ============================================

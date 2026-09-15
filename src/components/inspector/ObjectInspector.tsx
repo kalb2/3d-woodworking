@@ -86,15 +86,19 @@ export const ObjectInspector: React.FC = () => {
       data-testid="overlay-inspector"
       style={{
         position: 'absolute',
-        top: isPhone ? 72 : 88,
-        right: isPhone ? 8 : 16,
-        left: isPhone ? 8 : 'auto',
+        top: isPhone ? 'calc(72px + env(safe-area-inset-top, 0px))' : 88,
+        right: isPhone ? 'calc(8px + env(safe-area-inset-right, 0px))' : 16,
+        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 'auto',
         width: isPhone ? 'auto' : 320,
         borderRadius: 16,
-        zIndex: 16,
+        zIndex: 40,
         padding: 16,
-        maxHeight: isPhone ? 'calc(100vh - 140px)' : 'calc(100vh - 120px)',
+        paddingBottom: isPhone ? 72 : 16,
+        maxHeight: isPhone
+          ? 'calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+          : 'calc(100vh - 120px)',
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         display: 'flex',
         flexDirection: 'column',
         gap: 16
