@@ -68,6 +68,7 @@ export const PhoneCanvasHeader: React.FC = () => {
         <span className="phone-header-project-name">
           {currentProject?.name || 'My Project'}
         </span>
+        <span className="phone-header-sep" aria-hidden="true">/</span>
         <PhoneTapButton
           className="phone-header-unit"
           onTap={cycleUnit}

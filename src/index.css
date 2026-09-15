@@ -341,6 +341,13 @@ html, body, #root {
   min-width: 0;
 }
 
+.phone-header-sep {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .phone-header-unit {
   flex-shrink: 0;
   border: none;
