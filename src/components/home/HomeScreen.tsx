@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   FolderOpen,
   Sliders,
@@ -18,17 +18,21 @@ import {
   Sparkles,
   Share2,
   Box,
-  Compass
+  Compass,
+  X
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportProjectJSON, importProjectFromJSON, copyProjectToClipboard } from '../../utils/exportUtils';
 
 export const HomeScreen: React.FC = () => {
+  const isPhone = useIsPhone();
   const [activeTab, setActiveTab] = useState<'projects' | 'presets' | 'profile' | 'community' | 'tutorials'>('projects');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -115,6 +119,7 @@ export const HomeScreen: React.FC = () => {
         const imported = importProjectFromJSON(content);
         if (imported) {
           importProject(imported);
+          setIsImportSheetOpen(false);
           showToast(`Imported "${imported.name}" successfully!`);
           handleOpenProject(imported.id);
         } else {
@@ -128,8 +133,17 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isImportSheetOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsImportSheetOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isImportSheetOpen]);
+
   return (
-    <div className="home-screen">
+    <div className={`home-screen${isPhone ? ' is-phone' : ''}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="toast">
@@ -147,14 +161,21 @@ export const HomeScreen: React.FC = () => {
         style={{ display: 'none' }}
       />
 
-      {/* Header */}
+      {/* Header — phone: brand only. Create/import live in the FAB bar. */}
       <header className="home-header">
-        <div>
-          <h1>3D Woodworking</h1>
-          <div className="subtitle">Precision Woodworking & Parametric 3D Mockup Builder</div>
+        <div className="home-brand">
+          <div className="home-brand-mark" aria-hidden="true">
+            <Box size={isPhone ? 18 : 22} />
+          </div>
+          <div className="home-brand-text">
+            <h1>3D Woodworking</h1>
+            {!isPhone && (
+              <div className="subtitle">Precision Woodworking & Parametric 3D Mockup Builder</div>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="home-header-actions">
           <button
             className="glass-button"
             onClick={() => fileInputRef.current?.click()}
@@ -189,7 +210,7 @@ export const HomeScreen: React.FC = () => {
           onClick={() => setActiveTab('presets')}
         >
           <Sliders size={18} />
-          <span>Presets & Preferences</span>
+          <span>{isPhone ? 'Presets' : 'Presets & Preferences'}</span>
         </button>
 
         <button
@@ -222,7 +243,7 @@ export const HomeScreen: React.FC = () => {
         {/* PROJECTS TAB */}
         {activeTab === 'projects' && (
           <div className="projects-grid">
-            {/* New Project Action Card */}
+            {/* Desktop / iPad create card — phone uses the FAB instead */}
             <div className="new-project-card" onClick={handleCreateNew}>
               <div className="icon-circle">
                 <Plus size={28} />
@@ -650,6 +671,71 @@ export const HomeScreen: React.FC = () => {
           </div>
         )}
       </main>
+
+      <div className="home-fab-bar" data-testid="home-fab-bar">
+        <button
+          type="button"
+          className="home-fab-import"
+          onClick={() => setIsImportSheetOpen(true)}
+          title="Import project JSON"
+          aria-label="Import project JSON"
+          data-testid="home-fab-import"
+        >
+          <Upload size={20} />
+        </button>
+        <button
+          type="button"
+          className="home-fab-create"
+          onClick={handleCreateNew}
+          title="New Project"
+          aria-label="New Project"
+          data-testid="home-fab-create"
+        >
+          <Plus size={20} />
+          <span>New Project</span>
+        </button>
+      </div>
+
+      {isImportSheetOpen && (
+        <div
+          className="home-import-backdrop"
+          onClick={() => setIsImportSheetOpen(false)}
+          data-testid="import-sheet-backdrop"
+        >
+          <div
+            className="home-import-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-sheet-title"
+            onClick={(event) => event.stopPropagation()}
+            data-testid="import-sheet"
+          >
+            <div className="home-import-sheet-header">
+              <h2 id="import-sheet-title">Import JSON</h2>
+              <button
+                type="button"
+                className="home-import-sheet-close"
+                onClick={() => setIsImportSheetOpen(false)}
+                aria-label="Close import"
+                data-testid="import-sheet-close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="home-import-sheet-copy">
+              Choose a saved project JSON file to add it to your library.
+            </p>
+            <button
+              type="button"
+              className="glass-button active home-import-sheet-pick"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={18} />
+              <span>Choose JSON file</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
