@@ -2,6 +2,10 @@ import React from 'react';
 import { Eye, X } from 'lucide-react';
 import { fireReliableTap } from '../../utils/reliableTap';
 
+export const PhoneSheetGrab: React.FC = () => (
+  <div className="phone-sheet-grab" aria-hidden="true" />
+);
+
 interface OverlayDismissButtonProps {
   onDismiss: () => void;
   label?: string;

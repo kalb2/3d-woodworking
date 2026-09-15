@@ -17,7 +17,8 @@ import {
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
+import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
 import type { ShapeType } from '../../types/furniture';
 
 export const SidebarNav: React.FC = () => {
@@ -52,14 +53,19 @@ export const SidebarNav: React.FC = () => {
 
   return (
     <aside
-      className="glass-panel project-overlay project-overlay-sidebar"
+      className={`glass-panel project-overlay project-overlay-sidebar${isPhone ? ' phone-bottom-sheet' : ''}`}
       data-testid="overlay-sidebar"
-      style={{
+      style={isPhone ? {
+        ...PHONE_SHEET_STYLE,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      } : {
         position: 'absolute',
-        top: isPhone ? 'calc(72px + env(safe-area-inset-top, 0px))' : 88,
-        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 16,
-        bottom: isPhone ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 24,
-        width: isPhone ? 'min(280px, calc(100vw - 56px))' : 280,
+        top: 88,
+        left: 16,
+        bottom: 24,
+        width: 280,
         borderRadius: 16,
         zIndex: 40,
         display: 'flex',
@@ -67,6 +73,7 @@ export const SidebarNav: React.FC = () => {
         overflow: 'hidden'
       }}
     >
+      {isPhone && <PhoneSheetGrab />}
       <div style={{
         display: 'flex',
         alignItems: 'center',

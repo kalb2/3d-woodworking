@@ -3,7 +3,8 @@ import { RotateCw, Copy, Trash2, Type } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
+import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -82,21 +83,26 @@ export const ObjectInspector: React.FC = () => {
 
   return (
     <div
-      className="glass-panel project-overlay project-overlay-inspector"
+      className={`glass-panel project-overlay project-overlay-inspector${isPhone ? ' phone-bottom-sheet' : ''}`}
       data-testid="overlay-inspector"
-      style={{
+      style={isPhone ? {
+        ...PHONE_SHEET_STYLE,
+        padding: 16,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16
+      } : {
         position: 'absolute',
-        top: isPhone ? 'calc(72px + env(safe-area-inset-top, 0px))' : 88,
-        right: isPhone ? 'calc(8px + env(safe-area-inset-right, 0px))' : 16,
-        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 'auto',
-        width: isPhone ? 'auto' : 320,
+        top: 88,
+        right: 16,
+        left: 'auto',
+        width: 320,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
-        paddingBottom: isPhone ? 72 : 16,
-        maxHeight: isPhone
-          ? 'calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
-          : 'calc(100vh - 120px)',
+        maxHeight: 'calc(100vh - 120px)',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         display: 'flex',
@@ -104,6 +110,7 @@ export const ObjectInspector: React.FC = () => {
         gap: 16
       }}
     >
+      {isPhone && <PhoneSheetGrab />}
       {/* Object Header & Rename */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
