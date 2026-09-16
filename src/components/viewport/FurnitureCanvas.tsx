@@ -15,7 +15,8 @@ export const FurnitureCanvas: React.FC = () => {
     activeProjectId,
     selectedObjectId,
     selectObject,
-    activeGizmoMode
+    activeGizmoMode,
+    showDimensions,
   } = useProjectStore();
 
   const { preferences } = useAppStore();
@@ -104,11 +105,12 @@ export const FurnitureCanvas: React.FC = () => {
         {/* Active Selected Object Controls */}
         {selectedObject && (
           <>
-            {/* Dimension callout HUD overlay */}
-            <DimensionOverlay
-              object={selectedObject}
-              unit={currentProject.unit}
-            />
+            {showDimensions && (
+              <DimensionOverlay
+                object={selectedObject}
+                unit={currentProject.unit}
+              />
+            )}
 
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (

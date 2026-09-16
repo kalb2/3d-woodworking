@@ -6,6 +6,11 @@ import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
 import { IPadHeader } from './components/layout/iPadHeader';
 import { CanvasReturnButton, OverlayLaunchTab } from './components/layout/OverlayChrome';
+import {
+  PhoneBottomSheet,
+  PhoneCanvasHeader,
+  PhoneMenuSheet,
+} from './components/layout/PhoneCanvasChrome';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { MaterialPicker } from './components/inspector/MaterialPicker';
@@ -49,11 +54,16 @@ export const App: React.FC = () => {
   }
 
   const hasSelection = Boolean(selectedObjectId);
-  const anyOverlayOpen = overlays.sidebar || overlays.inspector || overlays.materials;
-  const showLaunchers = !isPhone || !anyOverlayOpen;
+  const anyOverlayOpen =
+    overlays.sidebar ||
+    overlays.inspector ||
+    overlays.materials ||
+    overlays.tools ||
+    overlays.menu;
+  const showDesktopLaunchers = !isPhone;
 
   return (
-    <div className="editor-root">
+    <div className={`editor-root${isPhone ? ' is-phone' : ''}`}>
       {/* 3D Furniture Viewport */}
       <FurnitureCanvas />
 
@@ -69,13 +79,30 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* iPad Top Header Toolbar */}
-      <IPadHeader
-        onOpenProjectModal={() => setIsProjectModalOpen(true)}
-        onOpenCutList={() => setIsCutListOpen(true)}
-      />
+      {isPhone ? (
+        <PhoneCanvasHeader />
+      ) : (
+        <IPadHeader
+          onOpenProjectModal={() => setIsProjectModalOpen(true)}
+          onOpenCutList={() => setIsCutListOpen(true)}
+        />
+      )}
 
-      {showLaunchers && !overlays.sidebar && (
+      {isPhone && (
+        <>
+          <PhoneBottomSheet hasSelection={hasSelection}>
+            <SidebarNav />
+            <ObjectInspector />
+            <MaterialPicker />
+          </PhoneBottomSheet>
+          <PhoneMenuSheet
+            onOpenProjectModal={() => setIsProjectModalOpen(true)}
+            onOpenCutList={() => setIsCutListOpen(true)}
+          />
+        </>
+      )}
+
+      {showDesktopLaunchers && !overlays.sidebar && (
         <OverlayLaunchTab
           label="Shapes"
           icon={<Box size={16} color="#e09f3e" />}
@@ -84,7 +111,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {showLaunchers && !overlays.inspector && hasSelection && (
+      {showDesktopLaunchers && !overlays.inspector && hasSelection && (
         <OverlayLaunchTab
           label="Properties"
           icon={<SlidersHorizontal size={16} color="#e09f3e" />}
@@ -93,7 +120,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {showLaunchers && !overlays.materials && hasSelection && (
+      {showDesktopLaunchers && !overlays.materials && hasSelection && (
         <OverlayLaunchTab
           label="Finish"
           icon={<Palette size={16} color="#e09f3e" />}
@@ -106,14 +133,13 @@ export const App: React.FC = () => {
         <CanvasReturnButton onHide={dismissOverlays} />
       )}
 
-      {/* Left Drawer Navigation (Shapes, Templates, Scene) */}
-      <SidebarNav />
-
-      {/* Right Inspector Panel (Numeric Dimensions, Rotation, Position) */}
-      <ObjectInspector />
-
-      {/* Bottom Right Real Wood Material Palette */}
-      <MaterialPicker />
+      {!isPhone && (
+        <>
+          <SidebarNav />
+          <ObjectInspector />
+          <MaterialPicker />
+        </>
+      )}
 
       {/* Modals */}
       <ProjectModal

@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
+import { SELECTION_COLOR } from '../../theme/canvasSelection';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -153,7 +154,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
       {/* Bounding box outline aligned with object rotation */}
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[length + 0.3, height + 0.3, width + 0.3]} />
-        <meshBasicMaterial color="#e09f3e" wireframe transparent opacity={0.5} />
+        <meshBasicMaterial color={SELECTION_COLOR} wireframe transparent opacity={0.45} />
       </mesh>
 
       {/* Axis Handle Spheres */}

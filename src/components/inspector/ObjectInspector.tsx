@@ -4,6 +4,8 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
+import { useReliableTap } from '../../utils/reliableTap';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -17,6 +19,13 @@ export const ObjectInspector: React.FC = () => {
     duplicateObject,
     setUnit
   } = useProjectStore();
+
+  const handleDuplicate = useReliableTap(() => {
+    if (selectedObjectId) duplicateObject(selectedObjectId);
+  });
+  const handleDelete = useReliableTap(() => {
+    if (selectedObjectId) deleteObject(selectedObjectId);
+  });
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   if (!overlays.inspector || !currentProject || !selectedObjectId) return null;
@@ -82,21 +91,24 @@ export const ObjectInspector: React.FC = () => {
 
   return (
     <div
-      className="glass-panel project-overlay project-overlay-inspector"
+      className={`project-overlay project-overlay-inspector${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-inspector"
-      style={{
+      style={isPhone ? {
+        ...PHONE_SHEET_EMBEDDED_STYLE,
+        padding: '0 16px 12px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        gap: 16
+      } : {
         position: 'absolute',
-        top: isPhone ? 'calc(72px + env(safe-area-inset-top, 0px))' : 88,
-        right: isPhone ? 'calc(8px + env(safe-area-inset-right, 0px))' : 16,
-        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 'auto',
-        width: isPhone ? 'auto' : 320,
+        top: 88,
+        right: 16,
+        left: 'auto',
+        width: 320,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
-        paddingBottom: isPhone ? 72 : 16,
-        maxHeight: isPhone
-          ? 'calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
-          : 'calc(100vh - 120px)',
+        maxHeight: 'calc(100vh - 120px)',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         display: 'flex',
@@ -284,19 +296,23 @@ export const ObjectInspector: React.FC = () => {
       </div>
 
       {/* QUICK ACTIONS */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <div className="inspector-quick-actions" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button
           className="glass-button"
-          onClick={() => duplicateObject(object.id)}
+          onClick={handleDuplicate}
+          onPointerUp={handleDuplicate}
           style={{ flex: 1 }}
+          data-testid="inspector-duplicate"
         >
           <Copy size={16} /> Duplicate
         </button>
 
         <button
           className="glass-button"
-          onClick={() => deleteObject(object.id)}
+          onClick={handleDelete}
+          onPointerUp={handleDelete}
           style={{ flex: 1, borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+          data-testid="inspector-delete"
         >
           <Trash2 size={16} /> Delete
         </button>

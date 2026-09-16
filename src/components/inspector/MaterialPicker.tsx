@@ -4,6 +4,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { PRESET_WOOD_MATERIALS } from '../../utils/woodTextureGenerator';
 import type { WoodSpecies } from '../../types/furniture';
 
@@ -66,25 +67,28 @@ export const MaterialPicker: React.FC = () => {
 
   return (
     <div
-      className="glass-panel project-overlay project-overlay-materials"
+      className={`project-overlay project-overlay-materials${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-materials"
-      style={{
+      style={isPhone ? {
+        ...PHONE_SHEET_EMBEDDED_STYLE,
+        padding: '0 16px 12px',
+        gap: 12,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      } : {
         position: 'absolute',
-        bottom: isPhone ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 24,
-        right: isPhone ? 'calc(8px + env(safe-area-inset-right, 0px))' : 16,
-        left: isPhone ? 'calc(8px + env(safe-area-inset-left, 0px))' : 'auto',
-        width: isPhone ? 'auto' : 320,
+        bottom: 24,
+        right: 16,
+        left: 'auto',
+        width: 320,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
-        maxHeight: isPhone
-          ? 'calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
-          : 'none',
-        overflowY: isPhone ? 'auto' : 'visible',
-        WebkitOverflowScrolling: isPhone ? 'touch' : undefined
+        maxHeight: 'none',
+        overflowY: 'visible'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>

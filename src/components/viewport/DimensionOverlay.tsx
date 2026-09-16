@@ -1,6 +1,7 @@
 import React from 'react';
 import { Html } from '@react-three/drei';
 import type { FurnitureObject } from '../../types/furniture';
+import { useIsPhone } from '../../hooks/useIsPhone';
 
 interface DimensionOverlayProps {
   object: FurnitureObject;
@@ -8,6 +9,7 @@ interface DimensionOverlayProps {
 }
 
 export const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ object, unit }) => {
+  const isPhone = useIsPhone();
   const { length, width, height } = object.dimensions;
   const { x, y, z } = object.position;
 
@@ -23,18 +25,18 @@ export const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ object, unit
     <group position={[x, y + height / 2 + 2, z]}>
       <Html center distanceFactor={25}>
         <div style={{
-          background: 'rgba(15, 17, 23, 0.88)',
-          border: '1px solid rgba(224, 159, 62, 0.6)',
-          borderRadius: '8px',
-          padding: '6px 12px',
-          color: '#ffffff',
+          background: isPhone ? 'rgba(255, 255, 255, 0.88)' : 'rgba(15, 17, 23, 0.88)',
+          border: isPhone ? '1px solid rgba(15, 23, 42, 0.08)' : '1px solid rgba(224, 159, 62, 0.6)',
+          borderRadius: isPhone ? '999px' : '8px',
+          padding: isPhone ? '4px 10px' : '6px 12px',
+          color: isPhone ? '#0f172a' : '#ffffff',
           fontFamily: 'Inter, sans-serif',
-          fontSize: '12px',
+          fontSize: isPhone ? '11px' : '12px',
           fontWeight: 600,
           whiteSpace: 'nowrap',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          boxShadow: isPhone ? '0 4px 14px rgba(15, 23, 42, 0.08)' : '0 4px 16px rgba(0,0,0,0.5)',
           display: 'flex',
-          gap: '8px',
+          gap: isPhone ? '6px' : '8px',
           alignItems: 'center',
           pointerEvents: 'none'
         }}>
