@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
-import { GizmoScale, ResizeCube } from './gizmoLook';
+import { FacePad, GizmoScale } from './gizmoLook';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -33,7 +33,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
-  const offset = 1.55;
+  const offset = 0;
   const worldAnchor: [number, number, number] = [x, y, z];
 
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
@@ -150,7 +150,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
       {handles.map(({ axis, pos, color }) => (
         <group key={axis} position={pos}>
           <GizmoScale anchor={worldAnchor}>
-            <ResizeCube
+            <FacePad
               axis={axis}
               color={color}
               active={activeAxis === axis}

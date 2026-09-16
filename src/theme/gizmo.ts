@@ -6,9 +6,9 @@ export const GIZMO_AXIS = {
   z: '#007AFF',
 } as const;
 
-export const GIZMO_HUB_FILL = '#D8DEE6';
-export const GIZMO_HUB_EDGE = '#8E99A6';
-export const GIZMO_HUB_CHEVRON = '#6E7B8A';
+export const GIZMO_HUB_FILL = '#F3F5F8';
+export const GIZMO_HUB_EDGE = '#C5CDD6';
+export const GIZMO_HUB_CHEVRON = '#8A96A3';
 
 /**
  * World-unit size of the gizmo at this camera distance.

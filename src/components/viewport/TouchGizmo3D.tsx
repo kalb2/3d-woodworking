@@ -5,7 +5,7 @@ import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
 import { GIZMO_AXIS } from '../../theme/gizmo';
-import { AxisArrow, GizmoScale, MoveHub, RotateArc, RotateHub } from './gizmoLook';
+import { AxisArrow, GizmoScale, MoveHub, RotateRing } from './gizmoLook';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
@@ -223,10 +223,9 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   return (
     <group position={objPos}>
       <GizmoScale anchor={objPos}>
-        <RotateArc axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
-        <RotateArc axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
-        <RotateArc axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
-        <RotateHub />
+        <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
+        <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
+        <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
       </GizmoScale>
     </group>
   );

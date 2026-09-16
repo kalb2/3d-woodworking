@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Line } from '@react-three/drei';
+import { Line, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import {
@@ -37,25 +37,32 @@ export const GizmoScale: React.FC<{
   );
 };
 
-export const GizmoMaterial: React.FC<{ color: string; active?: boolean }> = ({ color, active = false }) => (
+export const GizmoMaterial: React.FC<{
+  color: string;
+  active?: boolean;
+  opacity?: number;
+}> = ({ color, active = false, opacity = 1 }) => (
   <meshStandardMaterial
     color={color}
-    roughness={0.38}
+    roughness={0.36}
     metalness={0.04}
     emissive={color}
-    emissiveIntensity={active ? 0.32 : 0.16}
+    emissiveIntensity={active ? 0.3 : 0.14}
     depthTest={false}
+    depthWrite={opacity >= 1}
     toneMapped={false}
+    transparent={opacity < 1}
+    opacity={opacity}
   />
 );
 
-const SHAFT_START = 1.65;
-const SHAFT_LENGTH = 3.7;
-const SHAFT_RADIUS = 0.58;
-const CONE_LENGTH = 2.55;
-const CONE_RADIUS = 1.28;
-const ARROW_HIT_RADIUS = 3.8;
-const ARROW_HIT_EXTRA = 2.8;
+const SHAFT_START = 1.55;
+const SHAFT_LENGTH = 3.45;
+const SHAFT_RADIUS = 0.4;
+const CONE_LENGTH = 2.2;
+const CONE_RADIUS = 1.08;
+const ARROW_HIT_RADIUS = 3.5;
+const ARROW_HIT_EXTRA = 2.6;
 
 const AXIS_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   x: [0, 0, -Math.PI / 2],
@@ -69,7 +76,7 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   z: [0, 0, 0],
 };
 
-/** Fat Moblo-style axis arrow — thick shaft + cone, oversized invisible hit cylinder. */
+/** Moblo move arrow: thick shaft + cone clearly wider than the shaft. */
 export const AxisArrow: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
@@ -106,13 +113,13 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 1.28;
-const HUB_THICKNESS = 0.42;
-const CHEVRON_RADIUS = 0.48;
-const CHEVRON_LENGTH = 1.05;
-const HUB_HIT_RADIUS = 3.35;
+const HUB_RADIUS = 1.18;
+const HUB_THICKNESS = 0.36;
+const CHEVRON_RADIUS = 0.34;
+const CHEVRON_LENGTH = 0.72;
+const HUB_HIT_RADIUS = 3.2;
 
-/** Light circular hub with four planar chevrons — Moblo’s center move widget. */
+/** White/light hub with planar compass chevrons. */
 export const MoveHub: React.FC<{
   active: boolean;
   onPointerDown: (event: any) => void;
@@ -121,11 +128,11 @@ export const MoveHub: React.FC<{
     return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle) => {
       const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
       const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.22;
+      const reach = HUB_RADIUS * 0.42;
       return {
         angle,
         quaternion,
-        position: [dir.x * reach, 0, dir.z * reach] as [number, number, number],
+        position: [dir.x * reach, HUB_THICKNESS * 0.2, dir.z * reach] as [number, number, number],
       };
     });
   }, []);
@@ -133,11 +140,11 @@ export const MoveHub: React.FC<{
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
-        <cylinderGeometry args={[HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 28]} />
+        <cylinderGeometry args={[HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 32]} />
         <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-        <torusGeometry args={[HUB_RADIUS, 0.11, 8, 28]} />
+        <torusGeometry args={[HUB_RADIUS, 0.08, 8, 32]} />
         <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
       </mesh>
       {chevrons.map((chevron) => (
@@ -161,60 +168,60 @@ export const MoveHub: React.FC<{
           onPointerDown(event);
         }}
       >
-        <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 1.15, 20]} />
+        <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 1.2, 20]} />
         <meshBasicMaterial visible={false} depthTest={false} />
       </mesh>
     </group>
   );
 };
 
-const RING_RADIUS = 6.6;
-const RING_TUBE = 0.5;
-const RING_HIT_TUBE = 2.6;
-const ARC_ANGLE = Math.PI * 0.72;
-const ARC_CONE_LENGTH = 1.45;
-const ARC_CONE_RADIUS = 0.85;
+const RING_RADIUS = 7.1;
+const RING_TUBE = 0.13;
+const PILL_TUBE = 0.78;
+const PILL_ARC = Math.PI * 0.3;
+const RING_HIT_TUBE = 2.5;
 
-function arcCone(angle: number, towardIncreasing: boolean) {
-  const x = RING_RADIUS * Math.cos(angle);
-  const y = RING_RADIUS * Math.sin(angle);
-  const tx = towardIncreasing ? -Math.sin(angle) : Math.sin(angle);
-  const ty = towardIncreasing ? Math.cos(angle) : -Math.cos(angle);
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(tx, ty, 0).normalize()
-  );
-  const inset = ARC_CONE_LENGTH * 0.28;
-  return {
-    position: [x + tx * (ARC_CONE_LENGTH / 2 - inset), y + ty * (ARC_CONE_LENGTH / 2 - inset), 0] as [number, number, number],
-    quaternion,
-  };
-}
+const PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
+  x: Math.PI * 0.22,
+  y: Math.PI * 0.38,
+  z: Math.PI * 0.58,
+};
 
-/** Partial torus + arrowheads — a rotate affordance you can actually read on a phone. */
-export const RotateArc: React.FC<{
+/** Full RGB ring + fat curved pill grip (Moblo rotate). */
+export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, onPointerDown }) => {
-  const start = useMemo(() => arcCone(0, false), []);
-  const end = useMemo(() => arcCone(ARC_ANGLE, true), []);
+  const pillAngle = PILL_ANGLE[axis];
+  const endA: [number, number, number] = [RING_RADIUS, 0, 0];
+  const endB: [number, number, number] = [
+    RING_RADIUS * Math.cos(PILL_ARC),
+    RING_RADIUS * Math.sin(PILL_ARC),
+    0,
+  ];
 
   return (
     <group rotation={RING_ROTATION[axis]}>
-      <mesh renderOrder={12} frustumCulled={false}>
-        <torusGeometry args={[RING_RADIUS, RING_TUBE, 12, 56, ARC_ANGLE]} />
-        <GizmoMaterial color={color} active={active} />
+      <mesh renderOrder={11} frustumCulled={false}>
+        <torusGeometry args={[RING_RADIUS, RING_TUBE, 12, 80]} />
+        <GizmoMaterial color={color} active={active} opacity={0.92} />
       </mesh>
-      <mesh position={start.position} quaternion={start.quaternion} renderOrder={12} frustumCulled={false}>
-        <coneGeometry args={[ARC_CONE_RADIUS, ARC_CONE_LENGTH, 16]} />
-        <GizmoMaterial color={color} active={active} />
-      </mesh>
-      <mesh position={end.position} quaternion={end.quaternion} renderOrder={12} frustumCulled={false}>
-        <coneGeometry args={[ARC_CONE_RADIUS, ARC_CONE_LENGTH, 16]} />
-        <GizmoMaterial color={color} active={active} />
-      </mesh>
+      <group rotation={[0, 0, pillAngle]}>
+        <mesh renderOrder={13} frustumCulled={false}>
+          <torusGeometry args={[RING_RADIUS, PILL_TUBE, 16, 28, PILL_ARC]} />
+          <GizmoMaterial color={color} active={active} />
+        </mesh>
+        <mesh position={endA} renderOrder={13} frustumCulled={false}>
+          <sphereGeometry args={[PILL_TUBE, 16, 12]} />
+          <GizmoMaterial color={color} active={active} />
+        </mesh>
+        <mesh position={endB} renderOrder={13} frustumCulled={false}>
+          <sphereGeometry args={[PILL_TUBE, 16, 12]} />
+          <GizmoMaterial color={color} active={active} />
+        </mesh>
+      </group>
       <mesh
         renderOrder={22}
         frustumCulled={false}
@@ -223,63 +230,58 @@ export const RotateArc: React.FC<{
           onPointerDown(event);
         }}
       >
-        <torusGeometry args={[RING_RADIUS, RING_HIT_TUBE, 8, 40, ARC_ANGLE]} />
+        <torusGeometry args={[RING_RADIUS, RING_HIT_TUBE, 8, 56]} />
         <meshBasicMaterial visible={false} depthTest={false} />
       </mesh>
     </group>
   );
 };
 
-export const RotateHub: React.FC = () => (
-  <mesh renderOrder={13} frustumCulled={false}>
-    <sphereGeometry args={[0.72, 20, 16]} />
-    <GizmoMaterial color={GIZMO_HUB_FILL} />
-  </mesh>
-);
+const PAD = 2.2;
+const PAD_THICK = 0.58;
+const PAD_RADIUS = 0.22;
 
-const RESIZE_CUBE = 1.95;
-const RESIZE_STUB = 2.4;
-
-const RESIZE_STUB_XFORM: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', { rot: [number, number, number]; pos: [number, number, number] }> = {
-  '+x': { rot: [0, 0, -Math.PI / 2], pos: [-RESIZE_STUB / 2, 0, 0] },
-  '-x': { rot: [0, 0, -Math.PI / 2], pos: [RESIZE_STUB / 2, 0, 0] },
-  '+y': { rot: [0, 0, 0], pos: [0, -RESIZE_STUB / 2, 0] },
-  '-y': { rot: [0, 0, 0], pos: [0, RESIZE_STUB / 2, 0] },
-  '+z': { rot: [Math.PI / 2, 0, 0], pos: [0, 0, -RESIZE_STUB / 2] },
-  '-z': { rot: [Math.PI / 2, 0, 0], pos: [0, 0, RESIZE_STUB / 2] },
+const FACE_ROTATION: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', [number, number, number]> = {
+  '+x': [0, 0, -Math.PI / 2],
+  '-x': [0, 0, Math.PI / 2],
+  '+y': [0, 0, 0],
+  '-y': [Math.PI, 0, 0],
+  '+z': [Math.PI / 2, 0, 0],
+  '-z': [-Math.PI / 2, 0, 0],
 };
 
-export const ResizeCube: React.FC<{
+/** Moblo resize: rounded RGB face pad sitting on the part face. */
+export const FacePad: React.FC<{
   axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, onPointerDown }) => {
-  const stub = RESIZE_STUB_XFORM[axis];
-  return (
-    <group>
-      <mesh rotation={stub.rot} position={stub.pos} renderOrder={11} frustumCulled={false}>
-        <cylinderGeometry args={[0.32, 0.32, RESIZE_STUB, 14]} />
-        <GizmoMaterial color={color} active={active} />
-      </mesh>
-      <mesh renderOrder={12} frustumCulled={false}>
-        <boxGeometry args={[RESIZE_CUBE, RESIZE_CUBE, RESIZE_CUBE]} />
-        <GizmoMaterial color={color} active={active} />
-      </mesh>
-      <mesh
-        renderOrder={22}
-        frustumCulled={false}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onPointerDown(event);
-        }}
-      >
-        <sphereGeometry args={[3.45, 12, 12]} />
-        <meshBasicMaterial visible={false} depthTest={false} />
-      </mesh>
-    </group>
-  );
-};
+}> = ({ axis, color, active, onPointerDown }) => (
+  <group rotation={FACE_ROTATION[axis]}>
+    <RoundedBox
+      args={[PAD, PAD_THICK, PAD]}
+      radius={PAD_RADIUS}
+      smoothness={4}
+      position={[0, PAD_THICK / 2, 0]}
+      renderOrder={12}
+      frustumCulled={false}
+    >
+      <GizmoMaterial color={color} active={active} />
+    </RoundedBox>
+    <mesh
+      position={[0, PAD_THICK / 2, 0]}
+      renderOrder={22}
+      frustumCulled={false}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        onPointerDown(event);
+      }}
+    >
+      <boxGeometry args={[PAD + 1.5, PAD_THICK + 1.8, PAD + 1.5]} />
+      <meshBasicMaterial visible={false} depthTest={false} />
+    </mesh>
+  </group>
+);
 
 function boxOutlinePoints(length: number, height: number, width: number, pad: number): [number, number, number][] {
   const hx = length / 2 + pad;
