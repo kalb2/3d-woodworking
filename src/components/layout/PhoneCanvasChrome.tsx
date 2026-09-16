@@ -28,7 +28,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
-import { PHONE_SHEET_STYLE } from './phoneSheet';
+import { PHONE_FLOATING_SHEET_STYLE, PHONE_SHEET_EMBEDDED_STYLE } from './phoneSheet';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onTap: () => void;
@@ -137,9 +137,9 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
 
   return (
     <div
-      className="glass-panel project-overlay project-overlay-menu phone-bottom-sheet"
+      className="project-overlay project-overlay-menu phone-floating-sheet"
       data-testid="overlay-menu"
-      style={PHONE_SHEET_STYLE}
+      style={PHONE_FLOATING_SHEET_STYLE}
     >
       <PhoneSheetGrab />
       <div className="phone-sheet-header">
@@ -211,8 +211,12 @@ interface PhoneCanvasDockProps {
   hasSelection: boolean;
 }
 
-export const PhoneCanvasDock: React.FC<PhoneCanvasDockProps> = ({ hasSelection }) => {
+export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: React.ReactNode }> = ({
+  hasSelection,
+  children,
+}) => {
   const { overlays, openOverlay, setOverlayOpen } = useAppStore();
+  const toolOpen = overlays.sidebar || overlays.tools || overlays.inspector || overlays.materials;
 
   const items: Array<{
     id: 'sidebar' | 'tools' | 'inspector' | 'materials';
@@ -221,47 +225,61 @@ export const PhoneCanvasDock: React.FC<PhoneCanvasDockProps> = ({ hasSelection }
     icon: React.ReactNode;
     disabled?: boolean;
   }> = [
-    { id: 'sidebar', label: 'Parts', testId: 'overlay-launch-shapes', icon: <Box size={20} strokeWidth={1.6} /> },
-    { id: 'tools', label: 'Tools', testId: 'overlay-launch-tools', icon: <Move size={20} strokeWidth={1.6} /> },
+    { id: 'sidebar', label: 'Parts', testId: 'overlay-launch-shapes', icon: <Box size={22} strokeWidth={1.6} /> },
+    { id: 'tools', label: 'Tools', testId: 'overlay-launch-tools', icon: <Move size={22} strokeWidth={1.6} /> },
     {
       id: 'inspector',
       label: 'Properties',
       testId: 'overlay-launch-properties',
-      icon: <SlidersHorizontal size={20} strokeWidth={1.6} />,
+      icon: <SlidersHorizontal size={22} strokeWidth={1.6} />,
       disabled: !hasSelection,
     },
     {
       id: 'materials',
       label: 'Finish',
       testId: 'overlay-launch-finish',
-      icon: <Palette size={20} strokeWidth={1.6} />,
+      icon: <Palette size={22} strokeWidth={1.6} />,
       disabled: !hasSelection,
     },
   ];
 
   return (
-    <nav className="phone-canvas-dock" data-testid="phone-canvas-dock" aria-label="Canvas tools">
-      {items.map((item) => (
-        <DockItem
-          key={item.id}
-          label={item.label}
-          testId={item.testId}
-          icon={item.icon}
-          active={overlays[item.id]}
-          disabled={item.disabled}
-          onTap={() => {
-            if (item.disabled) return;
-            if (overlays[item.id]) {
-              setOverlayOpen(item.id, false);
-              return;
-            }
-            openOverlay(item.id, true);
-          }}
-        />
-      ))}
-    </nav>
+    <div
+      className={`phone-tool-sheet${toolOpen ? ' is-expanded' : ''}`}
+      data-testid="phone-canvas-dock"
+    >
+      <div className="phone-tool-sheet-handle" aria-hidden="true" />
+      {toolOpen && (
+        <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
+          {children}
+        </div>
+      )}
+      <nav className="phone-tool-sheet-tools" aria-label="Canvas tools">
+        {items.map((item) => (
+          <DockItem
+            key={item.id}
+            label={item.label}
+            testId={item.testId}
+            icon={item.icon}
+            active={overlays[item.id]}
+            disabled={item.disabled}
+            onTap={() => {
+              if (item.disabled) return;
+              if (overlays[item.id]) {
+                setOverlayOpen(item.id, false);
+                return;
+              }
+              openOverlay(item.id, true);
+            }}
+          />
+        ))}
+      </nav>
+    </div>
   );
 };
+
+/** @deprecated use PhoneBottomSheet — kept so existing imports keep type-checking during the rename */
+export const PhoneCanvasDock = PhoneBottomSheet;
 
 const DockItem: React.FC<{
   label: string;
@@ -312,11 +330,10 @@ export const PhoneToolsSheet: React.FC = () => {
 
   return (
     <div
-      className="glass-panel project-overlay project-overlay-tools phone-bottom-sheet"
+      className="project-overlay project-overlay-tools phone-sheet-embed"
       data-testid="overlay-tools"
-      style={PHONE_SHEET_STYLE}
+      style={PHONE_SHEET_EMBEDDED_STYLE}
     >
-      <PhoneSheetGrab />
       <div className="phone-sheet-header">
         <span className="phone-sheet-title">Tools</span>
         <OverlayDismissButton onDismiss={() => setOverlayOpen('tools', false)} />

@@ -7,7 +7,7 @@ import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
 import { IPadHeader } from './components/layout/iPadHeader';
 import { CanvasReturnButton, OverlayLaunchTab } from './components/layout/OverlayChrome';
 import {
-  PhoneCanvasDock,
+  PhoneBottomSheet,
   PhoneCanvasHeader,
   PhoneMenuSheet,
   PhoneToolsSheet,
@@ -91,8 +91,12 @@ export const App: React.FC = () => {
 
       {isPhone && (
         <>
-          <PhoneCanvasDock hasSelection={hasSelection} />
-          <PhoneToolsSheet />
+          <PhoneBottomSheet hasSelection={hasSelection}>
+            <SidebarNav />
+            <PhoneToolsSheet />
+            <ObjectInspector />
+            <MaterialPicker />
+          </PhoneBottomSheet>
           <PhoneMenuSheet
             onOpenProjectModal={() => setIsProjectModalOpen(true)}
             onOpenCutList={() => setIsCutListOpen(true)}
@@ -131,14 +135,13 @@ export const App: React.FC = () => {
         <CanvasReturnButton onHide={dismissOverlays} />
       )}
 
-      {/* Left Drawer Navigation (Shapes, Templates, Scene) */}
-      <SidebarNav />
-
-      {/* Right Inspector Panel (Numeric Dimensions, Rotation, Position) */}
-      <ObjectInspector />
-
-      {/* Bottom Right Real Wood Material Palette */}
-      <MaterialPicker />
+      {!isPhone && (
+        <>
+          <SidebarNav />
+          <ObjectInspector />
+          <MaterialPicker />
+        </>
+      )}
 
       {/* Modals */}
       <ProjectModal

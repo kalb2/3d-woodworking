@@ -15,3 +15,39 @@ export const PHONE_SHEET_STYLE: CSSProperties = {
   flexDirection: 'column',
   overflow: 'hidden',
 };
+
+/** Content rendered inside the floating phone tool sheet — no second frame. */
+export const PHONE_SHEET_EMBEDDED_STYLE: CSSProperties = {
+  position: 'relative',
+  top: 'auto',
+  left: 'auto',
+  right: 'auto',
+  bottom: 'auto',
+  width: '100%',
+  maxHeight: 'none',
+  borderRadius: 0,
+  zIndex: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  boxShadow: 'none',
+  border: 'none',
+  background: 'transparent',
+  backdropFilter: 'none',
+};
+
+/** Standalone phone sheets (menu) — same floating card language as the tool sheet. */
+export const PHONE_FLOATING_SHEET_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 'auto',
+  left: 12,
+  right: 12,
+  bottom: 'calc(var(--phone-sheet-float-bottom) + var(--phone-sheet-collapsed-height) + 8px)',
+  width: 'auto',
+  maxHeight: 'var(--phone-sheet-max-height)',
+  borderRadius: 24,
+  zIndex: 52,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+};

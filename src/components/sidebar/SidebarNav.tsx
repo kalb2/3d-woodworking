@@ -17,8 +17,8 @@ import {
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
-import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap } from '../../utils/reliableTap';
 import type { ShapeType } from '../../types/furniture';
 
@@ -54,13 +54,10 @@ export const SidebarNav: React.FC = () => {
 
   return (
     <aside
-      className={`glass-panel project-overlay project-overlay-sidebar${isPhone ? ' phone-bottom-sheet' : ''}`}
+      className={`project-overlay project-overlay-sidebar${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-sidebar"
       style={isPhone ? {
-        ...PHONE_SHEET_STYLE,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
+        ...PHONE_SHEET_EMBEDDED_STYLE,
       } : {
         position: 'absolute',
         top: 88,
@@ -74,7 +71,6 @@ export const SidebarNav: React.FC = () => {
         overflow: 'hidden'
       }}
     >
-      {isPhone && <PhoneSheetGrab />}
       <div className={isPhone ? 'phone-sheet-header' : undefined} style={isPhone ? undefined : {
         display: 'flex',
         alignItems: 'center',

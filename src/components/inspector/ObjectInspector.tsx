@@ -3,8 +3,8 @@ import { RotateCw, Copy, Trash2, Type } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
-import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -83,15 +83,13 @@ export const ObjectInspector: React.FC = () => {
 
   return (
     <div
-      className={`glass-panel project-overlay project-overlay-inspector${isPhone ? ' phone-bottom-sheet' : ''}`}
+      className={`project-overlay project-overlay-inspector${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-inspector"
       style={isPhone ? {
-        ...PHONE_SHEET_STYLE,
-        padding: 16,
+        ...PHONE_SHEET_EMBEDDED_STYLE,
+        padding: '0 16px 12px',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
-        display: 'flex',
-        flexDirection: 'column',
         gap: 16
       } : {
         position: 'absolute',
@@ -110,7 +108,6 @@ export const ObjectInspector: React.FC = () => {
         gap: 16
       }}
     >
-      {isPhone && <PhoneSheetGrab />}
       {/* Object Header & Rename */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

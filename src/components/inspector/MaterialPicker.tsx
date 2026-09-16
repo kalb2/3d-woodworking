@@ -3,8 +3,8 @@ import { Palette, Sparkles, Droplet } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton, PhoneSheetGrab } from '../layout/OverlayChrome';
-import { PHONE_SHEET_STYLE } from '../layout/phoneSheet';
+import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { PRESET_WOOD_MATERIALS } from '../../utils/woodTextureGenerator';
 import type { WoodSpecies } from '../../types/furniture';
 
@@ -67,13 +67,11 @@ export const MaterialPicker: React.FC = () => {
 
   return (
     <div
-      className={`glass-panel project-overlay project-overlay-materials${isPhone ? ' phone-bottom-sheet' : ''}`}
+      className={`project-overlay project-overlay-materials${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-materials"
       style={isPhone ? {
-        ...PHONE_SHEET_STYLE,
-        padding: 16,
-        display: 'flex',
-        flexDirection: 'column',
+        ...PHONE_SHEET_EMBEDDED_STYLE,
+        padding: '0 16px 12px',
         gap: 12,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch'
@@ -93,7 +91,6 @@ export const MaterialPicker: React.FC = () => {
         overflowY: 'visible'
       }}
     >
-      {isPhone && <PhoneSheetGrab />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <Palette size={18} color="#e09f3e" />
