@@ -49,13 +49,13 @@ export const GizmoMaterial: React.FC<{ color: string; active?: boolean }> = ({ c
   />
 );
 
-const SHAFT_START = 1.7;
-const SHAFT_LENGTH = 5.2;
-const SHAFT_RADIUS = 0.55;
-const CONE_LENGTH = 2.9;
-const CONE_RADIUS = 1.22;
-const ARROW_HIT_RADIUS = 3.7;
-const ARROW_HIT_EXTRA = 3.2;
+const SHAFT_START = 1.65;
+const SHAFT_LENGTH = 3.7;
+const SHAFT_RADIUS = 0.58;
+const CONE_LENGTH = 2.55;
+const CONE_RADIUS = 1.28;
+const ARROW_HIT_RADIUS = 3.8;
+const ARROW_HIT_EXTRA = 2.8;
 
 const AXIS_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   x: [0, 0, -Math.PI / 2],
@@ -168,12 +168,12 @@ export const MoveHub: React.FC<{
   );
 };
 
-const RING_RADIUS = 7.4;
-const RING_TUBE = 0.48;
-const RING_HIT_TUBE = 2.55;
+const RING_RADIUS = 6.6;
+const RING_TUBE = 0.5;
+const RING_HIT_TUBE = 2.6;
 const ARC_ANGLE = Math.PI * 0.72;
-const ARC_CONE_LENGTH = 1.55;
-const ARC_CONE_RADIUS = 0.82;
+const ARC_CONE_LENGTH = 1.45;
+const ARC_CONE_RADIUS = 0.85;
 
 function arcCone(angle: number, towardIncreasing: boolean) {
   const x = RING_RADIUS * Math.cos(angle);

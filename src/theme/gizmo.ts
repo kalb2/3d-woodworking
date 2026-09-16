@@ -14,8 +14,8 @@ export const GIZMO_HUB_CHEVRON = '#6E7B8A';
  * World-unit size of the gizmo at this camera distance.
  * Lower = larger on screen. Sized for finger grabs on iPhone.
  */
-export const GIZMO_DISTANCE_REF = 56;
-export const GIZMO_SCALE_MIN = 0.75;
+export const GIZMO_DISTANCE_REF = 64;
+export const GIZMO_SCALE_MIN = 0.72;
 export const GIZMO_SCALE_MAX = 6;
 
 export const GIZMO_OUTLINE_WIDTH = 2.25;
