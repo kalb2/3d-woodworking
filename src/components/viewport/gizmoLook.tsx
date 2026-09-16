@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Line, RoundedBox } from '@react-three/drei';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import {
@@ -41,14 +41,15 @@ export const GizmoMaterial: React.FC<{
   color: string;
   active?: boolean;
   opacity?: number;
-}> = ({ color, active = false, opacity = 1 }) => (
+  depthTest?: boolean;
+}> = ({ color, active = false, opacity = 1, depthTest = false }) => (
   <meshStandardMaterial
     color={color}
     roughness={0.36}
     metalness={0.04}
     emissive={color}
     emissiveIntensity={active ? 0.3 : 0.14}
-    depthTest={false}
+    depthTest={depthTest}
     depthWrite={opacity >= 1}
     toneMapped={false}
     transparent={opacity < 1}
@@ -178,7 +179,7 @@ export const MoveHub: React.FC<{
 const RING_RADIUS = 7.1;
 const RING_TUBE = 0.13;
 const PILL_TUBE = 0.78;
-const PILL_ARC = Math.PI * 0.3;
+const PILL_ARC = Math.PI * 0.22;
 const RING_HIT_TUBE = 2.5;
 
 const PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
@@ -237,9 +238,9 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD = 2.2;
-const PAD_THICK = 0.58;
-const PAD_RADIUS = 0.22;
+const PAD_MIN = 2.6;
+const PAD_FRAC = 0.26;
+const PAD_THICK_MIN = 0.5;
 
 const FACE_ROTATION: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', [number, number, number]> = {
   '+x': [0, 0, -Math.PI / 2],
@@ -250,38 +251,44 @@ const FACE_ROTATION: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', [number, nu
   '-z': [-Math.PI / 2, 0, 0],
 };
 
-/** Moblo resize: rounded RGB face pad sitting on the part face. */
+function facePadExtents(_axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z', length: number, _height: number, width: number) {
+  const side = Math.max(Math.min(length, width) * PAD_FRAC, PAD_MIN);
+  const thick = Math.max(PAD_THICK_MIN, side * 0.09);
+  return { side, thick };
+}
+
+/** Moblo resize: rounded RGB face pad sized to the part face. */
 export const FacePad: React.FC<{
   axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
   color: string;
   active: boolean;
+  length: number;
+  height: number;
+  width: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, onPointerDown }) => (
-  <group rotation={FACE_ROTATION[axis]}>
-    <RoundedBox
-      args={[PAD, PAD_THICK, PAD]}
-      radius={PAD_RADIUS}
-      smoothness={4}
-      position={[0, PAD_THICK / 2, 0]}
-      renderOrder={12}
-      frustumCulled={false}
-    >
-      <GizmoMaterial color={color} active={active} />
-    </RoundedBox>
-    <mesh
-      position={[0, PAD_THICK / 2, 0]}
-      renderOrder={22}
-      frustumCulled={false}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        onPointerDown(event);
-      }}
-    >
-      <boxGeometry args={[PAD + 1.5, PAD_THICK + 1.8, PAD + 1.5]} />
-      <meshBasicMaterial visible={false} depthTest={false} />
-    </mesh>
-  </group>
-);
+}> = ({ axis, color, active, length, height, width, onPointerDown }) => {
+  const { side, thick } = facePadExtents(axis, length, height, width);
+  return (
+    <group rotation={FACE_ROTATION[axis]}>
+      <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
+        <boxGeometry args={[side, thick, side]} />
+        <GizmoMaterial color={color} active={active} depthTest />
+      </mesh>
+      <mesh
+        position={[0, thick / 2, 0]}
+        renderOrder={22}
+        frustumCulled={false}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          onPointerDown(event);
+        }}
+      >
+        <boxGeometry args={[side + 1.2, thick + 1.6, side + 1.2]} />
+        <meshBasicMaterial visible={false} depthTest={false} />
+      </mesh>
+    </group>
+  );
+};
 
 function boxOutlinePoints(length: number, height: number, width: number, pad: number): [number, number, number][] {
   const hx = length / 2 + pad;

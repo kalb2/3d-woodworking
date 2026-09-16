@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
-import { FacePad, GizmoScale } from './gizmoLook';
+import { FacePad } from './gizmoLook';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -33,16 +33,13 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
-  const offset = 0;
-  const worldAnchor: [number, number, number] = [x, y, z];
-
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: [length / 2 + offset, 0, 0], color: GIZMO_AXIS.x },
-    { axis: '-x', pos: [-length / 2 - offset, 0, 0], color: GIZMO_AXIS.x },
-    { axis: '+y', pos: [0, height / 2 + offset, 0], color: GIZMO_AXIS.y },
-    { axis: '-y', pos: [0, -height / 2 - offset, 0], color: GIZMO_AXIS.y },
-    { axis: '+z', pos: [0, 0, width / 2 + offset], color: GIZMO_AXIS.z },
-    { axis: '-z', pos: [0, 0, -width / 2 - offset], color: GIZMO_AXIS.z }
+    { axis: '+x', pos: [length / 2, 0, 0], color: GIZMO_AXIS.x },
+    { axis: '-x', pos: [-length / 2, 0, 0], color: GIZMO_AXIS.x },
+    { axis: '+y', pos: [0, height / 2, 0], color: GIZMO_AXIS.y },
+    { axis: '-y', pos: [0, -height / 2, 0], color: GIZMO_AXIS.y },
+    { axis: '+z', pos: [0, 0, width / 2], color: GIZMO_AXIS.z },
+    { axis: '-z', pos: [0, 0, -width / 2], color: GIZMO_AXIS.z }
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
@@ -147,16 +144,17 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
 
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
-      {handles.map(({ axis, pos, color }) => (
+      {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color }) => (
         <group key={axis} position={pos}>
-          <GizmoScale anchor={worldAnchor}>
             <FacePad
               axis={axis}
               color={color}
               active={activeAxis === axis}
+              length={length}
+              height={height}
+              width={width}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />
-          </GizmoScale>
         </group>
       ))}
     </group>
