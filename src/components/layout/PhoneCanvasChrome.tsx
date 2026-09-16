@@ -15,20 +15,18 @@ import {
   Move,
   Palette,
   Plus,
-  Redo,
   RotateCw,
+  Ruler,
   Scaling,
   Share2,
   SlidersHorizontal,
-  Trash2,
-  Undo,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
-import { PHONE_FLOATING_SHEET_STYLE, PHONE_SHEET_EMBEDDED_STYLE } from './phoneSheet';
+import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onTap: () => void;
@@ -216,63 +214,156 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
   children,
 }) => {
   const { overlays, openOverlay, setOverlayOpen } = useAppStore();
-  const toolOpen = overlays.sidebar || overlays.tools || overlays.inspector || overlays.materials;
+  const {
+    projects,
+    activeProjectId,
+    selectedObjectId,
+    activeGizmoMode,
+    setGizmoMode,
+    duplicateObject,
+    toggleFloor,
+    updateSnapSettings,
+    showDimensions,
+    toggleDimensions,
+  } = useProjectStore();
 
-  const items: Array<{
-    id: 'sidebar' | 'tools' | 'inspector' | 'materials';
-    label: string;
-    testId: string;
-    icon: React.ReactNode;
-    disabled?: boolean;
-  }> = [
-    { id: 'sidebar', label: 'Parts', testId: 'overlay-launch-shapes', icon: <Box size={22} strokeWidth={1.6} /> },
-    { id: 'tools', label: 'Tools', testId: 'overlay-launch-tools', icon: <Move size={22} strokeWidth={1.6} /> },
-    {
-      id: 'inspector',
-      label: 'Properties',
-      testId: 'overlay-launch-properties',
-      icon: <SlidersHorizontal size={22} strokeWidth={1.6} />,
-      disabled: !hasSelection,
-    },
-    {
-      id: 'materials',
-      label: 'Finish',
-      testId: 'overlay-launch-finish',
-      icon: <Palette size={22} strokeWidth={1.6} />,
-      disabled: !hasSelection,
-    },
-  ];
+  const currentProject = projects.find((p) => p.id === activeProjectId);
+  const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials;
+  const propertiesOpen = overlays.inspector;
+
+  const closeContent = () => {
+    setOverlayOpen('inspector', false);
+    setOverlayOpen('sidebar', false);
+    setOverlayOpen('materials', false);
+    setOverlayOpen('tools', false);
+  };
+
+  const selectGizmo = (mode: 'move' | 'resize' | 'rotate') => {
+    setGizmoMode(mode);
+    closeContent();
+  };
 
   return (
     <div
-      className={`phone-tool-sheet${toolOpen ? ' is-expanded' : ''}`}
+      className={`phone-tool-sheet${contentOpen ? ' is-expanded' : ''}`}
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
-      {toolOpen && (
+      {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
         </div>
       )}
-      <nav className="phone-tool-sheet-tools" aria-label="Canvas tools">
-        {items.map((item) => (
-          <DockItem
-            key={item.id}
-            label={item.label}
-            testId={item.testId}
-            icon={item.icon}
-            active={overlays[item.id]}
-            disabled={item.disabled}
-            onTap={() => {
-              if (item.disabled) return;
-              if (overlays[item.id]) {
-                setOverlayOpen(item.id, false);
-                return;
-              }
-              openOverlay(item.id, true);
-            }}
-          />
-        ))}
+      <nav className="phone-tool-sheet-tools" aria-label="Basic tools">
+        <DockItem
+          label="Move"
+          testId="overlay-launch-tools"
+          icon={<Move size={22} strokeWidth={1.6} />}
+          active={!propertiesOpen && activeGizmoMode === 'move'}
+          onTap={() => selectGizmo('move')}
+        />
+        <DockItem
+          label="Copy"
+          testId="tool-copy"
+          icon={<Copy size={22} strokeWidth={1.6} />}
+          active={false}
+          disabled={!hasSelection}
+          onTap={() => {
+            if (selectedObjectId) duplicateObject(selectedObjectId);
+          }}
+        />
+        <DockItem
+          label="Rotate"
+          testId="tool-rotate"
+          icon={<RotateCw size={22} strokeWidth={1.6} />}
+          active={!propertiesOpen && activeGizmoMode === 'rotate'}
+          onTap={() => selectGizmo('rotate')}
+        />
+        <DockItem
+          label="Resize"
+          testId="tool-resize"
+          icon={<Scaling size={22} strokeWidth={1.6} />}
+          active={!propertiesOpen && activeGizmoMode === 'resize'}
+          onTap={() => selectGizmo('resize')}
+        />
+        <DockItem
+          label="Properties"
+          testId="overlay-launch-properties"
+          icon={<SlidersHorizontal size={22} strokeWidth={1.6} />}
+          active={propertiesOpen}
+          disabled={!hasSelection}
+          onTap={() => {
+            if (!hasSelection) return;
+            if (overlays.inspector) {
+              setOverlayOpen('inspector', false);
+              return;
+            }
+            openOverlay('inspector', true);
+          }}
+        />
+      </nav>
+      <nav className="phone-tool-sheet-secondary" aria-label="Measure and view">
+        <DockItem
+          compact
+          label="Floor"
+          testId="tool-floor"
+          icon={<Grid size={18} strokeWidth={1.7} />}
+          active={Boolean(currentProject?.showFloor)}
+          onTap={toggleFloor}
+        />
+        <DockItem
+          compact
+          label="Magnet"
+          testId="tool-magnet"
+          icon={<Magnet size={18} strokeWidth={1.7} />}
+          active={Boolean(currentProject?.snapSettings.enabled)}
+          onTap={() => {
+            if (currentProject) {
+              updateSnapSettings({ enabled: !currentProject.snapSettings.enabled });
+            }
+          }}
+        />
+        <PhoneTapButton
+          className={`phone-measure-pill${showDimensions ? ' is-active' : ''}`}
+          onTap={toggleDimensions}
+          aria-label="Toggle dimensions"
+          aria-pressed={showDimensions}
+          title="Toggle dimensions"
+          data-testid="tool-dims"
+        >
+          <Ruler size={16} strokeWidth={1.8} />
+          <span>Measure</span>
+        </PhoneTapButton>
+        <DockItem
+          compact
+          label="Parts"
+          testId="overlay-launch-shapes"
+          icon={<Box size={18} strokeWidth={1.7} />}
+          active={overlays.sidebar}
+          onTap={() => {
+            if (overlays.sidebar) {
+              setOverlayOpen('sidebar', false);
+              return;
+            }
+            openOverlay('sidebar', true);
+          }}
+        />
+        <DockItem
+          compact
+          label="Finish"
+          testId="overlay-launch-finish"
+          icon={<Palette size={18} strokeWidth={1.7} />}
+          active={overlays.materials}
+          disabled={!hasSelection}
+          onTap={() => {
+            if (!hasSelection) return;
+            if (overlays.materials) {
+              setOverlayOpen('materials', false);
+              return;
+            }
+            openOverlay('materials', true);
+          }}
+        />
       </nav>
     </div>
   );
@@ -287,13 +378,14 @@ const DockItem: React.FC<{
   icon: React.ReactNode;
   active: boolean;
   disabled?: boolean;
+  compact?: boolean;
   onTap: () => void;
-}> = ({ label, testId, icon, active, disabled, onTap }) => (
+}> = ({ label, testId, icon, active, disabled, compact, onTap }) => (
   <PhoneTapButton
-    className={`phone-dock-item${active ? ' is-active' : ''}`}
+    className={`phone-dock-item${compact ? ' is-compact' : ''}${active ? ' is-active' : ''}`}
     disabled={disabled}
     onTap={onTap}
-    aria-label={disabled ? `${label} (select a part)` : `Open ${label}`}
+    aria-label={disabled ? `${label} (select a part)` : label}
     aria-pressed={active}
     title={disabled ? 'Select a part first' : label}
     data-testid={testId}
@@ -302,114 +394,3 @@ const DockItem: React.FC<{
     <span>{label}</span>
   </PhoneTapButton>
 );
-
-export const PhoneToolsSheet: React.FC = () => {
-  const { overlays, setOverlayOpen } = useAppStore();
-  const {
-    projects,
-    activeProjectId,
-    selectedObjectId,
-    activeGizmoMode,
-    setGizmoMode,
-    historyIndex,
-    historyStack,
-    undo,
-    redo,
-    toggleFloor,
-    updateSnapSettings,
-    duplicateObject,
-    deleteObject,
-  } = useProjectStore();
-
-  const currentProject = projects.find((p) => p.id === activeProjectId);
-  if (!overlays.tools) return null;
-
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < historyStack.length - 1;
-  const hasSelection = Boolean(selectedObjectId);
-
-  return (
-    <div
-      className="project-overlay project-overlay-tools phone-sheet-embed"
-      data-testid="overlay-tools"
-      style={PHONE_SHEET_EMBEDDED_STYLE}
-    >
-      <div className="phone-sheet-header">
-        <span className="phone-sheet-title">Tools</span>
-        <OverlayDismissButton onDismiss={() => setOverlayOpen('tools', false)} />
-      </div>
-      <div className="phone-sheet-body">
-        <div className="phone-tool-group-label">Move / copy / rotate</div>
-        <div className="phone-tool-grid">
-          <PhoneTapButton
-            className={`phone-tool-chip${activeGizmoMode === 'move' ? ' is-active' : ''}`}
-            onTap={() => setGizmoMode('move')}
-          >
-            <Move size={18} />
-            <span>Move</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className={`phone-tool-chip${activeGizmoMode === 'resize' ? ' is-active' : ''}`}
-            onTap={() => setGizmoMode('resize')}
-          >
-            <Scaling size={18} />
-            <span>Resize</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className={`phone-tool-chip${activeGizmoMode === 'rotate' ? ' is-active' : ''}`}
-            onTap={() => setGizmoMode('rotate')}
-          >
-            <RotateCw size={18} />
-            <span>Rotate</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className="phone-tool-chip"
-            disabled={!hasSelection}
-            onTap={() => { if (selectedObjectId) duplicateObject(selectedObjectId); }}
-          >
-            <Copy size={18} />
-            <span>Copy</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className="phone-tool-chip is-danger"
-            disabled={!hasSelection}
-            onTap={() => { if (selectedObjectId) deleteObject(selectedObjectId); }}
-          >
-            <Trash2 size={18} />
-            <span>Delete</span>
-          </PhoneTapButton>
-        </div>
-
-        <div className="phone-tool-group-label">Settings</div>
-        <div className="phone-tool-grid">
-          <PhoneTapButton
-            className={`phone-tool-chip${currentProject?.snapSettings.enabled ? ' is-active' : ''}`}
-            onTap={() => {
-              if (currentProject) {
-                updateSnapSettings({ enabled: !currentProject.snapSettings.enabled });
-              }
-            }}
-          >
-            <Magnet size={18} />
-            <span>Magnet</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className={`phone-tool-chip${currentProject?.showFloor ? ' is-active' : ''}`}
-            onTap={toggleFloor}
-          >
-            <Grid size={18} />
-            <span>Floor</span>
-          </PhoneTapButton>
-          <PhoneTapButton className="phone-tool-chip" disabled={!canUndo} onTap={undo}>
-            <Undo size={18} />
-            <span>Undo</span>
-          </PhoneTapButton>
-          <PhoneTapButton className="phone-tool-chip" disabled={!canRedo} onTap={redo}>
-            <Redo size={18} />
-            <span>Redo</span>
-          </PhoneTapButton>
-        </div>
-      </div>
-    </div>
-  );
-};

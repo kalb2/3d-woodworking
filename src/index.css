@@ -275,8 +275,8 @@ html, body, #root {
 .editor-root.is-phone {
   --phone-sheet-inset: 12px;
   --phone-sheet-float-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  --phone-sheet-collapsed-height: 92px;
-  --phone-dock-height: 92px;
+  --phone-sheet-collapsed-height: 156px;
+  --phone-dock-height: 156px;
   --phone-sheet-max-height: min(52dvh, 440px);
   --phone-accent: #3b82f6;
   --phone-accent-soft: #eff6ff;
@@ -406,14 +406,23 @@ html, body, #root {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
-  padding: 10px 12px 14px;
+  padding: 6px 10px 4px;
 }
 
 .phone-tool-sheet.is-expanded .phone-tool-sheet-tools {
   border-top: 1px solid #eef2f6;
-  padding-top: 12px;
+  padding-top: 10px;
+}
+
+.phone-tool-sheet-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 4px 10px 12px;
 }
 
 .phone-dock-item {
@@ -425,15 +434,23 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 4px;
-  min-height: 64px;
+  gap: 4px;
+  padding: 8px 2px;
+  min-height: 58px;
   border-radius: 16px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.phone-dock-item.is-compact {
+  min-height: 46px;
+  padding: 4px 2px;
+  font-size: 9px;
+  gap: 3px;
+  border-radius: 12px;
 }
 
 .phone-dock-item.is-active {
@@ -444,6 +461,30 @@ html, body, #root {
 .phone-dock-item:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.phone-measure-pill {
+  flex: 1.35;
+  min-height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.phone-measure-pill.is-active {
+  background: var(--phone-accent-soft);
+  color: var(--phone-accent);
 }
 
 .phone-sheet-embed {

@@ -10,7 +10,6 @@ import {
   PhoneBottomSheet,
   PhoneCanvasHeader,
   PhoneMenuSheet,
-  PhoneToolsSheet,
 } from './components/layout/PhoneCanvasChrome';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
@@ -93,7 +92,6 @@ export const App: React.FC = () => {
         <>
           <PhoneBottomSheet hasSelection={hasSelection}>
             <SidebarNav />
-            <PhoneToolsSheet />
             <ObjectInspector />
             <MaterialPicker />
           </PhoneBottomSheet>

@@ -153,7 +153,8 @@ interface ProjectState {
   activeProjectId: string;
   selectedObjectId: string | null;
   activeGizmoMode: 'move' | 'resize' | 'rotate';
-  
+  showDimensions: boolean;
+
   historyStack: FurnitureObject[][];
   historyIndex: number;
 
@@ -174,6 +175,7 @@ interface ProjectState {
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
   setGizmoMode: (mode: 'move' | 'resize' | 'rotate') => void;
+  toggleDimensions: () => void;
 
   pushHistoryState: () => void;
   undo: () => void;
@@ -191,6 +193,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   activeProjectId: 'proj_default',
   selectedObjectId: 'tabletop_1',
   activeGizmoMode: 'move',
+  showDimensions: true,
   historyStack: [[...createInitialProject().objects]],
   historyIndex: 0,
 
@@ -550,6 +553,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   setGizmoMode: (mode) => set({ activeGizmoMode: mode }),
+
+  toggleDimensions: () => set((state) => ({ showDimensions: !state.showDimensions })),
 
   pushHistoryState: () => {
     const { projects, activeProjectId, historyStack, historyIndex } = get();
