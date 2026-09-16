@@ -15,6 +15,20 @@ import {
 
 const _anchor = new THREE.Vector3();
 
+/** Draw gizmos on top of the scene while still depth-testing themselves — solid, not glass. */
+export const GizmoDepthClear: React.FC = () => (
+  <mesh
+    renderOrder={9}
+    frustumCulled={false}
+    onBeforeRender={(renderer) => {
+      renderer.clearDepth();
+    }}
+  >
+    <boxGeometry args={[0.001, 0.001, 0.001]} />
+    <meshBasicMaterial colorWrite={false} depthWrite={false} />
+  </mesh>
+);
+
 /** Keep gizmos a stable screen size so they stay readable on iPhone at any zoom. */
 export const GizmoScale: React.FC<{
   anchor: [number, number, number];
@@ -32,28 +46,27 @@ export const GizmoScale: React.FC<{
 
   return (
     <group ref={ref} frustumCulled={false}>
+      <GizmoDepthClear />
       {children}
     </group>
   );
 };
 
+/** Solid matte paint — no transparency, no emissive glass. */
 export const GizmoMaterial: React.FC<{
   color: string;
   active?: boolean;
-  opacity?: number;
-  depthTest?: boolean;
-}> = ({ color, active = false, opacity = 1, depthTest = false }) => (
-  <meshStandardMaterial
+}> = ({ color, active = false }) => (
+  <meshLambertMaterial
     color={color}
-    roughness={0.36}
-    metalness={0.04}
-    emissive={color}
-    emissiveIntensity={active ? 0.3 : 0.14}
-    depthTest={depthTest}
-    depthWrite={opacity >= 1}
+    emissive={active ? color : '#000000'}
+    emissiveIntensity={active ? 0.18 : 0}
+    depthTest
+    depthWrite
     toneMapped={false}
-    transparent={opacity < 1}
-    opacity={opacity}
+    transparent={false}
+    opacity={1}
+    side={THREE.FrontSide}
   />
 );
 
@@ -176,53 +189,48 @@ export const MoveHub: React.FC<{
   );
 };
 
-const RING_RADIUS = 7.1;
-const RING_TUBE = 0.13;
-const PILL_TUBE = 0.78;
-const PILL_ARC = Math.PI * 0.22;
-const RING_HIT_TUBE = 2.5;
+const RING_RADIUS = 7.0;
+const RING_TUBE = 0.26;
+const PILL_RADIUS = 1.12;
+const PILL_HEIGHT = 1.35;
+const RING_HIT_TUBE = 2.6;
 
 const PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI * 0.22,
-  y: Math.PI * 0.38,
-  z: Math.PI * 0.58,
+  x: Math.PI * 0.28,
+  y: Math.PI * 0.42,
+  z: Math.PI * 0.62,
 };
 
-/** Full RGB ring + fat curved pill grip (Moblo rotate). */
+function pillPose(angle: number) {
+  const position: [number, number, number] = [
+    RING_RADIUS * Math.cos(angle),
+    RING_RADIUS * Math.sin(angle),
+    0,
+  ];
+  const tangent = new THREE.Vector3(-Math.sin(angle), Math.cos(angle), 0);
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+  return { position, quaternion };
+}
+
+/** Full opaque RGB hoop + short fat capsule grip (not a tapered torus sausage). */
 export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, onPointerDown }) => {
-  const pillAngle = PILL_ANGLE[axis];
-  const endA: [number, number, number] = [RING_RADIUS, 0, 0];
-  const endB: [number, number, number] = [
-    RING_RADIUS * Math.cos(PILL_ARC),
-    RING_RADIUS * Math.sin(PILL_ARC),
-    0,
-  ];
+  const pose = useMemo(() => pillPose(PILL_ANGLE[axis]), [axis]);
 
   return (
     <group rotation={RING_ROTATION[axis]}>
       <mesh renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[RING_RADIUS, RING_TUBE, 12, 80]} />
-        <GizmoMaterial color={color} active={active} opacity={0.92} />
+        <torusGeometry args={[RING_RADIUS, RING_TUBE, 16, 80]} />
+        <GizmoMaterial color={color} active={active} />
       </mesh>
-      <group rotation={[0, 0, pillAngle]}>
-        <mesh renderOrder={13} frustumCulled={false}>
-          <torusGeometry args={[RING_RADIUS, PILL_TUBE, 16, 28, PILL_ARC]} />
-          <GizmoMaterial color={color} active={active} />
-        </mesh>
-        <mesh position={endA} renderOrder={13} frustumCulled={false}>
-          <sphereGeometry args={[PILL_TUBE, 16, 12]} />
-          <GizmoMaterial color={color} active={active} />
-        </mesh>
-        <mesh position={endB} renderOrder={13} frustumCulled={false}>
-          <sphereGeometry args={[PILL_TUBE, 16, 12]} />
-          <GizmoMaterial color={color} active={active} />
-        </mesh>
-      </group>
+      <mesh position={pose.position} quaternion={pose.quaternion} renderOrder={13} frustumCulled={false}>
+        <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 8, 20]} />
+        <GizmoMaterial color={color} active={active} />
+      </mesh>
       <mesh
         renderOrder={22}
         frustumCulled={false}
@@ -272,7 +280,7 @@ export const FacePad: React.FC<{
     <group rotation={FACE_ROTATION[axis]}>
       <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
         <boxGeometry args={[side, thick, side]} />
-        <GizmoMaterial color={color} active={active} depthTest />
+        <GizmoMaterial color={color} active={active} />
       </mesh>
       <mesh
         position={[0, thick / 2, 0]}

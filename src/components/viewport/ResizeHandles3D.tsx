@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
-import { FacePad } from './gizmoLook';
+import { FacePad, GizmoDepthClear } from './gizmoLook';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -144,6 +144,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
 
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
+      <GizmoDepthClear />
       {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color }) => (
         <group key={axis} position={pos}>
             <FacePad
