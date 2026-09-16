@@ -19,7 +19,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
-import { fireReliableTap } from '../../utils/reliableTap';
+import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { ShapeType } from '../../types/furniture';
 
 export const SidebarNav: React.FC = () => {
@@ -295,35 +295,25 @@ export const SidebarNav: React.FC = () => {
                   </span>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button
-                      style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateObject(obj.id, { visible: !obj.visible });
-                      }}
+                    <SceneIconButton
+                      label={obj.visible ? `Hide ${obj.name}` : `Show ${obj.name}`}
+                      onTap={() => updateObject(obj.id, { visible: !obj.visible })}
                     >
                       {obj.visible ? <Eye size={14} /> : <EyeOff size={14} color="#ef4444" />}
-                    </button>
-
-                    <button
-                      style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        duplicateObject(obj.id);
-                      }}
+                    </SceneIconButton>
+                    <SceneIconButton
+                      label={`Duplicate ${obj.name}`}
+                      onTap={() => duplicateObject(obj.id)}
                     >
                       <Copy size={14} />
-                    </button>
-
-                    <button
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteObject(obj.id);
-                      }}
+                    </SceneIconButton>
+                    <SceneIconButton
+                      danger
+                      label={`Delete ${obj.name}`}
+                      onTap={() => deleteObject(obj.id)}
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </SceneIconButton>
                   </div>
                 </div>
               );
@@ -332,5 +322,40 @@ export const SidebarNav: React.FC = () => {
         )}
       </div>
     </aside>
+  );
+};
+
+const SceneIconButton: React.FC<{
+  label: string;
+  onTap: () => void;
+  danger?: boolean;
+  testId?: string;
+  children: React.ReactNode;
+}> = ({ label, onTap, danger, testId, children }) => {
+  const handler = useReliableTap(onTap);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      data-testid={testId}
+      style={{
+        background: 'none',
+        border: 'none',
+        color: danger ? '#ef4444' : '#9ca3af',
+        cursor: 'pointer',
+        padding: 6,
+        minWidth: 32,
+        minHeight: 32,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'manipulation',
+      }}
+      onClick={handler}
+      onPointerUp={handler}
+    >
+      {children}
+    </button>
   );
 };

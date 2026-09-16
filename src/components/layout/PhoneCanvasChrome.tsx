@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Camera,
@@ -12,6 +12,7 @@ import {
   Layers,
   Magnet,
   Menu,
+  Ellipsis,
   Move,
   Palette,
   Plus,
@@ -20,6 +21,7 @@ import {
   Scaling,
   Share2,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -221,15 +223,22 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     activeGizmoMode,
     setGizmoMode,
     duplicateObject,
+    deleteObject,
     toggleFloor,
     updateSnapSettings,
     showDimensions,
     toggleDimensions,
   } = useProjectStore();
+  const [partMenuOpen, setPartMenuOpen] = useState(false);
 
   const currentProject = projects.find((p) => p.id === activeProjectId);
+  const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials;
   const propertiesOpen = overlays.inspector;
+
+  useEffect(() => {
+    setPartMenuOpen(false);
+  }, [selectedObjectId]);
 
   const closeContent = () => {
     setOverlayOpen('inspector', false);
@@ -252,6 +261,59 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
+        </div>
+      )}
+      {hasSelection && selectedObject && (
+        <div className="phone-selected-part" data-testid="selected-part-chip">
+          <span className="phone-selected-part-name" title={selectedObject.name}>
+            {selectedObject.name}
+          </span>
+          <PhoneTapButton
+            className="phone-selected-part-delete"
+            onTap={() => deleteObject(selectedObject.id)}
+            aria-label={`Delete ${selectedObject.name}`}
+            title="Delete part"
+            data-testid="selected-part-delete"
+          >
+            <Trash2 size={15} strokeWidth={1.8} />
+            <span>Delete</span>
+          </PhoneTapButton>
+          <PhoneTapButton
+            className={`phone-selected-part-more${partMenuOpen ? ' is-open' : ''}`}
+            onTap={() => setPartMenuOpen((open) => !open)}
+            aria-label="Part actions"
+            aria-expanded={partMenuOpen}
+            title="Part actions"
+            data-testid="selected-part-menu"
+          >
+            <Ellipsis size={18} strokeWidth={1.8} />
+          </PhoneTapButton>
+          {partMenuOpen && (
+            <div className="phone-selected-part-menu" role="menu" data-testid="selected-part-menu-list">
+              <PhoneTapButton
+                className="phone-sheet-row"
+                onTap={() => {
+                  duplicateObject(selectedObject.id);
+                  setPartMenuOpen(false);
+                }}
+                data-testid="selected-part-menu-duplicate"
+              >
+                <Copy size={16} />
+                <span>Duplicate</span>
+              </PhoneTapButton>
+              <PhoneTapButton
+                className="phone-sheet-row is-danger"
+                onTap={() => {
+                  deleteObject(selectedObject.id);
+                  setPartMenuOpen(false);
+                }}
+                data-testid="selected-part-menu-delete"
+              >
+                <Trash2 size={16} />
+                <span>Delete</span>
+              </PhoneTapButton>
+            </div>
+          )}
         </div>
       )}
       <nav className="phone-tool-sheet-tools" aria-label="Basic tools">

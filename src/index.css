@@ -275,8 +275,8 @@ html, body, #root {
 .editor-root.is-phone {
   --phone-sheet-inset: 12px;
   --phone-sheet-float-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  --phone-sheet-collapsed-height: 156px;
-  --phone-dock-height: 156px;
+  --phone-sheet-collapsed-height: 208px;
+  --phone-dock-height: 208px;
   --phone-sheet-max-height: min(52dvh, 440px);
   --phone-accent: #3b82f6;
   --phone-accent-soft: #eff6ff;
@@ -381,7 +381,7 @@ html, body, #root {
   box-shadow:
     0 12px 40px rgba(15, 23, 42, 0.14),
     0 0 0 1px rgba(15, 23, 42, 0.05);
-  overflow: hidden;
+  overflow: visible;
   pointer-events: auto;
 }
 
@@ -400,6 +400,100 @@ html, body, #root {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+}
+
+.phone-selected-part {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 4px 10px 2px;
+  padding: 4px 4px 4px 14px;
+  min-height: 44px;
+  background: #f8fafc;
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.phone-selected-part-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-selected-part-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: none;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 8px 12px;
+  min-height: 36px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.phone-selected-part-more {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.phone-selected-part-more.is-open,
+.phone-selected-part-more:active {
+  background: #e2e8f0;
+  color: var(--text-main);
+}
+
+.phone-selected-part-menu {
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 8px);
+  min-width: 188px;
+  padding: 6px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 40px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.06);
+  z-index: 60;
+}
+
+.phone-sheet-row.is-danger {
+  color: #dc2626;
+}
+
+.editor-root.is-phone .inspector-quick-actions {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  padding-bottom: 4px;
 }
 
 .phone-tool-sheet-tools {

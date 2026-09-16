@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
+import { useReliableTap } from '../../utils/reliableTap';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -18,6 +19,13 @@ export const ObjectInspector: React.FC = () => {
     duplicateObject,
     setUnit
   } = useProjectStore();
+
+  const handleDuplicate = useReliableTap(() => {
+    if (selectedObjectId) duplicateObject(selectedObjectId);
+  });
+  const handleDelete = useReliableTap(() => {
+    if (selectedObjectId) deleteObject(selectedObjectId);
+  });
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   if (!overlays.inspector || !currentProject || !selectedObjectId) return null;
@@ -288,19 +296,23 @@ export const ObjectInspector: React.FC = () => {
       </div>
 
       {/* QUICK ACTIONS */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <div className="inspector-quick-actions" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button
           className="glass-button"
-          onClick={() => duplicateObject(object.id)}
+          onClick={handleDuplicate}
+          onPointerUp={handleDuplicate}
           style={{ flex: 1 }}
+          data-testid="inspector-duplicate"
         >
           <Copy size={16} /> Duplicate
         </button>
 
         <button
           className="glass-button"
-          onClick={() => deleteObject(object.id)}
+          onClick={handleDelete}
+          onPointerUp={handleDelete}
           style={{ flex: 1, borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+          data-testid="inspector-delete"
         >
           <Trash2 size={16} /> Delete
         </button>
