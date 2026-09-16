@@ -40,22 +40,22 @@ export const GizmoScale: React.FC<{
 export const GizmoMaterial: React.FC<{ color: string; active?: boolean }> = ({ color, active = false }) => (
   <meshStandardMaterial
     color={color}
-    roughness={0.42}
-    metalness={0.07}
+    roughness={0.38}
+    metalness={0.04}
     emissive={color}
-    emissiveIntensity={active ? 0.28 : 0.1}
+    emissiveIntensity={active ? 0.32 : 0.16}
     depthTest={false}
     toneMapped={false}
   />
 );
 
-const SHAFT_START = 1.15;
-const SHAFT_LENGTH = 5.05;
-const SHAFT_RADIUS = 0.2;
-const CONE_LENGTH = 2.15;
-const CONE_RADIUS = 0.62;
-const ARROW_HIT_RADIUS = 2.15;
-const ARROW_HIT_EXTRA = 2.4;
+const SHAFT_START = 1.7;
+const SHAFT_LENGTH = 5.2;
+const SHAFT_RADIUS = 0.55;
+const CONE_LENGTH = 2.9;
+const CONE_RADIUS = 1.22;
+const ARROW_HIT_RADIUS = 3.7;
+const ARROW_HIT_EXTRA = 3.2;
 
 const AXIS_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   x: [0, 0, -Math.PI / 2],
@@ -69,7 +69,7 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   z: [0, 0, 0],
 };
 
-/** Thin shaft + distinct cone — Moblo / CAD move arrow, not a chunky TransformControls stub. */
+/** Fat Moblo-style axis arrow — thick shaft + cone, oversized invisible hit cylinder. */
 export const AxisArrow: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
@@ -83,11 +83,11 @@ export const AxisArrow: React.FC<{
   return (
     <group rotation={AXIS_ROTATION[axis]}>
       <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
-        <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 20]} />
+        <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 24]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <mesh position={[0, coneCenter, 0]} renderOrder={12} frustumCulled={false}>
-        <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 24]} />
+        <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 28]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <mesh
@@ -106,11 +106,11 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 0.82;
-const HUB_THICKNESS = 0.22;
-const CHEVRON_RADIUS = 0.3;
-const CHEVRON_LENGTH = 0.78;
-const HUB_HIT_RADIUS = 2.05;
+const HUB_RADIUS = 1.28;
+const HUB_THICKNESS = 0.42;
+const CHEVRON_RADIUS = 0.48;
+const CHEVRON_LENGTH = 1.05;
+const HUB_HIT_RADIUS = 3.35;
 
 /** Light circular hub with four planar chevrons — Moblo’s center move widget. */
 export const MoveHub: React.FC<{
@@ -121,7 +121,7 @@ export const MoveHub: React.FC<{
     return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle) => {
       const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
       const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.28;
+      const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.22;
       return {
         angle,
         quaternion,
@@ -137,7 +137,7 @@ export const MoveHub: React.FC<{
         <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-        <torusGeometry args={[HUB_RADIUS, 0.07, 8, 28]} />
+        <torusGeometry args={[HUB_RADIUS, 0.11, 8, 28]} />
         <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
       </mesh>
       {chevrons.map((chevron) => (
@@ -161,19 +161,19 @@ export const MoveHub: React.FC<{
           onPointerDown(event);
         }}
       >
-        <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.7, 20]} />
+        <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 1.15, 20]} />
         <meshBasicMaterial visible={false} depthTest={false} />
       </mesh>
     </group>
   );
 };
 
-const RING_RADIUS = 6.7;
-const RING_TUBE = 0.2;
-const RING_HIT_TUBE = 1.65;
-const ARC_ANGLE = Math.PI * 0.68;
-const ARC_CONE_LENGTH = 0.95;
-const ARC_CONE_RADIUS = 0.36;
+const RING_RADIUS = 7.4;
+const RING_TUBE = 0.48;
+const RING_HIT_TUBE = 2.55;
+const ARC_ANGLE = Math.PI * 0.72;
+const ARC_CONE_LENGTH = 1.55;
+const ARC_CONE_RADIUS = 0.82;
 
 function arcCone(angle: number, towardIncreasing: boolean) {
   const x = RING_RADIUS * Math.cos(angle);
@@ -232,13 +232,13 @@ export const RotateArc: React.FC<{
 
 export const RotateHub: React.FC = () => (
   <mesh renderOrder={13} frustumCulled={false}>
-    <sphereGeometry args={[0.42, 20, 16]} />
+    <sphereGeometry args={[0.72, 20, 16]} />
     <GizmoMaterial color={GIZMO_HUB_FILL} />
   </mesh>
 );
 
-const RESIZE_CUBE = 1.28;
-const RESIZE_STUB = 2.1;
+const RESIZE_CUBE = 1.95;
+const RESIZE_STUB = 2.4;
 
 const RESIZE_STUB_XFORM: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', { rot: [number, number, number]; pos: [number, number, number] }> = {
   '+x': { rot: [0, 0, -Math.PI / 2], pos: [-RESIZE_STUB / 2, 0, 0] },
@@ -259,7 +259,7 @@ export const ResizeCube: React.FC<{
   return (
     <group>
       <mesh rotation={stub.rot} position={stub.pos} renderOrder={11} frustumCulled={false}>
-        <cylinderGeometry args={[0.16, 0.16, RESIZE_STUB, 12]} />
+        <cylinderGeometry args={[0.32, 0.32, RESIZE_STUB, 14]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <mesh renderOrder={12} frustumCulled={false}>
@@ -274,7 +274,7 @@ export const ResizeCube: React.FC<{
           onPointerDown(event);
         }}
       >
-        <sphereGeometry args={[2.35, 12, 12]} />
+        <sphereGeometry args={[3.45, 12, 12]} />
         <meshBasicMaterial visible={false} depthTest={false} />
       </mesh>
     </group>

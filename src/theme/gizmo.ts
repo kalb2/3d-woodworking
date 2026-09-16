@@ -1,18 +1,21 @@
-/** Moblo-like transform handles — solid RGB axes, gray hub, no amber glow. */
+/** Moblo transform handles — iOS RGB axes, gray hub, no amber. */
 
 export const GIZMO_AXIS = {
-  x: '#F04438',
-  y: '#22C55E',
-  z: '#2F80FF',
+  x: '#FF3B30',
+  y: '#34C759',
+  z: '#007AFF',
 } as const;
 
-export const GIZMO_HUB_FILL = '#E8EEF4';
-export const GIZMO_HUB_EDGE = '#90A0B2';
-export const GIZMO_HUB_CHEVRON = '#6B7C8D';
+export const GIZMO_HUB_FILL = '#D8DEE6';
+export const GIZMO_HUB_EDGE = '#8E99A6';
+export const GIZMO_HUB_CHEVRON = '#6E7B8A';
 
-/** World-unit size of the gizmo at the default editor camera distance. */
-export const GIZMO_DISTANCE_REF = 90;
-export const GIZMO_SCALE_MIN = 0.42;
-export const GIZMO_SCALE_MAX = 5.5;
+/**
+ * World-unit size of the gizmo at this camera distance.
+ * Lower = larger on screen. Sized for finger grabs on iPhone.
+ */
+export const GIZMO_DISTANCE_REF = 56;
+export const GIZMO_SCALE_MIN = 0.75;
+export const GIZMO_SCALE_MAX = 6;
 
-export const GIZMO_OUTLINE_WIDTH = 2.15;
+export const GIZMO_OUTLINE_WIDTH = 2.25;
