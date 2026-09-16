@@ -33,7 +33,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
-  const offset = 0.35;
+  const offset = 1.25;
   const worldAnchor: [number, number, number] = [x, y, z];
 
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [

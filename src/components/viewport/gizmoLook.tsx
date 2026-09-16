@@ -106,10 +106,10 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 0.92;
-const HUB_THICKNESS = 0.2;
-const CHEVRON_RADIUS = 0.42;
-const CHEVRON_LENGTH = 0.52;
+const HUB_RADIUS = 0.82;
+const HUB_THICKNESS = 0.22;
+const CHEVRON_RADIUS = 0.3;
+const CHEVRON_LENGTH = 0.78;
 const HUB_HIT_RADIUS = 2.05;
 
 /** Light circular hub with four planar chevrons — Moblo’s center move widget. */
@@ -121,11 +121,11 @@ export const MoveHub: React.FC<{
     return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle) => {
       const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
       const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const reach = HUB_RADIUS * 0.22;
+      const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.28;
       return {
         angle,
         quaternion,
-        position: [dir.x * reach, HUB_THICKNESS * 0.35, dir.z * reach] as [number, number, number],
+        position: [dir.x * reach, 0, dir.z * reach] as [number, number, number],
       };
     });
   }, []);
@@ -148,7 +148,7 @@ export const MoveHub: React.FC<{
           renderOrder={14}
           frustumCulled={false}
         >
-          <coneGeometry args={[CHEVRON_RADIUS * 0.55, CHEVRON_LENGTH, 3]} />
+          <coneGeometry args={[CHEVRON_RADIUS, CHEVRON_LENGTH, 3]} />
           <GizmoMaterial color={GIZMO_HUB_CHEVRON} active={active} />
         </mesh>
       ))}
@@ -169,8 +169,8 @@ export const MoveHub: React.FC<{
 };
 
 const RING_RADIUS = 6.7;
-const RING_TUBE = 0.17;
-const RING_HIT_TUBE = 1.55;
+const RING_TUBE = 0.2;
+const RING_HIT_TUBE = 1.65;
 const ARC_ANGLE = Math.PI * 0.68;
 const ARC_CONE_LENGTH = 0.95;
 const ARC_CONE_RADIUS = 0.36;
@@ -237,8 +237,8 @@ export const RotateHub: React.FC = () => (
   </mesh>
 );
 
-const RESIZE_CUBE = 1.05;
-const RESIZE_STUB = 2.35;
+const RESIZE_CUBE = 1.28;
+const RESIZE_STUB = 2.1;
 
 const RESIZE_STUB_XFORM: Record<'+x' | '-x' | '+y' | '-y' | '+z' | '-z', { rot: [number, number, number]; pos: [number, number, number] }> = {
   '+x': { rot: [0, 0, -Math.PI / 2], pos: [-RESIZE_STUB / 2, 0, 0] },
