@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { createWoodMeshMaterial } from '../../utils/woodTextureGenerator';
-import { SELECTION_COLOR } from '../../theme/canvasSelection';
+import { SelectionOutline } from './gizmoLook';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -109,10 +109,11 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       />
 
       {isSelected && (
-        <lineSegments>
-          <edgesGeometry args={[geometry]} />
-          <lineBasicMaterial color={SELECTION_COLOR} linewidth={2} />
-        </lineSegments>
+        <SelectionOutline
+          length={dimensions.length}
+          height={dimensions.height}
+          width={dimensions.width}
+        />
       )}
     </group>
   );

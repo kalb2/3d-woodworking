@@ -3,7 +3,8 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
-import { SELECTION_COLOR } from '../../theme/canvasSelection';
+import { GIZMO_AXIS } from '../../theme/gizmo';
+import { FacePad, GizmoDepthClear } from './gizmoLook';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -32,26 +33,19 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
-  // Offset distance for handle spheres from object center in local space
-  const offset = 1.5;
-  const handleRadius = 2.0;
-  const hitRadius = 4.0;  // invisible touch target — much larger for finger grabbing
-
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: [length / 2 + offset, 0, 0], color: '#ef4444' },
-    { axis: '-x', pos: [-length / 2 - offset, 0, 0], color: '#ef4444' },
-    { axis: '+y', pos: [0, height / 2 + offset, 0], color: '#10b981' },
-    { axis: '-y', pos: [0, -height / 2 - offset, 0], color: '#10b981' },
-    { axis: '+z', pos: [0, 0, width / 2 + offset], color: '#3b82f6' },
-    { axis: '-z', pos: [0, 0, -width / 2 - offset], color: '#3b82f6' }
+    { axis: '+x', pos: [length / 2, 0, 0], color: GIZMO_AXIS.x },
+    { axis: '-x', pos: [-length / 2, 0, 0], color: GIZMO_AXIS.x },
+    { axis: '+y', pos: [0, height / 2, 0], color: GIZMO_AXIS.y },
+    { axis: '-y', pos: [0, -height / 2, 0], color: GIZMO_AXIS.y },
+    { axis: '+z', pos: [0, 0, width / 2], color: GIZMO_AXIS.z },
+    { axis: '-z', pos: [0, 0, -width / 2], color: GIZMO_AXIS.z }
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
     e.stopPropagation();
-    // Capture pointer for reliable touch tracking on iPad
     (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
 
-    // Disable OrbitControls immediately while resizing so canvas doesn't orbit
     if (controls) {
       controls.enabled = false;
     }
@@ -126,7 +120,6 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
         dragSessionRef.current = null;
         setActiveAxis(null);
 
-        // Re-enable OrbitControls after resizing completes
         if (controls) {
           controls.enabled = true;
         }
@@ -151,32 +144,18 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
 
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
-      {/* Bounding box outline aligned with object rotation */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[length + 0.3, height + 0.3, width + 0.3]} />
-        <meshBasicMaterial color={SELECTION_COLOR} wireframe transparent opacity={0.45} />
-      </mesh>
-
-      {/* Axis Handle Spheres */}
-      {handles.map(({ axis, pos, color }) => (
+      <GizmoDepthClear />
+      {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color }) => (
         <group key={axis} position={pos}>
-          {/* Visible sphere */}
-          <mesh>
-            <sphereGeometry args={[handleRadius, 24, 24]} />
-            <meshStandardMaterial
-              color={activeAxis === axis ? '#ffffff' : color}
-              emissive={color}
-              emissiveIntensity={activeAxis === axis ? 0.9 : 0.6}
-              roughness={0.2}
+            <FacePad
+              axis={axis}
+              color={color}
+              active={activeAxis === axis}
+              length={length}
+              height={height}
+              width={width}
+              onPointerDown={(e) => handlePointerDown(e, axis)}
             />
-          </mesh>
-          {/* Invisible fat hit sphere — easy to grab with a finger */}
-          <mesh
-            onPointerDown={(e) => handlePointerDown(e, axis)}
-          >
-            <sphereGeometry args={[hitRadius, 12, 12]} />
-            <meshBasicMaterial visible={false} />
-          </mesh>
         </group>
       ))}
     </group>

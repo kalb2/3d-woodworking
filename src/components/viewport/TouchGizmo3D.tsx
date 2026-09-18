@@ -1,166 +1,18 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
-import { SELECTION_COLOR } from '../../theme/canvasSelection';
+import { GIZMO_AXIS, boundRingRadius, boundRingTube, partHalfExtents } from '../../theme/gizmo';
+import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
 }
 
-type DragAxis = 'x' | 'y' | 'z' | null;
+type DragAxis = 'x' | 'y' | 'z' | 'xz' | null;
 
-/* ---- constants ---- */
-const ARROW_LENGTH = 8;
-const ARROW_RADIUS = 0.7;
-const CONE_LENGTH = 3.5;
-const CONE_RADIUS = 1.8;
-const HIT_RADIUS = 3.5;   // invisible touch-target — very fat for finger grabbing
-const HIT_LENGTH_EXTRA = 4; // extra length beyond arrow+cone
-
-// Each rotation ring is a different radius so they don't overlap / z-fight
-const RING_RADII = { x: 11, y: 13, z: 15 };
-const RING_TUBE = 0.55;
-const RING_HIT_TUBE = 3.5; // invisible hit-area tube thickness
-
-const AXIS_COLORS = {
-  x: '#ef4444',  // red
-  y: '#10b981',  // green
-  z: '#3b82f6',  // blue
-};
-const ACTIVE_COLOR = SELECTION_COLOR;
-
-/* ======================================================================
-   MOVE HANDLE — one per axis (fat arrow + invisible hit cylinder)
-   ====================================================================== */
-const MoveHandle: React.FC<{
-  axis: 'x' | 'y' | 'z';
-  objectPosition: [number, number, number];
-  color: string;
-  onDragStart: (axis: DragAxis, startPoint: THREE.Vector3) => void;
-  isActive: boolean;
-}> = ({ axis, objectPosition, color, onDragStart, isActive }) => {
-  // Rotation to point the cylinder/cone along the correct world axis
-  const axisRotation: [number, number, number] = useMemo(() => {
-    switch (axis) {
-      case 'x': return [0, 0, -Math.PI / 2];
-      case 'y': return [0, 0, 0];
-      case 'z': return [Math.PI / 2, 0, 0];
-    }
-  }, [axis]);
-
-  const displayColor = isActive ? ACTIVE_COLOR : color;
-  const hitLength = ARROW_LENGTH + CONE_LENGTH + HIT_LENGTH_EXTRA;
-
-  return (
-    <group position={objectPosition}>
-      <group rotation={axisRotation}>
-        {/* Visible shaft (cylinder) */}
-        <mesh position={[0, ARROW_LENGTH / 2, 0]} renderOrder={10}>
-          <cylinderGeometry args={[ARROW_RADIUS, ARROW_RADIUS, ARROW_LENGTH, 12]} />
-          <meshStandardMaterial
-            color={displayColor}
-            emissive={displayColor}
-            emissiveIntensity={isActive ? 0.8 : 0.4}
-            roughness={0.3}
-            transparent
-            opacity={0.92}
-            depthTest={false}
-          />
-        </mesh>
-
-        {/* Visible cone tip */}
-        <mesh position={[0, ARROW_LENGTH + CONE_LENGTH / 2, 0]} renderOrder={10}>
-          <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 16]} />
-          <meshStandardMaterial
-            color={displayColor}
-            emissive={displayColor}
-            emissiveIntensity={isActive ? 0.8 : 0.4}
-            roughness={0.3}
-            transparent
-            opacity={0.92}
-            depthTest={false}
-          />
-        </mesh>
-
-        {/* INVISIBLE fat hit target — easy to grab with a finger */}
-        <mesh
-          position={[0, hitLength / 2, 0]}
-          renderOrder={20}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onDragStart(axis, e.point.clone());
-          }}
-        >
-          <cylinderGeometry args={[HIT_RADIUS, HIT_RADIUS, hitLength, 8]} />
-          <meshBasicMaterial visible={false} depthTest={false} />
-        </mesh>
-      </group>
-    </group>
-  );
-};
-
-/* ======================================================================
-   ROTATE HANDLE — one per axis (torus ring + invisible fat hit torus)
-   Each axis gets a slightly different radius so all 3 are clearly visible.
-   ====================================================================== */
-const RotateHandle: React.FC<{
-  axis: 'x' | 'y' | 'z';
-  objectPosition: [number, number, number];
-  color: string;
-  onDragStart: (axis: DragAxis, startPoint: THREE.Vector3) => void;
-  isActive: boolean;
-}> = ({ axis, objectPosition, color, onDragStart, isActive }) => {
-  const axisRotation: [number, number, number] = useMemo(() => {
-    switch (axis) {
-      case 'x': return [0, Math.PI / 2, 0]; // ring in YZ plane (normal = X axis)
-      case 'y': return [Math.PI / 2, 0, 0]; // ring in XZ plane (normal = Y axis)
-      case 'z': return [0, 0, 0];           // ring in XY plane (normal = Z axis)
-    }
-  }, [axis]);
-
-  const displayColor = isActive ? ACTIVE_COLOR : color;
-  const ringRadius = RING_RADII[axis];
-
-  return (
-    <group position={objectPosition}>
-      <group rotation={axisRotation}>
-        {/* Visible ring */}
-        <mesh renderOrder={10}>
-          <torusGeometry args={[ringRadius, RING_TUBE, 16, 64]} />
-          <meshStandardMaterial
-            color={displayColor}
-            emissive={displayColor}
-            emissiveIntensity={isActive ? 0.8 : 0.5}
-            roughness={0.3}
-            transparent
-            opacity={0.9}
-            depthTest={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-
-        {/* INVISIBLE fat hit ring — easy to grab with a finger */}
-        <mesh
-          renderOrder={20}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onDragStart(axis, e.point.clone());
-          }}
-        >
-          <torusGeometry args={[ringRadius, RING_HIT_TUBE, 8, 48]} />
-          <meshBasicMaterial visible={false} depthTest={false} />
-        </mesh>
-      </group>
-    </group>
-  );
-};
-
-/* ======================================================================
-   MAIN GIZMO
-   ====================================================================== */
 export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const {
     activeGizmoMode,
@@ -181,35 +33,50 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     startRotation: { x: number; y: number; z: number };
     dragPlane: THREE.Plane;
     objectCenter: THREE.Vector3;
+    axisDir: THREE.Vector3 | null;
   } | null>(null);
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const isMove = activeGizmoMode === 'move';
 
+  const { length, height, width } = object.dimensions;
+  const { hx, hy, hz } = partHalfExtents(length, height, width);
   const objPos: [number, number, number] = [object.position.x, object.position.y, object.position.z];
+  const objRot: [number, number, number] = [
+    THREE.MathUtils.degToRad(object.rotation.x),
+    THREE.MathUtils.degToRad(object.rotation.y),
+    THREE.MathUtils.degToRad(object.rotation.z),
+  ];
 
-  /* ---- drag start ---- */
+  const objectEuler = () => new THREE.Euler(objRot[0], objRot[1], objRot[2], 'XYZ');
+
   const handleDragStart = (axis: DragAxis, startPoint: THREE.Vector3) => {
     if (!axis) return;
 
-    // Disable orbit controls immediately
     if (controls) {
       controls.enabled = false;
     }
 
     setActiveAxis(axis);
 
-    // Build a drag plane perpendicular to the camera through the start point
-    const cameraDir = new THREE.Vector3();
-    camera.getWorldDirection(cameraDir);
-    const planeNormal = cameraDir.clone().negate();
-
-    const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-      planeNormal,
-      startPoint
-    );
-
     const objectCenter = new THREE.Vector3(object.position.x, object.position.y, object.position.z);
+    let dragPlane: THREE.Plane;
+    let axisDir: THREE.Vector3 | null = null;
+
+    if (axis === 'xz') {
+      dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -object.position.y);
+    } else {
+      axisDir = new THREE.Vector3(
+        axis === 'x' ? 1 : 0,
+        axis === 'y' ? 1 : 0,
+        axis === 'z' ? 1 : 0,
+      ).applyEuler(objectEuler());
+
+      const cameraDir = new THREE.Vector3();
+      camera.getWorldDirection(cameraDir);
+      const planeNormal = cameraDir.clone().negate();
+      dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, startPoint);
+    }
 
     dragRef.current = {
       axis,
@@ -218,10 +85,10 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
       startRotation: { ...object.rotation },
       dragPlane,
       objectCenter,
+      axisDir,
     };
   };
 
-  /* ---- drag move & drag end (window-level listeners) ---- */
   useEffect(() => {
     if (!activeAxis) return;
 
@@ -243,24 +110,25 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
       const worldDelta = currentIntersection.clone().sub(session.startPoint);
 
       if (isMove) {
-        /* ---- TRANSLATION ---- */
-        // Use world-space axes (not object-local) for intuitive movement
-        let axisDir: THREE.Vector3;
-        switch (session.axis) {
-          case 'x': axisDir = new THREE.Vector3(1, 0, 0); break;
-          case 'y': axisDir = new THREE.Vector3(0, 1, 0); break;
-          case 'z': axisDir = new THREE.Vector3(0, 0, 1); break;
-          default: return;
+        let newPos: { x: number; y: number; z: number };
+
+        if (session.axis === 'xz') {
+          newPos = {
+            x: session.startPosition.x + worldDelta.x,
+            y: session.startPosition.y,
+            z: session.startPosition.z + worldDelta.z,
+          };
+        } else {
+          const axisDir = session.axisDir;
+          if (!axisDir) return;
+          const projected = worldDelta.dot(axisDir);
+          newPos = {
+            x: session.startPosition.x + axisDir.x * projected,
+            y: session.startPosition.y + axisDir.y * projected,
+            z: session.startPosition.z + axisDir.z * projected,
+          };
         }
 
-        const projected = worldDelta.dot(axisDir);
-        const newPos = {
-          x: session.startPosition.x + axisDir.x * projected,
-          y: session.startPosition.y + axisDir.y * projected,
-          z: session.startPosition.z + axisDir.z * projected,
-        };
-
-        // Always enforce floor collision: object bottom (y - height/2) must not go below 0
         if (currentProject?.snapSettings.floorCollision) {
           const minY = object.dimensions.height / 2;
           if (newPos.y < minY) {
@@ -280,20 +148,21 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           updateObject(object.id, { position: newPos }, true);
         }
       } else {
-        /* ---- ROTATION ---- */
+        if (session.axis === 'xz') return;
+
         const center = session.objectCenter;
         const startVec = session.startPoint.clone().sub(center);
         const curVec = currentIntersection.clone().sub(center);
 
-        let rotAxisWorld: THREE.Vector3;
-        switch (session.axis) {
-          case 'x': rotAxisWorld = new THREE.Vector3(1, 0, 0); break;
-          case 'y': rotAxisWorld = new THREE.Vector3(0, 1, 0); break;
-          case 'z': rotAxisWorld = new THREE.Vector3(0, 0, 1); break;
-          default: return;
-        }
+        const rotAxisWorld = session.axisDir ?? (() => {
+          switch (session.axis) {
+            case 'x': return new THREE.Vector3(1, 0, 0);
+            case 'y': return new THREE.Vector3(0, 1, 0);
+            case 'z': return new THREE.Vector3(0, 0, 1);
+            default: return new THREE.Vector3(0, 1, 0);
+          }
+        })();
 
-        // Project both vectors onto the plane perpendicular to the rotation axis
         const startProj = startVec.clone().sub(rotAxisWorld.clone().multiplyScalar(startVec.dot(rotAxisWorld)));
         const curProj = curVec.clone().sub(rotAxisWorld.clone().multiplyScalar(curVec.dot(rotAxisWorld)));
 
@@ -307,8 +176,6 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
         if (cross.dot(rotAxisWorld) < 0) angle = -angle;
 
         const angleDeg = THREE.MathUtils.radToDeg(angle);
-
-        // Snap to 5° increments for finger-friendly precision
         const snappedAngle = Math.round(angleDeg / 5) * 5;
 
         const newRotation = { ...session.startRotation };
@@ -349,33 +216,51 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
 
   if (activeGizmoMode === 'resize') return null;
 
-  /* ---- RENDER ---- */
-  if (isMove) {
-    return (
-      <>
-        <MoveHandle axis="x" objectPosition={objPos} color={AXIS_COLORS.x} onDragStart={handleDragStart} isActive={activeAxis === 'x'} />
-        <MoveHandle axis="y" objectPosition={objPos} color={AXIS_COLORS.y} onDragStart={handleDragStart} isActive={activeAxis === 'y'} />
-        <MoveHandle axis="z" objectPosition={objPos} color={AXIS_COLORS.z} onDragStart={handleDragStart} isActive={activeAxis === 'z'} />
-        {/* Center sphere anchor */}
-        <mesh position={objPos} renderOrder={10}>
-          <sphereGeometry args={[1.5, 16, 16]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} roughness={0.3} transparent opacity={0.7} depthTest={false} />
-        </mesh>
-      </>
-    );
-  }
+  const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
+    handleDragStart(axis, event.point.clone());
+  };
 
-  // Rotate mode — all 3 rings always visible, each a different radius
+  // One wrap radius so the triad hugs the whole part like Moblo, not a tiny center ball.
+  const ringRadius = boundRingRadius(length, height, width);
+  const ringTube = boundRingTube(ringRadius);
+  const ringGap = Math.max(ringTube * 1.1, 0.4);
+  const showMinusY = height >= 3;
+
+  const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; reach: number; color: string }[] = [
+    { axis: '+x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
+    { axis: '-x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
+    { axis: '+y', drag: 'y', reach: hy, color: GIZMO_AXIS.y },
+    ...(showMinusY ? [{ axis: '-y' as const, drag: 'y' as const, reach: hy, color: GIZMO_AXIS.y }] : []),
+    { axis: '+z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
+    { axis: '-z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
+  ];
+
   return (
-    <>
-      <RotateHandle axis="x" objectPosition={objPos} color={AXIS_COLORS.x} onDragStart={handleDragStart} isActive={activeAxis === 'x'} />
-      <RotateHandle axis="y" objectPosition={objPos} color={AXIS_COLORS.y} onDragStart={handleDragStart} isActive={activeAxis === 'y'} />
-      <RotateHandle axis="z" objectPosition={objPos} color={AXIS_COLORS.z} onDragStart={handleDragStart} isActive={activeAxis === 'z'} />
-      {/* Center dot */}
-      <mesh position={objPos} renderOrder={10}>
-        <sphereGeometry args={[1.0, 16, 16]} />
-        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} roughness={0.3} transparent opacity={0.6} depthTest={false} />
-      </mesh>
-    </>
+    <group position={objPos} rotation={objRot}>
+      <GizmoDepthClear />
+      {isMove ? (
+        <>
+          {moveHandles.map(({ axis, drag, reach, color }) => (
+            <AxisArrow
+              key={axis}
+              axis={axis}
+              reach={reach}
+              color={color}
+              active={activeAxis === drag}
+              onPointerDown={beginAxis(drag)}
+            />
+          ))}
+          <group position={[0, hy, 0]}>
+            <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
+          </group>
+        </>
+      ) : (
+        <>
+          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} radius={ringRadius} tube={ringTube} onPointerDown={beginAxis('x')} />
+          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} radius={ringRadius + ringGap} tube={ringTube} onPointerDown={beginAxis('y')} />
+          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} radius={ringRadius + ringGap * 2} tube={ringTube} onPointerDown={beginAxis('z')} />
+        </>
+      )}
+    </group>
   );
 };
