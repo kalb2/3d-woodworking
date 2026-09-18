@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
-import { GIZMO_AXIS } from '../../theme/gizmo';
-import { AxisArrow, GizmoScale, MoveHub, RotateRing } from './gizmoLook';
+import { GIZMO_AXIS, boundRingRadius, boundRingTube, partHalfExtents } from '../../theme/gizmo';
+import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
@@ -33,12 +33,22 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     startRotation: { x: number; y: number; z: number };
     dragPlane: THREE.Plane;
     objectCenter: THREE.Vector3;
+    axisDir: THREE.Vector3 | null;
   } | null>(null);
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const isMove = activeGizmoMode === 'move';
 
+  const { length, height, width } = object.dimensions;
+  const { hx, hy, hz } = partHalfExtents(length, height, width);
   const objPos: [number, number, number] = [object.position.x, object.position.y, object.position.z];
+  const objRot: [number, number, number] = [
+    THREE.MathUtils.degToRad(object.rotation.x),
+    THREE.MathUtils.degToRad(object.rotation.y),
+    THREE.MathUtils.degToRad(object.rotation.z),
+  ];
+
+  const objectEuler = () => new THREE.Euler(objRot[0], objRot[1], objRot[2], 'XYZ');
 
   const handleDragStart = (axis: DragAxis, startPoint: THREE.Vector3) => {
     if (!axis) return;
@@ -51,10 +61,17 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
 
     const objectCenter = new THREE.Vector3(object.position.x, object.position.y, object.position.z);
     let dragPlane: THREE.Plane;
+    let axisDir: THREE.Vector3 | null = null;
 
     if (axis === 'xz') {
       dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -object.position.y);
     } else {
+      axisDir = new THREE.Vector3(
+        axis === 'x' ? 1 : 0,
+        axis === 'y' ? 1 : 0,
+        axis === 'z' ? 1 : 0,
+      ).applyEuler(objectEuler());
+
       const cameraDir = new THREE.Vector3();
       camera.getWorldDirection(cameraDir);
       const planeNormal = cameraDir.clone().negate();
@@ -68,6 +85,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
       startRotation: { ...object.rotation },
       dragPlane,
       objectCenter,
+      axisDir,
     };
   };
 
@@ -101,14 +119,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
             z: session.startPosition.z + worldDelta.z,
           };
         } else {
-          let axisDir: THREE.Vector3;
-          switch (session.axis) {
-            case 'x': axisDir = new THREE.Vector3(1, 0, 0); break;
-            case 'y': axisDir = new THREE.Vector3(0, 1, 0); break;
-            case 'z': axisDir = new THREE.Vector3(0, 0, 1); break;
-            default: return;
-          }
-
+          const axisDir = session.axisDir;
+          if (!axisDir) return;
           const projected = worldDelta.dot(axisDir);
           newPos = {
             x: session.startPosition.x + axisDir.x * projected,
@@ -142,13 +154,14 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
         const startVec = session.startPoint.clone().sub(center);
         const curVec = currentIntersection.clone().sub(center);
 
-        let rotAxisWorld: THREE.Vector3;
-        switch (session.axis) {
-          case 'x': rotAxisWorld = new THREE.Vector3(1, 0, 0); break;
-          case 'y': rotAxisWorld = new THREE.Vector3(0, 1, 0); break;
-          case 'z': rotAxisWorld = new THREE.Vector3(0, 0, 1); break;
-          default: return;
-        }
+        const rotAxisWorld = session.axisDir ?? (() => {
+          switch (session.axis) {
+            case 'x': return new THREE.Vector3(1, 0, 0);
+            case 'y': return new THREE.Vector3(0, 1, 0);
+            case 'z': return new THREE.Vector3(0, 0, 1);
+            default: return new THREE.Vector3(0, 1, 0);
+          }
+        })();
 
         const startProj = startVec.clone().sub(rotAxisWorld.clone().multiplyScalar(startVec.dot(rotAxisWorld)));
         const curProj = curVec.clone().sub(rotAxisWorld.clone().multiplyScalar(curVec.dot(rotAxisWorld)));
@@ -207,26 +220,47 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     handleDragStart(axis, event.point.clone());
   };
 
-  if (isMove) {
-    return (
-      <group position={objPos}>
-        <GizmoScale anchor={objPos}>
-          <AxisArrow axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
-          <AxisArrow axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
-          <AxisArrow axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
-          <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
-        </GizmoScale>
-      </group>
-    );
-  }
+  const ringRadius = boundRingRadius(length, height, width);
+  const ringTube = boundRingTube(ringRadius);
+  // Tiny radius offsets so the three hoops don't z-fight where they cross.
+  const ringGap = Math.max(ringTube * 1.15, 0.42);
+  const showMinusY = height >= 3;
+
+  const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; reach: number; color: string }[] = [
+    { axis: '+x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
+    { axis: '-x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
+    { axis: '+y', drag: 'y', reach: hy, color: GIZMO_AXIS.y },
+    ...(showMinusY ? [{ axis: '-y' as const, drag: 'y' as const, reach: hy, color: GIZMO_AXIS.y }] : []),
+    { axis: '+z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
+    { axis: '-z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
+  ];
 
   return (
-    <group position={objPos}>
-      <GizmoScale anchor={objPos}>
-        <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
-        <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
-        <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
-      </GizmoScale>
+    <group position={objPos} rotation={objRot}>
+      <GizmoDepthClear />
+      {isMove ? (
+        <>
+          {moveHandles.map(({ axis, drag, reach, color }) => (
+            <AxisArrow
+              key={axis}
+              axis={axis}
+              reach={reach}
+              color={color}
+              active={activeAxis === drag}
+              onPointerDown={beginAxis(drag)}
+            />
+          ))}
+          <group position={[0, hy, 0]}>
+            <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
+          </group>
+        </>
+      ) : (
+        <>
+          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} radius={ringRadius} tube={ringTube} onPointerDown={beginAxis('x')} />
+          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} radius={ringRadius + ringGap} tube={ringTube} onPointerDown={beginAxis('y')} />
+          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} radius={ringRadius + ringGap * 2} tube={ringTube} onPointerDown={beginAxis('z')} />
+        </>
+      )}
     </group>
   );
 };
