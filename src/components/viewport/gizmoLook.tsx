@@ -87,18 +87,22 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   z: [0, 0, 0],
 };
 
-/** Pills sit on bounding-box edges: red +Z, green −Z, blue +X. */
+/**
+ * Pills on visible edges of each hoop.
+ * Angles avoid antipodal setFromUnitVectors singularities.
+ * X: high on the ring (above the part). Y: near long edge. Z: high / +X.
+ */
 const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI,
-  y: Math.PI / 2,
-  z: 0,
+  x: Math.PI * 0.72,
+  y: Math.PI * 1.52,
+  z: Math.PI * 0.28,
 };
 
-const SHAFT_START = 0.12;
-const SHAFT_LENGTH = 3.15;
-const SHAFT_RADIUS = 0.42;
-const CONE_LENGTH = 2.05;
-const CONE_RADIUS = 1.12;
+const SHAFT_START = 0.18;
+const SHAFT_LENGTH = 3.35;
+const SHAFT_RADIUS = 0.52;
+const CONE_LENGTH = 2.35;
+const CONE_RADIUS = 1.32;
 const ARROW_HIT_RADIUS = 3.4;
 const ARROW_HIT_EXTRA = 2.4;
 
@@ -217,9 +221,9 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 1.12;
-const PILL_HEIGHT = 1.4;
-const RING_HIT_TUBE = 2.7;
+const PILL_RADIUS = 1.55;
+const PILL_HEIGHT = 2.05;
+const RING_HIT_TUBE = 2.8;
 
 function pillPose(radius: number, angle: number) {
   const position: [number, number, number] = [
@@ -227,8 +231,8 @@ function pillPose(radius: number, angle: number) {
     radius * Math.sin(angle),
     0,
   ];
-  const tangent = new THREE.Vector3(-Math.sin(angle), Math.cos(angle), 0);
-  const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+  // Rz(angle) maps capsule +Y onto the circle tangent — always well-defined.
+  const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
   return { position, quaternion };
 }
 

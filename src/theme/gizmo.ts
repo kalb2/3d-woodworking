@@ -31,6 +31,19 @@ export function partHalfExtents(length: number, height: number, width: number) {
   };
 }
 
+/** Per-axis hoop radius: wraps that plane’s silhouette so rings hug the part. */
+export function boundRingRadiusForAxis(
+  axis: 'x' | 'y' | 'z',
+  length: number,
+  height: number,
+  width: number,
+  pad = GIZMO_BOUND_PAD,
+) {
+  const { hx, hy, hz } = partHalfExtents(length, height, width);
+  const pair = axis === 'x' ? [hy, hz] : axis === 'y' ? [hx, hz] : [hx, hy];
+  return Math.hypot(pair[0], pair[1]) + pad;
+}
+
 /** Circular triad sized to wrap the part's bounding box (not a tiny center widget). */
 export function boundRingRadius(length: number, height: number, width: number, pad = GIZMO_BOUND_PAD) {
   const { hx, hy, hz } = partHalfExtents(length, height, width);

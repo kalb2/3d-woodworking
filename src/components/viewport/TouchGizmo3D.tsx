@@ -220,10 +220,10 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     handleDragStart(axis, event.point.clone());
   };
 
+  // One wrap radius so the triad hugs the whole part like Moblo, not a tiny center ball.
   const ringRadius = boundRingRadius(length, height, width);
   const ringTube = boundRingTube(ringRadius);
-  // Tiny radius offsets so the three hoops don't z-fight where they cross.
-  const ringGap = Math.max(ringTube * 1.15, 0.42);
+  const ringGap = Math.max(ringTube * 1.1, 0.4);
   const showMinusY = height >= 3;
 
   const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; reach: number; color: string }[] = [
