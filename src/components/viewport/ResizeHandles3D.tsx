@@ -36,14 +36,15 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const hx = length / 2;
   const hy = height / 2;
   const hz = width / 2;
-  const top = hy + 0.02;
+  const top = hy + 0.48;
+  const inset = 0.55;
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: [hx, top, 0], color: GIZMO_AXIS.x },
-    { axis: '-x', pos: [-hx, top, 0], color: GIZMO_AXIS.x },
+    { axis: '+x', pos: [hx - inset, top, 0], color: GIZMO_AXIS.x },
+    { axis: '-x', pos: [-hx + inset, top, 0], color: GIZMO_AXIS.x },
     { axis: '+y', pos: [0, hy, 0], color: GIZMO_AXIS.y },
     { axis: '-y', pos: [0, -hy, 0], color: GIZMO_AXIS.y },
-    { axis: '+z', pos: [0, top, hz], color: GIZMO_AXIS.z },
-    { axis: '-z', pos: [0, top, -hz], color: GIZMO_AXIS.z }
+    { axis: '+z', pos: [0, top, hz - inset], color: GIZMO_AXIS.z },
+    { axis: '-z', pos: [0, top, -hz + inset], color: GIZMO_AXIS.z }
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {

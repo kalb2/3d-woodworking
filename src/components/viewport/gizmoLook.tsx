@@ -80,15 +80,6 @@ export const GizmoMaterial: React.FC<{
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 
-const FACE_ROTATION: Record<FaceAxis, [number, number, number]> = {
-  '+x': [0, 0, -Math.PI / 2],
-  '-x': [0, 0, Math.PI / 2],
-  '+y': [0, 0, 0],
-  '-y': [Math.PI, 0, 0],
-  '+z': [Math.PI / 2, 0, 0],
-  '-z': [-Math.PI / 2, 0, 0],
-};
-
 const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   x: [0, Math.PI / 2, 0],
   y: [Math.PI / 2, 0, 0],
@@ -122,7 +113,7 @@ function edgeTopPose(
   hz: number,
 ): { position: [number, number, number]; rotation: [number, number, number] } {
   const y = hy + GRIP_RADIUS;
-  const inset = GRIP_RADIUS * 0.15;
+  const inset = GRIP_RADIUS * 1.05;
   switch (axis) {
     case '+x': return { position: [hx - inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
     case '-x': return { position: [-hx + inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
@@ -311,10 +302,19 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
   }
   const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
   const thick = Math.max(PAD_THICK_MIN, side * 0.22);
-  const radius = THREE.MathUtils.clamp(side * 0.3, 0.38, 0.52);
-  const body = THREE.MathUtils.clamp(thick * 1.05, 0.28, 0.7);
+  const radius = THREE.MathUtils.clamp(side * 0.32, 0.42, 0.52);
+  const body = THREE.MathUtils.clamp(side * 0.7, 0.85, 1.35);
   return { side, thick, radius, body };
 }
+
+const EDGE_ALONG: Record<FaceAxis, [number, number, number]> = {
+  '+x': [Math.PI / 2, 0, 0],
+  '-x': [Math.PI / 2, 0, 0],
+  '+z': [0, 0, Math.PI / 2],
+  '-z': [0, 0, Math.PI / 2],
+  '+y': [0, 0, 0],
+  '-y': [Math.PI, 0, 0],
+};
 
 /** Soft rounded pad on the part face — same RGB, less cube mass. */
 export const FacePad: React.FC<{
@@ -327,17 +327,18 @@ export const FacePad: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, length, height, width, onPointerDown }) => {
   const { side, thick, radius, body } = facePadExtents(axis, length, height, width);
-  const padLength = body + radius * 2;
+  const upright = axis === '+y' || axis === '-y';
+  const yOff = upright ? radius + body / 2 : 0;
 
   return (
-    <group rotation={FACE_ROTATION[axis]}>
+    <group rotation={EDGE_ALONG[axis]}>
       <GripSize>
-        <mesh position={[0, padLength / 2, 0]} renderOrder={12} frustumCulled={false}>
+        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[radius, body, 6, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, padLength / 2, 0]}
+          position={[0, yOff, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
