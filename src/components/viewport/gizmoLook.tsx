@@ -106,26 +106,27 @@ const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: Math.PI * 0.28,
 };
 
-const GRIP_START = 0.1;
-const GRIP_RADIUS = 0.32;
-const GRIP_BODY = 0.78;
-const ARROW_HIT_RADIUS = 2.15;
-const ARROW_HIT_EXTRA = 2.1;
+const GRIP_START = 0.12;
+const GRIP_RADIUS = 0.5;
+const GRIP_BODY = 1.28;
+const ARROW_HIT_RADIUS = 2.2;
+const ARROW_HIT_EXTRA = 2.15;
 
-/** Soft capsule planted on a face — tappable, not a dominating spike. */
+/** Soft capsule on a face/edge — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
   reach: number;
+  lift?: number;
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, reach, color, active, onPointerDown }) => {
+}> = ({ axis, reach, lift = 0, color, active, onPointerDown }) => {
   const gripLength = GRIP_BODY + GRIP_RADIUS * 2;
   const gripCenter = GRIP_START + gripLength / 2;
   const hitLength = GRIP_START + gripLength + ARROW_HIT_EXTRA;
 
   return (
-    <group position={facePoint(axis, reach)} rotation={FACE_ROTATION[axis]}>
+    <group position={facePoint(axis, reach, lift)} rotation={FACE_ROTATION[axis]}>
       <GripSize>
         <mesh position={[0, gripCenter, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
@@ -148,22 +149,22 @@ export const AxisArrow: React.FC<{
   );
 };
 
-function facePoint(axis: FaceAxis, reach: number): [number, number, number] {
+function facePoint(axis: FaceAxis, reach: number, lift = 0): [number, number, number] {
   switch (axis) {
-    case '+x': return [reach, 0, 0];
-    case '-x': return [-reach, 0, 0];
+    case '+x': return [reach, lift, 0];
+    case '-x': return [-reach, lift, 0];
     case '+y': return [0, reach, 0];
     case '-y': return [0, -reach, 0];
-    case '+z': return [0, 0, reach];
-    case '-z': return [0, 0, -reach];
+    case '+z': return [0, lift, reach];
+    case '-z': return [0, lift, -reach];
   }
 }
 
-const HUB_RADIUS = 0.62;
-const HUB_THICKNESS = 0.16;
-const CHEVRON_RADIUS = 0.16;
-const CHEVRON_LENGTH = 0.34;
-const HUB_HIT_RADIUS = 2.15;
+const HUB_RADIUS = 0.78;
+const HUB_THICKNESS = 0.2;
+const CHEVRON_RADIUS = 0.2;
+const CHEVRON_LENGTH = 0.42;
+const HUB_HIT_RADIUS = 2.2;
 
 /** Light hub that sits on the part's top face (not a floating origin ball). */
 export const MoveHub: React.FC<{
@@ -223,9 +224,9 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 0.34;
-const PILL_HEIGHT = 0.82;
-const RING_HIT_TUBE = 2.15;
+const PILL_RADIUS = 0.48;
+const PILL_HEIGHT = 1.12;
+const RING_HIT_TUBE = 2.2;
 
 function pillPose(radius: number, angle: number) {
   const position: [number, number, number] = [
@@ -279,10 +280,10 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD_MIN = 0.95;
-const PAD_MAX = 1.85;
-const PAD_FRAC = 0.09;
-const PAD_THICK_MIN = 0.22;
+const PAD_MIN = 1.15;
+const PAD_MAX = 2.2;
+const PAD_FRAC = 0.12;
+const PAD_THICK_MIN = 0.28;
 
 function facePadExtents(axis: FaceAxis, length: number, height: number, width: number) {
   let across: number;
@@ -299,8 +300,8 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
   }
   const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
   const thick = Math.max(PAD_THICK_MIN, side * 0.22);
-  const radius = THREE.MathUtils.clamp(side * 0.28, 0.26, 0.38);
-  const body = THREE.MathUtils.clamp(thick * 0.9, 0.18, 0.48);
+  const radius = THREE.MathUtils.clamp(side * 0.3, 0.38, 0.52);
+  const body = THREE.MathUtils.clamp(thick * 1.05, 0.28, 0.7);
   return { side, thick, radius, body };
 }
 

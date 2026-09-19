@@ -33,13 +33,14 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
+  const rim = height / 2 * 0.92;
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: [length / 2, 0, 0], color: GIZMO_AXIS.x },
-    { axis: '-x', pos: [-length / 2, 0, 0], color: GIZMO_AXIS.x },
+    { axis: '+x', pos: [length / 2, rim, 0], color: GIZMO_AXIS.x },
+    { axis: '-x', pos: [-length / 2, rim, 0], color: GIZMO_AXIS.x },
     { axis: '+y', pos: [0, height / 2, 0], color: GIZMO_AXIS.y },
     { axis: '-y', pos: [0, -height / 2, 0], color: GIZMO_AXIS.y },
-    { axis: '+z', pos: [0, 0, width / 2], color: GIZMO_AXIS.z },
-    { axis: '-z', pos: [0, 0, -width / 2], color: GIZMO_AXIS.z }
+    { axis: '+z', pos: [0, rim, width / 2], color: GIZMO_AXIS.z },
+    { axis: '-z', pos: [0, rim, -width / 2], color: GIZMO_AXIS.z }
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {

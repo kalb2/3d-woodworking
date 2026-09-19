@@ -17,9 +17,9 @@ export const GIZMO_HUB_CHEVRON = '#8A96A3';
  * Positions stay on the part bounds — never scale the whole gizmo from the origin.
  * Cap is tight so handles stay tappable without swallowing the wood.
  */
-export const GIZMO_DISTANCE_REF = 88;
-export const GIZMO_SCALE_MIN = 0.72;
-export const GIZMO_SCALE_MAX = 1.35;
+export const GIZMO_DISTANCE_REF = 76;
+export const GIZMO_SCALE_MIN = 0.82;
+export const GIZMO_SCALE_MAX = 1.5;
 
 export const GIZMO_OUTLINE_WIDTH = 2.25;
 
