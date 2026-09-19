@@ -12,6 +12,7 @@ import {
   GIZMO_SCALE_MAX,
   GIZMO_SCALE_MIN,
 } from '../../theme/gizmo';
+import { gripAnchor, type MeshExtents } from '../../theme/partSurface';
 
 const _world = new THREE.Vector3();
 
@@ -102,44 +103,29 @@ const GRIP_BODY = 1.35;
 const ARROW_HIT_RADIUS = 2.25;
 const ARROW_HIT_LENGTH = 3.4;
 
-/**
- * Sit the pill on the top edge (Moblo), long axis along that edge.
- * +Y stays a short upright capsule on the top face.
- */
-function edgeTopPose(
-  axis: FaceAxis,
-  hx: number,
-  hy: number,
-  hz: number,
-): { position: [number, number, number]; rotation: [number, number, number] } {
-  const y = hy + GRIP_RADIUS;
-  const inset = GRIP_RADIUS * 1.05;
-  switch (axis) {
-    case '+x': return { position: [hx - inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
-    case '-x': return { position: [-hx + inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
-    case '+z': return { position: [0, y, hz - inset], rotation: [0, 0, Math.PI / 2] };
-    case '-z': return { position: [0, y, -hz + inset], rotation: [0, 0, Math.PI / 2] };
-    case '+y': return { position: [0, hy, 0], rotation: [0, 0, 0] };
-    case '-y': return { position: [0, -hy, 0], rotation: [Math.PI, 0, 0] };
-  }
-}
+const EDGE_ALONG: Record<FaceAxis, [number, number, number]> = {
+  '+x': [Math.PI / 2, 0, 0],
+  '-x': [Math.PI / 2, 0, 0],
+  '+z': [0, 0, Math.PI / 2],
+  '-z': [0, 0, Math.PI / 2],
+  '+y': [0, 0, 0],
+  '-y': [Math.PI, 0, 0],
+};
 
-/** Soft capsule on a face/edge — tappable, not a dominating spike. */
+/** Soft capsule on the real mesh edge/rim — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
-  hx: number;
-  hy: number;
-  hz: number;
+  extents: MeshExtents;
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, hx, hy, hz, color, active, onPointerDown }) => {
-  const pose = edgeTopPose(axis, hx, hy, hz);
+}> = ({ axis, extents, color, active, onPointerDown }) => {
+  const position = gripAnchor(axis, extents);
   const upright = axis === '+y' || axis === '-y';
   const yOff = upright ? GRIP_RADIUS + GRIP_BODY / 2 : 0;
 
   return (
-    <group position={pose.position} rotation={pose.rotation}>
+    <group position={position} rotation={EDGE_ALONG[axis]}>
       <GripSize>
         <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
@@ -307,15 +293,6 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
   return { side, thick, radius, body };
 }
 
-const EDGE_ALONG: Record<FaceAxis, [number, number, number]> = {
-  '+x': [Math.PI / 2, 0, 0],
-  '-x': [Math.PI / 2, 0, 0],
-  '+z': [0, 0, Math.PI / 2],
-  '-z': [0, 0, Math.PI / 2],
-  '+y': [0, 0, 0],
-  '-y': [Math.PI, 0, 0],
-};
-
 /** Soft rounded pad on the part face — same RGB, less cube mass. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
@@ -354,48 +331,44 @@ export const FacePad: React.FC<{
   );
 };
 
-function boxOutlinePoints(length: number, height: number, width: number, pad: number): [number, number, number][] {
-  const hx = length / 2 + pad;
-  const hy = height / 2 + pad;
-  const hz = width / 2 + pad;
-  return [
-    [-hx, -hy, -hz], [hx, -hy, -hz],
-    [hx, -hy, -hz], [hx, -hy, hz],
-    [hx, -hy, hz], [-hx, -hy, hz],
-    [-hx, -hy, hz], [-hx, -hy, -hz],
-    [-hx, hy, -hz], [hx, hy, -hz],
-    [hx, hy, -hz], [hx, hy, hz],
-    [hx, hy, hz], [-hx, hy, hz],
-    [-hx, hy, hz], [-hx, hy, -hz],
-    [-hx, -hy, -hz], [-hx, hy, -hz],
-    [hx, -hy, -hz], [hx, hy, -hz],
-    [hx, -hy, hz], [hx, hy, hz],
-    [-hx, -hy, hz], [-hx, hy, hz],
-  ];
+function circlePoints(radius: number, axis: 'x' | 'y' | 'z', segments = 64): [number, number, number][] {
+  const pts: [number, number, number][] = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
+    const c = Math.cos(t) * radius;
+    const s = Math.sin(t) * radius;
+    if (axis === 'y') pts.push([c, 0, s]);
+    else if (axis === 'x') pts.push([0, c, s]);
+    else pts.push([c, s, 0]);
+  }
+  return pts;
 }
 
-/** 12-edge bounding box using pixel-width lines (WebGL ignores LineBasic linewidth). */
-export const SelectionOutline: React.FC<{
-  length: number;
-  height: number;
-  width: number;
-  pad?: number;
-}> = ({ length, height, width, pad = 0.1 }) => {
-  const points = useMemo(
-    () => boxOutlinePoints(length, height, width, pad),
-    [length, height, width, pad]
+/** Light-blue meridians on a sphere — EdgesGeometry is empty on a smooth ball. */
+export const SphereOutline: React.FC<{ radius: number }> = ({ radius }) => {
+  const rings = useMemo(
+    () => ({
+      xz: circlePoints(radius, 'y'),
+      xy: circlePoints(radius, 'z'),
+      yz: circlePoints(radius, 'x'),
+    }),
+    [radius]
   );
 
   return (
-    <Line
-      segments
-      points={points}
-      color={SELECTION_COLOR}
-      lineWidth={GIZMO_OUTLINE_WIDTH}
-      depthTest={false}
-      renderOrder={8}
-      frustumCulled={false}
-      raycast={() => undefined}
-    />
+    <>
+      {(['xz', 'xy', 'yz'] as const).map((key) => (
+        <Line
+          key={key}
+          points={rings[key]}
+          color={SELECTION_COLOR}
+          lineWidth={GIZMO_OUTLINE_WIDTH}
+          depthTest={false}
+          renderOrder={8}
+          frustumCulled={false}
+          raycast={() => undefined}
+        />
+      ))}
+    </>
   );
 };

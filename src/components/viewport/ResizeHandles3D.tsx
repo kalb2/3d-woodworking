@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
+import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
 
 interface ResizeHandles3DProps {
@@ -25,7 +26,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     inverseRotationMatrix: THREE.Matrix4;
   } | null>(null);
 
-  const { length, width, height } = object.dimensions;
+  const { height } = object.dimensions;
   const { x, y, z } = object.position;
   const { x: rotX, y: rotY, z: rotZ } = object.rotation;
 
@@ -33,18 +34,14 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadY = THREE.MathUtils.degToRad(rotY);
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
-  const hx = length / 2;
-  const hy = height / 2;
-  const hz = width / 2;
-  const top = hy + 0.48;
-  const inset = 0.55;
+  const extents = meshExtents(object.shape, object.dimensions);
   const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: [hx - inset, top, 0], color: GIZMO_AXIS.x },
-    { axis: '-x', pos: [-hx + inset, top, 0], color: GIZMO_AXIS.x },
-    { axis: '+y', pos: [0, hy, 0], color: GIZMO_AXIS.y },
-    { axis: '-y', pos: [0, -hy, 0], color: GIZMO_AXIS.y },
-    { axis: '+z', pos: [0, top, hz - inset], color: GIZMO_AXIS.z },
-    { axis: '-z', pos: [0, top, -hz + inset], color: GIZMO_AXIS.z }
+    { axis: '+x', pos: gripAnchor('+x', extents), color: GIZMO_AXIS.x },
+    { axis: '-x', pos: gripAnchor('-x', extents), color: GIZMO_AXIS.x },
+    { axis: '+y', pos: gripAnchor('+y', extents), color: GIZMO_AXIS.y },
+    { axis: '-y', pos: gripAnchor('-y', extents), color: GIZMO_AXIS.y },
+    { axis: '+z', pos: gripAnchor('+z', extents), color: GIZMO_AXIS.z },
+    { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z }
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
@@ -156,9 +153,9 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
               axis={axis}
               color={color}
               active={activeAxis === axis}
-              length={length}
-              height={height}
-              width={width}
+              length={extents.hx * 2}
+              height={extents.hy * 2}
+              width={extents.hz * 2}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />
         </group>

@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
+import { Edges } from '@react-three/drei';
 import type { FurnitureObject } from '../../types/furniture';
 import { createWoodMeshMaterial } from '../../utils/woodTextureGenerator';
-import { SelectionOutline } from './gizmoLook';
+import { SELECTION_COLOR } from '../../theme/canvasSelection';
+import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
+import { SphereOutline } from './gizmoLook';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -106,15 +109,20 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         castShadow
         receiveShadow
         onPointerDown={onPointerDown}
-      />
-
-      {isSelected && (
-        <SelectionOutline
-          length={dimensions.length}
-          height={dimensions.height}
-          width={dimensions.width}
-        />
-      )}
+      >
+        {isSelected && shape === 'sphere' && (
+          <SphereOutline radius={Math.min(dimensions.length, dimensions.width, dimensions.height) / 2} />
+        )}
+        {isSelected && shape !== 'sphere' && (
+          <Edges
+            threshold={24}
+            color={SELECTION_COLOR}
+            lineWidth={GIZMO_OUTLINE_WIDTH}
+            depthTest={false}
+            toneMapped={false}
+          />
+        )}
+      </mesh>
     </group>
   );
 };
