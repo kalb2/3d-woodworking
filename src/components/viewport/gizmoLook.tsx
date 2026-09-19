@@ -52,23 +52,31 @@ export const GripSize: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
-/** Solid matte paint — no transparency, no emissive glass. */
+/**
+ * Unlit opaque paint so Moblo RGB lands on screen as-authored.
+ * Studio lights were shifting Lambert handles off the reference swatches.
+ */
 export const GizmoMaterial: React.FC<{
   color: string;
   active?: boolean;
-}> = ({ color, active = false }) => (
-  <meshLambertMaterial
-    color={color}
-    emissive={active ? color : '#000000'}
-    emissiveIntensity={active ? 0.18 : 0}
-    depthTest
-    depthWrite
-    toneMapped={false}
-    transparent={false}
-    opacity={1}
-    side={THREE.FrontSide}
-  />
-);
+}> = ({ color, active = false }) => {
+  const paint = useMemo(() => {
+    if (!active) return color;
+    return `#${new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.1).getHexString()}`;
+  }, [color, active]);
+
+  return (
+    <meshBasicMaterial
+      color={paint}
+      depthTest
+      depthWrite
+      toneMapped={false}
+      transparent={false}
+      opacity={1}
+      side={THREE.FrontSide}
+    />
+  );
+};
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 
@@ -98,15 +106,13 @@ const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: Math.PI * 0.28,
 };
 
-const SHAFT_START = 0.18;
-const SHAFT_LENGTH = 3.35;
-const SHAFT_RADIUS = 0.52;
-const CONE_LENGTH = 2.35;
-const CONE_RADIUS = 1.32;
-const ARROW_HIT_RADIUS = 3.4;
-const ARROW_HIT_EXTRA = 2.4;
+const GRIP_START = 0.1;
+const GRIP_RADIUS = 0.32;
+const GRIP_BODY = 0.78;
+const ARROW_HIT_RADIUS = 2.15;
+const ARROW_HIT_EXTRA = 2.1;
 
-/** Thick shaft + fat cone planted on a face, pointing outward. */
+/** Soft capsule planted on a face — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
   reach: number;
@@ -114,19 +120,15 @@ export const AxisArrow: React.FC<{
   active: boolean;
   onPointerDown: (event: any) => void;
 }> = ({ axis, reach, color, active, onPointerDown }) => {
-  const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
-  const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
-  const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
+  const gripLength = GRIP_BODY + GRIP_RADIUS * 2;
+  const gripCenter = GRIP_START + gripLength / 2;
+  const hitLength = GRIP_START + gripLength + ARROW_HIT_EXTRA;
 
   return (
     <group position={facePoint(axis, reach)} rotation={FACE_ROTATION[axis]}>
       <GripSize>
-        <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
-          <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 24]} />
-          <GizmoMaterial color={color} active={active} />
-        </mesh>
-        <mesh position={[0, coneCenter, 0]} renderOrder={12} frustumCulled={false}>
-          <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 28]} />
+        <mesh position={[0, gripCenter, 0]} renderOrder={12} frustumCulled={false}>
+          <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
@@ -157,11 +159,11 @@ function facePoint(axis: FaceAxis, reach: number): [number, number, number] {
   }
 }
 
-const HUB_RADIUS = 1.18;
-const HUB_THICKNESS = 0.36;
-const CHEVRON_RADIUS = 0.34;
-const CHEVRON_LENGTH = 0.72;
-const HUB_HIT_RADIUS = 3.2;
+const HUB_RADIUS = 0.62;
+const HUB_THICKNESS = 0.16;
+const CHEVRON_RADIUS = 0.16;
+const CHEVRON_LENGTH = 0.34;
+const HUB_HIT_RADIUS = 2.15;
 
 /** Light hub that sits on the part's top face (not a floating origin ball). */
 export const MoveHub: React.FC<{
@@ -189,7 +191,7 @@ export const MoveHub: React.FC<{
           <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-          <torusGeometry args={[HUB_RADIUS, 0.08, 8, 32]} />
+          <torusGeometry args={[HUB_RADIUS, 0.045, 8, 32]} />
           <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
         </mesh>
         {chevrons.map((chevron) => (
@@ -213,7 +215,7 @@ export const MoveHub: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 1.2, 20]} />
+          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.85, 20]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
@@ -221,9 +223,9 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 1.55;
-const PILL_HEIGHT = 2.05;
-const RING_HIT_TUBE = 2.8;
+const PILL_RADIUS = 0.34;
+const PILL_HEIGHT = 0.82;
+const RING_HIT_TUBE = 2.15;
 
 function pillPose(radius: number, angle: number) {
   const position: [number, number, number] = [
@@ -251,13 +253,13 @@ export const RotateRing: React.FC<{
   return (
     <group rotation={RING_ROTATION[axis]}>
       <mesh renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[radius, tube, 16, 80]} />
+        <torusGeometry args={[radius, tube, 10, 80]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
         <GripSize>
           <mesh renderOrder={13} frustumCulled={false}>
-            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 8, 20]} />
+            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 6, 16]} />
             <GizmoMaterial color={color} active={active} />
           </mesh>
         </GripSize>
@@ -277,10 +279,10 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD_MIN = 2.5;
-const PAD_MAX = 7.2;
-const PAD_FRAC = 0.22;
-const PAD_THICK_MIN = 0.55;
+const PAD_MIN = 0.95;
+const PAD_MAX = 1.85;
+const PAD_FRAC = 0.09;
+const PAD_THICK_MIN = 0.22;
 
 function facePadExtents(axis: FaceAxis, length: number, height: number, width: number) {
   let across: number;
@@ -296,11 +298,13 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
     along = height;
   }
   const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
-  const thick = Math.max(PAD_THICK_MIN, side * 0.18);
-  return { side, thick };
+  const thick = Math.max(PAD_THICK_MIN, side * 0.22);
+  const radius = THREE.MathUtils.clamp(side * 0.28, 0.26, 0.38);
+  const body = THREE.MathUtils.clamp(thick * 0.9, 0.18, 0.48);
+  return { side, thick, radius, body };
 }
 
-/** Rounded-ish RGB cube sitting on the part face. */
+/** Soft rounded pad on the part face — same RGB, less cube mass. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
@@ -310,17 +314,18 @@ export const FacePad: React.FC<{
   width: number;
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, length, height, width, onPointerDown }) => {
-  const { side, thick } = facePadExtents(axis, length, height, width);
+  const { side, thick, radius, body } = facePadExtents(axis, length, height, width);
+  const padLength = body + radius * 2;
 
   return (
     <group rotation={FACE_ROTATION[axis]}>
       <GripSize>
-        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
-          <boxGeometry args={[side, thick, side]} />
+        <mesh position={[0, padLength / 2, 0]} renderOrder={12} frustumCulled={false}>
+          <capsuleGeometry args={[radius, body, 6, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, thick / 2, 0]}
+          position={[0, padLength / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -328,7 +333,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 1.4, thick + 1.8, side + 1.4]} />
+          <boxGeometry args={[side + 1.55, thick + 1.7, side + 1.55]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
