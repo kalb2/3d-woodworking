@@ -106,34 +106,56 @@ const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: Math.PI * 0.28,
 };
 
-const GRIP_START = 0.12;
-const GRIP_RADIUS = 0.5;
-const GRIP_BODY = 1.28;
-const ARROW_HIT_RADIUS = 2.2;
-const ARROW_HIT_EXTRA = 2.15;
+const GRIP_RADIUS = 0.52;
+const GRIP_BODY = 1.35;
+const ARROW_HIT_RADIUS = 2.25;
+const ARROW_HIT_LENGTH = 3.4;
+
+/**
+ * Sit the pill on the top edge (Moblo), long axis along that edge.
+ * +Y stays a short upright capsule on the top face.
+ */
+function edgeTopPose(
+  axis: FaceAxis,
+  hx: number,
+  hy: number,
+  hz: number,
+): { position: [number, number, number]; rotation: [number, number, number] } {
+  const y = hy + GRIP_RADIUS;
+  const inset = GRIP_RADIUS * 0.15;
+  switch (axis) {
+    case '+x': return { position: [hx - inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
+    case '-x': return { position: [-hx + inset, y, 0], rotation: [Math.PI / 2, 0, 0] };
+    case '+z': return { position: [0, y, hz - inset], rotation: [0, 0, Math.PI / 2] };
+    case '-z': return { position: [0, y, -hz + inset], rotation: [0, 0, Math.PI / 2] };
+    case '+y': return { position: [0, hy, 0], rotation: [0, 0, 0] };
+    case '-y': return { position: [0, -hy, 0], rotation: [Math.PI, 0, 0] };
+  }
+}
 
 /** Soft capsule on a face/edge — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
-  reach: number;
-  lift?: number;
+  hx: number;
+  hy: number;
+  hz: number;
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, reach, lift = 0, color, active, onPointerDown }) => {
-  const gripLength = GRIP_BODY + GRIP_RADIUS * 2;
-  const gripCenter = GRIP_START + gripLength / 2;
-  const hitLength = GRIP_START + gripLength + ARROW_HIT_EXTRA;
+}> = ({ axis, hx, hy, hz, color, active, onPointerDown }) => {
+  const pose = edgeTopPose(axis, hx, hy, hz);
+  const upright = axis === '+y' || axis === '-y';
+  const yOff = upright ? GRIP_RADIUS + GRIP_BODY / 2 : 0;
 
   return (
-    <group position={facePoint(axis, reach, lift)} rotation={FACE_ROTATION[axis]}>
+    <group position={pose.position} rotation={pose.rotation}>
       <GripSize>
-        <mesh position={[0, gripCenter, 0]} renderOrder={12} frustumCulled={false}>
+        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, hitLength / 2, 0]}
+          position={[0, yOff, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -141,24 +163,13 @@ export const AxisArrow: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, hitLength, 10]} />
+          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, ARROW_HIT_LENGTH, 10]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
     </group>
   );
 };
-
-function facePoint(axis: FaceAxis, reach: number, lift = 0): [number, number, number] {
-  switch (axis) {
-    case '+x': return [reach, lift, 0];
-    case '-x': return [-reach, lift, 0];
-    case '+y': return [0, reach, 0];
-    case '-y': return [0, -reach, 0];
-    case '+z': return [0, lift, reach];
-    case '-z': return [0, lift, -reach];
-  }
-}
 
 const HUB_RADIUS = 0.78;
 const HUB_THICKNESS = 0.2;

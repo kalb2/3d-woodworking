@@ -226,13 +226,13 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const ringGap = Math.max(ringTube * 1.1, 0.4);
   const showMinusY = height >= 3;
 
-  const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; reach: number; color: string }[] = [
-    { axis: '+x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
-    { axis: '-x', drag: 'x', reach: hx, color: GIZMO_AXIS.x },
-    { axis: '+y', drag: 'y', reach: hy, color: GIZMO_AXIS.y },
-    ...(showMinusY ? [{ axis: '-y' as const, drag: 'y' as const, reach: hy, color: GIZMO_AXIS.y }] : []),
-    { axis: '+z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
-    { axis: '-z', drag: 'z', reach: hz, color: GIZMO_AXIS.z },
+  const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; color: string }[] = [
+    { axis: '+x', drag: 'x', color: GIZMO_AXIS.x },
+    { axis: '-x', drag: 'x', color: GIZMO_AXIS.x },
+    { axis: '+y', drag: 'y', color: GIZMO_AXIS.y },
+    ...(showMinusY ? [{ axis: '-y' as const, drag: 'y' as const, color: GIZMO_AXIS.y }] : []),
+    { axis: '+z', drag: 'z', color: GIZMO_AXIS.z },
+    { axis: '-z', drag: 'z', color: GIZMO_AXIS.z },
   ];
 
   return (
@@ -240,12 +240,13 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
       <GizmoDepthClear />
       {isMove ? (
         <>
-          {moveHandles.map(({ axis, drag, reach, color }) => (
+          {moveHandles.map(({ axis, drag, color }) => (
             <AxisArrow
               key={axis}
               axis={axis}
-              reach={reach}
-              lift={axis === '+y' || axis === '-y' ? 0 : hy * 0.92}
+              hx={hx}
+              hy={hy}
+              hz={hz}
               color={color}
               active={activeAxis === drag}
               onPointerDown={beginAxis(drag)}
