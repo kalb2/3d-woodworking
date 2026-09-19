@@ -12,6 +12,7 @@ import {
   GIZMO_SCALE_MAX,
   GIZMO_SCALE_MIN,
 } from '../../theme/gizmo';
+import { gripAnchor, type MeshExtents } from '../../theme/partSurface';
 
 const _world = new THREE.Vector3();
 
@@ -52,34 +53,33 @@ export const GripSize: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
-/** Solid matte paint — no transparency, no emissive glass. */
+/**
+ * Unlit opaque paint so Moblo RGB lands on screen as-authored.
+ * Studio lights were shifting Lambert handles off the reference swatches.
+ */
 export const GizmoMaterial: React.FC<{
   color: string;
   active?: boolean;
-}> = ({ color, active = false }) => (
-  <meshLambertMaterial
-    color={color}
-    emissive={active ? color : '#000000'}
-    emissiveIntensity={active ? 0.18 : 0}
-    depthTest
-    depthWrite
-    toneMapped={false}
-    transparent={false}
-    opacity={1}
-    side={THREE.FrontSide}
-  />
-);
+}> = ({ color, active = false }) => {
+  const paint = useMemo(() => {
+    if (!active) return color;
+    return `#${new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.1).getHexString()}`;
+  }, [color, active]);
+
+  return (
+    <meshBasicMaterial
+      color={paint}
+      depthTest
+      depthWrite
+      toneMapped={false}
+      transparent={false}
+      opacity={1}
+      side={THREE.FrontSide}
+    />
+  );
+};
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
-
-const FACE_ROTATION: Record<FaceAxis, [number, number, number]> = {
-  '+x': [0, 0, -Math.PI / 2],
-  '-x': [0, 0, Math.PI / 2],
-  '+y': [0, 0, 0],
-  '-y': [Math.PI, 0, 0],
-  '+z': [Math.PI / 2, 0, 0],
-  '-z': [-Math.PI / 2, 0, 0],
-};
 
 const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
   x: [0, Math.PI / 2, 0],
@@ -98,39 +98,41 @@ const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: Math.PI * 0.28,
 };
 
-const SHAFT_START = 0.18;
-const SHAFT_LENGTH = 3.35;
-const SHAFT_RADIUS = 0.52;
-const CONE_LENGTH = 2.35;
-const CONE_RADIUS = 1.32;
-const ARROW_HIT_RADIUS = 3.4;
-const ARROW_HIT_EXTRA = 2.4;
+const GRIP_RADIUS = 0.52;
+const GRIP_BODY = 1.35;
+const ARROW_HIT_RADIUS = 2.25;
+const ARROW_HIT_LENGTH = 3.4;
 
-/** Thick shaft + fat cone planted on a face, pointing outward. */
+const EDGE_ALONG: Record<FaceAxis, [number, number, number]> = {
+  '+x': [Math.PI / 2, 0, 0],
+  '-x': [Math.PI / 2, 0, 0],
+  '+z': [0, 0, Math.PI / 2],
+  '-z': [0, 0, Math.PI / 2],
+  '+y': [0, 0, 0],
+  '-y': [Math.PI, 0, 0],
+};
+
+/** Soft capsule on the real mesh edge/rim — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
-  reach: number;
+  extents: MeshExtents;
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, reach, color, active, onPointerDown }) => {
-  const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
-  const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
-  const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
+}> = ({ axis, extents, color, active, onPointerDown }) => {
+  const position = gripAnchor(axis, extents);
+  const upright = axis === '+y' || axis === '-y';
+  const yOff = upright ? GRIP_RADIUS + GRIP_BODY / 2 : 0;
 
   return (
-    <group position={facePoint(axis, reach)} rotation={FACE_ROTATION[axis]}>
+    <group position={position} rotation={EDGE_ALONG[axis]}>
       <GripSize>
-        <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
-          <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 24]} />
-          <GizmoMaterial color={color} active={active} />
-        </mesh>
-        <mesh position={[0, coneCenter, 0]} renderOrder={12} frustumCulled={false}>
-          <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 28]} />
+        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
+          <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, hitLength / 2, 0]}
+          position={[0, yOff, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -138,7 +140,7 @@ export const AxisArrow: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, hitLength, 10]} />
+          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, ARROW_HIT_LENGTH, 10]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
@@ -146,22 +148,11 @@ export const AxisArrow: React.FC<{
   );
 };
 
-function facePoint(axis: FaceAxis, reach: number): [number, number, number] {
-  switch (axis) {
-    case '+x': return [reach, 0, 0];
-    case '-x': return [-reach, 0, 0];
-    case '+y': return [0, reach, 0];
-    case '-y': return [0, -reach, 0];
-    case '+z': return [0, 0, reach];
-    case '-z': return [0, 0, -reach];
-  }
-}
-
-const HUB_RADIUS = 1.18;
-const HUB_THICKNESS = 0.36;
-const CHEVRON_RADIUS = 0.34;
-const CHEVRON_LENGTH = 0.72;
-const HUB_HIT_RADIUS = 3.2;
+const HUB_RADIUS = 0.78;
+const HUB_THICKNESS = 0.2;
+const CHEVRON_RADIUS = 0.2;
+const CHEVRON_LENGTH = 0.42;
+const HUB_HIT_RADIUS = 2.2;
 
 /** Light hub that sits on the part's top face (not a floating origin ball). */
 export const MoveHub: React.FC<{
@@ -189,7 +180,7 @@ export const MoveHub: React.FC<{
           <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-          <torusGeometry args={[HUB_RADIUS, 0.08, 8, 32]} />
+          <torusGeometry args={[HUB_RADIUS, 0.045, 8, 32]} />
           <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
         </mesh>
         {chevrons.map((chevron) => (
@@ -213,7 +204,7 @@ export const MoveHub: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 1.2, 20]} />
+          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.85, 20]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
@@ -221,9 +212,9 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 1.55;
-const PILL_HEIGHT = 2.05;
-const RING_HIT_TUBE = 2.8;
+const PILL_RADIUS = 0.48;
+const PILL_HEIGHT = 1.12;
+const RING_HIT_TUBE = 2.2;
 
 function pillPose(radius: number, angle: number) {
   const position: [number, number, number] = [
@@ -251,13 +242,13 @@ export const RotateRing: React.FC<{
   return (
     <group rotation={RING_ROTATION[axis]}>
       <mesh renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[radius, tube, 16, 80]} />
+        <torusGeometry args={[radius, tube, 10, 80]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
         <GripSize>
           <mesh renderOrder={13} frustumCulled={false}>
-            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 8, 20]} />
+            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 6, 16]} />
             <GizmoMaterial color={color} active={active} />
           </mesh>
         </GripSize>
@@ -277,10 +268,10 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD_MIN = 2.5;
-const PAD_MAX = 7.2;
-const PAD_FRAC = 0.22;
-const PAD_THICK_MIN = 0.55;
+const PAD_MIN = 1.15;
+const PAD_MAX = 2.2;
+const PAD_FRAC = 0.12;
+const PAD_THICK_MIN = 0.28;
 
 function facePadExtents(axis: FaceAxis, length: number, height: number, width: number) {
   let across: number;
@@ -296,11 +287,13 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
     along = height;
   }
   const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
-  const thick = Math.max(PAD_THICK_MIN, side * 0.18);
-  return { side, thick };
+  const thick = Math.max(PAD_THICK_MIN, side * 0.22);
+  const radius = THREE.MathUtils.clamp(side * 0.32, 0.42, 0.52);
+  const body = THREE.MathUtils.clamp(side * 0.7, 0.85, 1.35);
+  return { side, thick, radius, body };
 }
 
-/** Rounded-ish RGB cube sitting on the part face. */
+/** Soft rounded pad on the part face — same RGB, less cube mass. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
@@ -310,17 +303,19 @@ export const FacePad: React.FC<{
   width: number;
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, length, height, width, onPointerDown }) => {
-  const { side, thick } = facePadExtents(axis, length, height, width);
+  const { side, thick, radius, body } = facePadExtents(axis, length, height, width);
+  const upright = axis === '+y' || axis === '-y';
+  const yOff = upright ? radius + body / 2 : 0;
 
   return (
-    <group rotation={FACE_ROTATION[axis]}>
+    <group rotation={EDGE_ALONG[axis]}>
       <GripSize>
-        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
-          <boxGeometry args={[side, thick, side]} />
+        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
+          <capsuleGeometry args={[radius, body, 6, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, thick / 2, 0]}
+          position={[0, yOff, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -328,7 +323,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 1.4, thick + 1.8, side + 1.4]} />
+          <boxGeometry args={[side + 1.55, thick + 1.7, side + 1.55]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
@@ -336,48 +331,44 @@ export const FacePad: React.FC<{
   );
 };
 
-function boxOutlinePoints(length: number, height: number, width: number, pad: number): [number, number, number][] {
-  const hx = length / 2 + pad;
-  const hy = height / 2 + pad;
-  const hz = width / 2 + pad;
-  return [
-    [-hx, -hy, -hz], [hx, -hy, -hz],
-    [hx, -hy, -hz], [hx, -hy, hz],
-    [hx, -hy, hz], [-hx, -hy, hz],
-    [-hx, -hy, hz], [-hx, -hy, -hz],
-    [-hx, hy, -hz], [hx, hy, -hz],
-    [hx, hy, -hz], [hx, hy, hz],
-    [hx, hy, hz], [-hx, hy, hz],
-    [-hx, hy, hz], [-hx, hy, -hz],
-    [-hx, -hy, -hz], [-hx, hy, -hz],
-    [hx, -hy, -hz], [hx, hy, -hz],
-    [hx, -hy, hz], [hx, hy, hz],
-    [-hx, -hy, hz], [-hx, hy, hz],
-  ];
+function circlePoints(radius: number, axis: 'x' | 'y' | 'z', segments = 64): [number, number, number][] {
+  const pts: [number, number, number][] = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
+    const c = Math.cos(t) * radius;
+    const s = Math.sin(t) * radius;
+    if (axis === 'y') pts.push([c, 0, s]);
+    else if (axis === 'x') pts.push([0, c, s]);
+    else pts.push([c, s, 0]);
+  }
+  return pts;
 }
 
-/** 12-edge bounding box using pixel-width lines (WebGL ignores LineBasic linewidth). */
-export const SelectionOutline: React.FC<{
-  length: number;
-  height: number;
-  width: number;
-  pad?: number;
-}> = ({ length, height, width, pad = 0.1 }) => {
-  const points = useMemo(
-    () => boxOutlinePoints(length, height, width, pad),
-    [length, height, width, pad]
+/** Light-blue meridians on a sphere — EdgesGeometry is empty on a smooth ball. */
+export const SphereOutline: React.FC<{ radius: number }> = ({ radius }) => {
+  const rings = useMemo(
+    () => ({
+      xz: circlePoints(radius, 'y'),
+      xy: circlePoints(radius, 'z'),
+      yz: circlePoints(radius, 'x'),
+    }),
+    [radius]
   );
 
   return (
-    <Line
-      segments
-      points={points}
-      color={SELECTION_COLOR}
-      lineWidth={GIZMO_OUTLINE_WIDTH}
-      depthTest={false}
-      renderOrder={8}
-      frustumCulled={false}
-      raycast={() => undefined}
-    />
+    <>
+      {(['xz', 'xy', 'yz'] as const).map((key) => (
+        <Line
+          key={key}
+          points={rings[key]}
+          color={SELECTION_COLOR}
+          lineWidth={GIZMO_OUTLINE_WIDTH}
+          depthTest={false}
+          renderOrder={8}
+          frustumCulled={false}
+          raycast={() => undefined}
+        />
+      ))}
+    </>
   );
 };
