@@ -97,12 +97,15 @@ const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: 0,
 };
 
-const GRIP_RADIUS = 0.52;
-const GRIP_BODY = 1.35;
-const ARROW_HIT_RADIUS = 2.25;
-const ARROW_HIT_LENGTH = 3.4;
+const SHAFT_START = 0.12;
+const SHAFT_LENGTH = 1.72;
+const SHAFT_RADIUS = 0.2;
+const CONE_LENGTH = 1.08;
+const CONE_RADIUS = 0.52;
+const ARROW_HIT_RADIUS = 2.15;
+const ARROW_HIT_EXTRA = 1.6;
 
-/** Local +Y of a capsule maps onto the face normal — pull outward from the side. */
+/** Local +Y maps onto the face normal — pull outward from the side. */
 const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
   '+x': [0, 0, -Math.PI / 2],
   '-x': [0, 0, Math.PI / 2],
@@ -112,7 +115,7 @@ const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
   '-z': [-Math.PI / 2, 0, 0],
 };
 
-/** Soft capsule sticking out from a face center — tappable, not a dominating spike. */
+/** Moblo move: shaft + cone on the face you'd pull. Not a capsule. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
   extents: MeshExtents;
@@ -121,17 +124,23 @@ export const AxisArrow: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, extents, color, active, onPointerDown }) => {
   const position = gripAnchor(axis, extents);
-  const yOff = GRIP_RADIUS + GRIP_BODY / 2;
+  const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
+  const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
+  const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
 
   return (
     <group position={position} rotation={FACE_OUT[axis]}>
       <GripSize>
-        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
-          <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
+        <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
+          <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 20]} />
+          <GizmoMaterial color={color} active={active} />
+        </mesh>
+        <mesh position={[0, coneCenter, 0]} renderOrder={12} frustumCulled={false}>
+          <coneGeometry args={[CONE_RADIUS, CONE_LENGTH, 22]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, yOff, 0]}
+          position={[0, hitLength / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -139,7 +148,7 @@ export const AxisArrow: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, ARROW_HIT_LENGTH, 10]} />
+          <cylinderGeometry args={[ARROW_HIT_RADIUS, ARROW_HIT_RADIUS, hitLength, 10]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
@@ -211,8 +220,9 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 0.48;
-const PILL_HEIGHT = 1.12;
+const PILL_RADIUS = 0.36;
+const PILL_HEIGHT = 1.28;
+const PILL_FLAT = 0.4;
 const RING_HIT_TUBE = 2.2;
 
 function pillPose(radius: number, angle: number) {
@@ -226,7 +236,7 @@ function pillPose(radius: number, angle: number) {
   return { position, quaternion };
 }
 
-/** Full opaque RGB hoop wrapped around the part + fat capsule on an edge. */
+/** Full opaque RGB hoop + flattened pill on the side you'd grab. Not a cone or cube. */
 export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
@@ -246,7 +256,7 @@ export const RotateRing: React.FC<{
       </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
         <GripSize>
-          <mesh renderOrder={13} frustumCulled={false}>
+          <mesh scale={[1.12, 1, PILL_FLAT]} renderOrder={13} frustumCulled={false}>
             <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 6, 16]} />
             <GizmoMaterial color={color} active={active} />
           </mesh>
@@ -267,10 +277,10 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD_MIN = 1.15;
-const PAD_MAX = 2.2;
+const PAD_MIN = 1.05;
+const PAD_MAX = 1.85;
 const PAD_FRAC = 0.12;
-const PAD_THICK_MIN = 0.28;
+const PAD_THICK_MIN = 0.32;
 
 function facePadExtents(axis: FaceAxis, length: number, height: number, width: number) {
   let across: number;
@@ -286,13 +296,11 @@ function facePadExtents(axis: FaceAxis, length: number, height: number, width: n
     along = height;
   }
   const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
-  const thick = Math.max(PAD_THICK_MIN, side * 0.22);
-  const radius = THREE.MathUtils.clamp(side * 0.32, 0.42, 0.52);
-  const body = THREE.MathUtils.clamp(side * 0.7, 0.85, 1.35);
-  return { side, thick, radius, body };
+  const thick = Math.max(PAD_THICK_MIN, side * 0.2);
+  return { side, thick };
 }
 
-/** Soft rounded pad on the part face — same RGB, less cube mass. */
+/** Moblo resize: square RGB pad on the face you'd pull. Not a capsule. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
@@ -302,18 +310,17 @@ export const FacePad: React.FC<{
   width: number;
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, length, height, width, onPointerDown }) => {
-  const { side, thick, radius, body } = facePadExtents(axis, length, height, width);
-  const yOff = radius + body / 2;
+  const { side, thick } = facePadExtents(axis, length, height, width);
 
   return (
     <group rotation={FACE_OUT[axis]}>
       <GripSize>
-        <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
-          <capsuleGeometry args={[radius, body, 6, 16]} />
+        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
+          <boxGeometry args={[side, thick, side]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
         <mesh
-          position={[0, yOff, 0]}
+          position={[0, thick / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -321,7 +328,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 1.55, thick + 1.7, side + 1.55]} />
+          <boxGeometry args={[side + 1.4, thick + 1.8, side + 1.4]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
