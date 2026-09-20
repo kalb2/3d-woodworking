@@ -429,6 +429,25 @@ html, body, #root {
   white-space: nowrap;
 }
 
+.phone-selected-part-duplicate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: none;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 8px 12px;
+  min-height: 36px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .phone-selected-part-delete {
   display: inline-flex;
   align-items: center;

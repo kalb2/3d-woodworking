@@ -9,9 +9,6 @@ export interface MeshExtents {
   kind: MeshKind;
 }
 
-/** How far a resting pill sits above a top face (matches the soft-capsule radius). */
-export const GRIP_SURFACE_SIT = 0.52;
-
 /** Tight pad so rotate hoops kiss the silhouette instead of a loose AABB. */
 export const MESH_RING_PAD = 0.18;
 
@@ -55,33 +52,17 @@ export function meshRingRadius(
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 
 /**
- * Anchor on the mesh: top-edge / rim for boards and cylinders, surface for spheres.
- * No AABB corner that floats off a round part.
+ * Center of the face you'd pull — sides for X/Z, top/bottom for Y.
+ * Same for box, cylinder wall, and sphere. Never the top-edge cluster.
  */
 export function gripAnchor(axis: FaceAxis, extents: MeshExtents): [number, number, number] {
-  const { hx, hy, hz, kind } = extents;
-
-  if (kind === 'sphere') {
-    switch (axis) {
-      case '+x': return [hx, 0, 0];
-      case '-x': return [-hx, 0, 0];
-      case '+y': return [0, hy, 0];
-      case '-y': return [0, -hy, 0];
-      case '+z': return [0, 0, hz];
-      case '-z': return [0, 0, -hz];
-    }
-  }
-
-  const top = hy + GRIP_SURFACE_SIT;
-  // Cylinders: sit on the circular rim. Boxes: inset so the pill rests on the board.
-  const inset = kind === 'cylinder' ? 0 : GRIP_SURFACE_SIT;
-
+  const { hx, hy, hz } = extents;
   switch (axis) {
-    case '+x': return [hx - inset, top, 0];
-    case '-x': return [-hx + inset, top, 0];
+    case '+x': return [hx, 0, 0];
+    case '-x': return [-hx, 0, 0];
     case '+y': return [0, hy, 0];
     case '-y': return [0, -hy, 0];
-    case '+z': return [0, top, hz - inset];
-    case '-z': return [0, top, -hz + inset];
+    case '+z': return [0, 0, hz];
+    case '-z': return [0, 0, -hz];
   }
 }

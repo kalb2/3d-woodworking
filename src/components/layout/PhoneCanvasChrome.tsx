@@ -269,6 +269,16 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
             {selectedObject.name}
           </span>
           <PhoneTapButton
+            className="phone-selected-part-duplicate"
+            onTap={() => duplicateObject(selectedObject.id)}
+            aria-label={`Duplicate ${selectedObject.name}`}
+            title="Duplicate part"
+            data-testid="selected-part-duplicate"
+          >
+            <Copy size={15} strokeWidth={1.8} />
+            <span>Duplicate</span>
+          </PhoneTapButton>
+          <PhoneTapButton
             className="phone-selected-part-delete"
             onTap={() => deleteObject(selectedObject.id)}
             aria-label={`Delete ${selectedObject.name}`}
@@ -323,16 +333,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           icon={<Move size={22} strokeWidth={1.6} />}
           active={!propertiesOpen && activeGizmoMode === 'move'}
           onTap={() => selectGizmo('move')}
-        />
-        <DockItem
-          label="Copy"
-          testId="tool-copy"
-          icon={<Copy size={22} strokeWidth={1.6} />}
-          active={false}
-          disabled={!hasSelection}
-          onTap={() => {
-            if (selectedObjectId) duplicateObject(selectedObjectId);
-          }}
         />
         <DockItem
           label="Rotate"

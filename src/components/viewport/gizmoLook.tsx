@@ -88,14 +88,13 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
 };
 
 /**
- * Pills on visible edges of each hoop.
- * Angles avoid antipodal setFromUnitVectors singularities.
- * X: high on the ring (above the part). Y: near long edge. Z: high / +X.
+ * Rotate pills on the hoop equator — the side you'd grab, not the top.
+ * X hoop (YZ): +Z. Y hoop (XZ): +Z. Z hoop (XY): +X.
  */
-const EDGE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI * 0.72,
-  y: Math.PI * 1.52,
-  z: Math.PI * 0.28,
+const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
+  x: Math.PI,
+  y: Math.PI / 2,
+  z: 0,
 };
 
 const GRIP_RADIUS = 0.52;
@@ -103,16 +102,17 @@ const GRIP_BODY = 1.35;
 const ARROW_HIT_RADIUS = 2.25;
 const ARROW_HIT_LENGTH = 3.4;
 
-const EDGE_ALONG: Record<FaceAxis, [number, number, number]> = {
-  '+x': [Math.PI / 2, 0, 0],
-  '-x': [Math.PI / 2, 0, 0],
-  '+z': [0, 0, Math.PI / 2],
-  '-z': [0, 0, Math.PI / 2],
+/** Local +Y of a capsule maps onto the face normal — pull outward from the side. */
+const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
+  '+x': [0, 0, -Math.PI / 2],
+  '-x': [0, 0, Math.PI / 2],
   '+y': [0, 0, 0],
   '-y': [Math.PI, 0, 0],
+  '+z': [Math.PI / 2, 0, 0],
+  '-z': [-Math.PI / 2, 0, 0],
 };
 
-/** Soft capsule on the real mesh edge/rim — tappable, not a dominating spike. */
+/** Soft capsule sticking out from a face center — tappable, not a dominating spike. */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
   extents: MeshExtents;
@@ -121,11 +121,10 @@ export const AxisArrow: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, extents, color, active, onPointerDown }) => {
   const position = gripAnchor(axis, extents);
-  const upright = axis === '+y' || axis === '-y';
-  const yOff = upright ? GRIP_RADIUS + GRIP_BODY / 2 : 0;
+  const yOff = GRIP_RADIUS + GRIP_BODY / 2;
 
   return (
-    <group position={position} rotation={EDGE_ALONG[axis]}>
+    <group position={position} rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[GRIP_RADIUS, GRIP_BODY, 8, 16]} />
@@ -236,7 +235,7 @@ export const RotateRing: React.FC<{
   tube: number;
   pillAngle?: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, radius, tube, pillAngle = EDGE_PILL_ANGLE[axis], onPointerDown }) => {
+}> = ({ axis, color, active, radius, tube, pillAngle = SIDE_PILL_ANGLE[axis], onPointerDown }) => {
   const pose = useMemo(() => pillPose(radius, pillAngle), [radius, pillAngle]);
 
   return (
@@ -304,11 +303,10 @@ export const FacePad: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, length, height, width, onPointerDown }) => {
   const { side, thick, radius, body } = facePadExtents(axis, length, height, width);
-  const upright = axis === '+y' || axis === '-y';
-  const yOff = upright ? radius + body / 2 : 0;
+  const yOff = radius + body / 2;
 
   return (
-    <group rotation={EDGE_ALONG[axis]}>
+    <group rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, yOff, 0]} renderOrder={12} frustumCulled={false}>
           <capsuleGeometry args={[radius, body, 6, 16]} />
