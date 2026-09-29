@@ -60,9 +60,9 @@ export const SidebarNav: React.FC = () => {
         ...PHONE_SHEET_EMBEDDED_STYLE,
       } : {
         position: 'absolute',
-        top: 88,
+        top: 'var(--ipad-panel-top)',
         left: 16,
-        bottom: 24,
+        bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
         width: 280,
         borderRadius: 16,
         zIndex: 40,

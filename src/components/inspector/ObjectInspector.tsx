@@ -101,14 +101,14 @@ export const ObjectInspector: React.FC = () => {
         gap: 16
       } : {
         position: 'absolute',
-        top: 88,
+        top: 'var(--ipad-panel-top)',
         right: 16,
         left: 'auto',
         width: 320,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
-        maxHeight: 'calc(100vh - 120px)',
+        maxHeight: 'calc(100dvh - var(--ipad-panel-top) - 24px - env(safe-area-inset-bottom, 0px))',
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         display: 'flex',
