@@ -74,20 +74,22 @@ export const FurnitureCanvas: React.FC = () => {
           maxPolarAngle={Math.PI / 2 + 0.05}
         />
 
-        {/* See-through floor & grid */}
+        {/* Single workshop grid while Floor is on — no extra plane */}
         <TransparentFloor
           visible={currentProject.showFloor}
           opacity={currentProject.floorOpacity}
         />
 
-        {/* Dynamic shadow ground contact */}
-        <ContactShadows
-          position={[0, 0, 0]}
-          opacity={0.6}
-          scale={120}
-          blur={2}
-          far={10}
-        />
+        {/* Shadow disc only when Floor is off — otherwise it reads as a second ground */}
+        {!currentProject.showFloor && (
+          <ContactShadows
+            position={[0, 0, 0]}
+            opacity={0.6}
+            scale={120}
+            blur={2}
+            far={10}
+          />
+        )}
 
         {/* Render all furniture objects in active project */}
         {currentProject.objects.map((obj) => (
