@@ -14,7 +14,6 @@ import {
   Menu,
   Ellipsis,
   Move,
-  Palette,
   Plus,
   RotateCw,
   Ruler,
@@ -316,6 +315,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           )}
         </div>
       )}
+      <div className="phone-dock-grid">
       <nav className="phone-tool-sheet-tools" aria-label="Basic tools">
         <DockItem
           label="Move"
@@ -347,21 +347,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           icon={<Scaling size={22} strokeWidth={1.6} />}
           active={!propertiesOpen && activeGizmoMode === 'resize'}
           onTap={() => selectGizmo('resize')}
-        />
-        <DockItem
-          label="Properties"
-          testId="overlay-launch-properties"
-          icon={<SlidersHorizontal size={22} strokeWidth={1.6} />}
-          active={propertiesOpen}
-          disabled={!hasSelection}
-          onTap={() => {
-            if (!hasSelection) return;
-            if (overlays.inspector) {
-              setOverlayOpen('inspector', false);
-              return;
-            }
-            openOverlay('inspector', true);
-          }}
         />
       </nav>
       <nav className="phone-tool-sheet-secondary" aria-label="Measure and view">
@@ -410,23 +395,24 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
             openOverlay('sidebar', true);
           }}
         />
-        <DockItem
-          compact
-          label="Color"
-          testId="overlay-launch-finish"
-          icon={<Palette size={18} strokeWidth={1.7} />}
-          active={overlays.materials}
-          disabled={!hasSelection}
-          onTap={() => {
-            if (!hasSelection) return;
-            if (overlays.materials) {
-              setOverlayOpen('materials', false);
-              return;
-            }
-            openOverlay('materials', true);
-          }}
-        />
       </nav>
+      <DockItem
+        className="phone-dock-part"
+        label="Properties"
+        testId="overlay-launch-properties"
+        icon={<SlidersHorizontal size={22} strokeWidth={1.6} />}
+        active={propertiesOpen}
+        disabled={!hasSelection}
+        onTap={() => {
+          if (!hasSelection) return;
+          if (overlays.inspector) {
+            setOverlayOpen('inspector', false);
+            return;
+          }
+          openOverlay('inspector', true);
+        }}
+      />
+      </div>
     </div>
   );
 };
@@ -441,10 +427,11 @@ const DockItem: React.FC<{
   active: boolean;
   disabled?: boolean;
   compact?: boolean;
+  className?: string;
   onTap: () => void;
-}> = ({ label, testId, icon, active, disabled, compact, onTap }) => (
+}> = ({ label, testId, icon, active, disabled, compact, className, onTap }) => (
   <PhoneTapButton
-    className={`phone-dock-item${compact ? ' is-compact' : ''}${active ? ' is-active' : ''}`}
+    className={`phone-dock-item${compact ? ' is-compact' : ''}${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
     disabled={disabled}
     onTap={onTap}
     aria-label={disabled ? `${label} (select a part)` : label}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Palette, SlidersHorizontal } from 'lucide-react';
+import { Box, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
 import { useAppStore } from './state/useAppStore';
 import { useIsPhone } from './hooks/useIsPhone';
@@ -13,7 +13,6 @@ import {
 } from './components/layout/PhoneCanvasChrome';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
-import { MaterialPicker } from './components/inspector/MaterialPicker';
 import { ProjectModal } from './components/modals/ProjectModal';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
@@ -93,7 +92,6 @@ export const App: React.FC = () => {
           <PhoneBottomSheet hasSelection={hasSelection}>
             <SidebarNav />
             <ObjectInspector />
-            <MaterialPicker />
           </PhoneBottomSheet>
           <PhoneMenuSheet
             onOpenProjectModal={() => setIsProjectModalOpen(true)}
@@ -120,20 +118,10 @@ export const App: React.FC = () => {
         />
       )}
 
-      {showDesktopLaunchers && !overlays.materials && hasSelection && (
-        <OverlayLaunchTab
-          label="Color"
-          icon={<Palette size={16} color="#e09f3e" />}
-          placement="right-bottom"
-          onOpen={() => openOverlay('materials', isPhone)}
-        />
-      )}
-
       {!isPhone && (
         <>
           <SidebarNav />
           <ObjectInspector />
-          <MaterialPicker />
         </>
       )}
 

@@ -477,13 +477,41 @@ html, body, #root {
   padding-bottom: 4px;
 }
 
+.phone-dock-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  grid-template-rows: auto auto;
+  align-items: stretch;
+}
+
+.phone-dock-grid > .phone-tool-sheet-tools {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.phone-dock-grid > .phone-tool-sheet-secondary {
+  grid-column: 1;
+  grid-row: 2;
+}
+
 .phone-tool-sheet-tools {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
   gap: 4px;
   flex-shrink: 0;
-  padding: 6px 10px 4px;
+  padding: 6px 6px 4px 10px;
+}
+
+.phone-dock-item.phone-dock-part {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  height: auto;
+  min-height: 108px;
+  margin: 8px 8px 10px 0;
+  padding: 8px 4px;
+  font-size: 10px;
 }
 
 .phone-tool-sheet.is-expanded .phone-tool-sheet-tools {
@@ -497,7 +525,7 @@ html, body, #root {
   justify-content: space-between;
   gap: 4px;
   flex-shrink: 0;
-  padding: 4px 10px 12px;
+  padding: 4px 6px 12px 10px;
 }
 
 .phone-dock-item {
@@ -1347,9 +1375,13 @@ html, body, #root {
   max-width: 100%;
 }
 
-.editor-root.is-phone .finish-picker.phone-sheet-embed {
-  background: #ffffff !important;
-  color: #0f172a;
+.part-color-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
 }
 
 /* Color swatch pill button */

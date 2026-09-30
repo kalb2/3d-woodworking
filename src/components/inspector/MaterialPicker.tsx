@@ -1,10 +1,6 @@
 import React from 'react';
-import { Check, Palette } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { useAppStore } from '../../state/useAppStore';
-import { useIsPhone } from '../../hooks/useIsPhone';
-import { OverlayDismissButton } from '../layout/OverlayChrome';
-import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import {
   FINISH_MATERIALS,
   PRESET_WOOD_MATERIALS,
@@ -23,9 +19,8 @@ function swatchInk(hex: string): string {
   return luminance > 160 ? '#0f172a' : '#ffffff';
 }
 
-export const MaterialPicker: React.FC = () => {
-  const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen } = useAppStore();
+/** Color well and wood chips. Rendered inside the part properties sheet, not its own panel. */
+export const PartColorSection: React.FC = () => {
   const {
     projects,
     activeProjectId,
@@ -34,9 +29,7 @@ export const MaterialPicker: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
-  if (!overlays.materials || !currentProject || !selectedObjectId) return null;
-
-  const object = currentProject.objects.find(o => o.id === selectedObjectId);
+  const object = currentProject?.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
 
   const applyMaterial = (material: WoodMaterial, skipHistory = false) => {
@@ -46,42 +39,7 @@ export const MaterialPicker: React.FC = () => {
   const paintHex = normalizePaintHex(object.material.baseColor);
 
   return (
-    <div
-      className={`project-overlay project-overlay-materials finish-picker${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
-      data-testid="overlay-materials"
-      style={isPhone ? {
-        ...PHONE_SHEET_EMBEDDED_STYLE,
-        padding: '0 16px 16px',
-        gap: 14,
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch'
-      } : {
-        position: 'absolute',
-        bottom: 24,
-        right: 16,
-        left: 'auto',
-        width: 340,
-        borderRadius: 16,
-        zIndex: 40,
-        padding: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        maxHeight: 'min(520px, calc(100dvh - 200px))',
-        overflowY: 'auto'
-      }}
-    >
-      <div className="finish-picker-header">
-        <div className="finish-picker-heading">
-          <Palette size={18} strokeWidth={2} />
-          <div className="finish-picker-titles">
-            <span className="finish-picker-title">Color</span>
-            <span className="finish-picker-part" data-testid="finish-part-name">{object.name}</span>
-          </div>
-        </div>
-        <OverlayDismissButton onDismiss={() => setOverlayOpen('materials', false)} />
-      </div>
-
+    <div className="finish-picker part-color-section" data-testid="part-color-section">
       <label className="finish-color-row">
         <span className="finish-section-label">Color</span>
         <span className="finish-color-value" data-testid="finish-color-value">{paintHex}</span>

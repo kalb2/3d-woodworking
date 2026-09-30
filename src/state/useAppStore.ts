@@ -150,8 +150,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openOverlay: (id) => {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    // pointerup opens the panel and can unmount that button before the
-    // synthesized click lands on the control underneath (Color under Properties).
+    // pointerup can unmount a launcher before the synthesized click lands
+    // on whatever control is now underneath.
     if (now - lastOverlayOpenAt < 280) return;
     lastOverlayOpenAt = now;
     set(() => ({
