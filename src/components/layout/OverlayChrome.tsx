@@ -74,7 +74,7 @@ interface CanvasReturnButtonProps {
 
 /**
  * Always-on-top hide control. Sits in the iOS safe area, above the iPad header
- * z-index, so Shapes / properties / finish can still be dismissed when Done
+ * z-index, so Shapes / properties / color can still be dismissed when Done
  * is covered or the WKWebView dropped in-panel clicks.
  */
 export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }) => {

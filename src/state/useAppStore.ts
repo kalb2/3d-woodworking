@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { isCompactChrome } from '../utils/compactLayout';
 
 const APP_PREFS_KEY = 'ipad_3d_furniture_app_prefs_v1';
 
@@ -75,14 +74,6 @@ export interface OverlayVisibility {
   menu: boolean;
 }
 
-const ALL_OVERLAYS_OPEN: OverlayVisibility = {
-  sidebar: true,
-  inspector: true,
-  materials: true,
-  tools: false,
-  menu: false,
-};
-
 const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
   sidebar: false,
   inspector: false,
@@ -92,12 +83,9 @@ const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
 };
 
 function initialOverlayVisibility(): OverlayVisibility {
-  // Default closed on compact / native iPhone. Never trust a single innerWidth
-  // read — Capacitor WKWebView often reports a wide size on first evaluate.
-  if (typeof window === 'undefined' || isCompactChrome()) {
-    return { ...ALL_OVERLAYS_CLOSED };
-  }
-  return { ...ALL_OVERLAYS_OPEN };
+  // One panel at a time. Starting with Shapes + Properties + Color open
+  // stacked those sheets on iPad.
+  return { ...ALL_OVERLAYS_CLOSED };
 }
 
 interface AppState {
@@ -158,21 +146,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       overlays: { ...state.overlays, [id]: open },
     })),
 
-  openOverlay: (id, exclusive) =>
-    set((state) => {
-      if (!exclusive) {
-        return { overlays: { ...state.overlays, [id]: true } };
-      }
-      return {
-        overlays: {
-          sidebar: id === 'sidebar',
-          inspector: id === 'inspector',
-          materials: id === 'materials',
-          tools: id === 'tools',
-          menu: id === 'menu',
-        },
-      };
-    }),
+  openOverlay: (id) =>
+    set(() => ({
+      overlays: {
+        sidebar: id === 'sidebar',
+        inspector: id === 'inspector',
+        materials: id === 'materials',
+        tools: id === 'tools',
+        menu: id === 'menu',
+      },
+    })),
 
   dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED } }),
 
@@ -181,8 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ overlays: { ...ALL_OVERLAYS_CLOSED } });
       return;
     }
-    // Do not force-open all three when compact detection is false.
-    // A false-wide WKWebView read is what stacked Shapes + props + finish
-    // on iPhone with no reachable dismiss.
+    // Do not force-open panels when the layout reads as wide.
+    // A false-wide WKWebView read used to stack Shapes, properties, and color.
   },
 }));

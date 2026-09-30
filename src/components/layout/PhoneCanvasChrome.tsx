@@ -412,7 +412,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
         />
         <DockItem
           compact
-          label="Finish"
+          label="Color"
           testId="overlay-launch-finish"
           icon={<Palette size={18} strokeWidth={1.7} />}
           active={overlays.materials}

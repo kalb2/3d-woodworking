@@ -122,7 +122,7 @@ export const App: React.FC = () => {
 
       {showDesktopLaunchers && !overlays.materials && hasSelection && (
         <OverlayLaunchTab
-          label="Finish"
+          label="Color"
           icon={<Palette size={16} color="#e09f3e" />}
           placement="right-bottom"
           onOpen={() => openOverlay('materials', isPhone)}

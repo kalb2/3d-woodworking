@@ -75,7 +75,7 @@ export const MaterialPicker: React.FC = () => {
         <div className="finish-picker-heading">
           <Palette size={18} strokeWidth={2} />
           <div className="finish-picker-titles">
-            <span className="finish-picker-title">Finish</span>
+            <span className="finish-picker-title">Color</span>
             <span className="finish-picker-part" data-testid="finish-part-name">{object.name}</span>
           </div>
         </div>
