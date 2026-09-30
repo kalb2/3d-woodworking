@@ -1214,6 +1214,154 @@ html, body, #root {
   font-weight: 500;
 }
 
+/* ============================================
+   FINISH PICKER — named paint + wood
+   ============================================ */
+
+.finish-picker {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.finish-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.finish-picker-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #0f172a;
+}
+
+.finish-picker-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.finish-picker-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.finish-picker-part {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finish-section-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.1px;
+}
+
+.finish-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.finish-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+.finish-chip.is-selected {
+  border: 2px solid #0f172a;
+  background: #f8fafc;
+}
+
+.finish-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.finish-swatch-wood {
+  background-blend-mode: multiply;
+}
+
+.finish-chip-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: #0f172a;
+  max-width: 100%;
+}
+
+.finish-sheen-row {
+  display: flex;
+  gap: 6px;
+}
+
+.finish-sheen-btn {
+  flex: 1;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  text-transform: capitalize;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.finish-sheen-btn.is-selected {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.editor-root.is-phone .finish-picker.phone-sheet-embed {
+  background: #ffffff !important;
+  color: #0f172a;
+}
+
 /* Color swatch pill button */
 .color-swatch-btn {
   width: 28px;

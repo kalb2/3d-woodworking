@@ -100,6 +100,18 @@ export const PRESET_WOOD_MATERIALS: Record<WoodSpecies, WoodMaterial> = {
     metalness: 0.0,
     varnishSheen: 'satin'
   },
+  plywood: {
+    id: 'plywood',
+    name: 'Plywood',
+    species: 'plywood',
+    baseColor: '#e7d3a1',
+    secondaryColor: '#b08968',
+    grainIntensity: 0.35,
+    grainScale: 5.5,
+    roughness: 0.55,
+    metalness: 0.0,
+    varnishSheen: 'matte'
+  },
   custom_paint: {
     id: 'custom_paint',
     name: 'Painted Matte Finish',
@@ -125,6 +137,85 @@ export const PRESET_WOOD_MATERIALS: Record<WoodSpecies, WoodMaterial> = {
     varnishSheen: 'glossy'
   }
 };
+
+export interface NamedPaintColor {
+  id: string;
+  name: string;
+  hex: string;
+}
+
+/** Solid paint colors. Labels stay in the UI; the hex is what lands on the part. */
+export const NAMED_PAINT_COLORS: NamedPaintColor[] = [
+  { id: 'white', name: 'White', hex: '#f8fafc' },
+  { id: 'grey', name: 'Grey', hex: '#6b7280' },
+  { id: 'black', name: 'Black', hex: '#111827' },
+  { id: 'red', name: 'Red', hex: '#dc2626' },
+  { id: 'orange', name: 'Orange', hex: '#f97316' },
+  { id: 'yellow', name: 'Yellow', hex: '#eab308' },
+  { id: 'green', name: 'Green', hex: '#16a34a' },
+  { id: 'blue', name: 'Blue', hex: '#2563eb' },
+  { id: 'navy', name: 'Navy', hex: '#1e3a8a' },
+  { id: 'teal', name: 'Teal', hex: '#0d9488' },
+  { id: 'brown', name: 'Brown', hex: '#92400e' },
+  { id: 'cream', name: 'Cream', hex: '#f3e6c8' }
+];
+
+/** Wood and metal finishes shown separately from paint. custom_paint is not a swatch. */
+export const FINISH_MATERIALS: { species: WoodSpecies; label: string }[] = [
+  { species: 'walnut', label: 'Walnut' },
+  { species: 'oak', label: 'Oak' },
+  { species: 'birch', label: 'Birch' },
+  { species: 'pine', label: 'Pine' },
+  { species: 'plywood', label: 'Plywood' },
+  { species: 'cherry', label: 'Cherry' },
+  { species: 'mahogany', label: 'Mahogany' },
+  { species: 'teak', label: 'Teak' },
+  { species: 'ebony', label: 'Ebony' },
+  { species: 'metal_accent', label: 'Brass' }
+];
+
+export function paintMaterialFromColor(
+  color: NamedPaintColor,
+  sheen: WoodMaterial['varnishSheen'] = 'matte'
+): WoodMaterial {
+  return {
+    id: 'custom_paint',
+    name: color.name,
+    species: 'custom_paint',
+    baseColor: color.hex,
+    secondaryColor: color.hex,
+    grainIntensity: 0,
+    grainScale: 1,
+    roughness: sheen === 'glossy' ? 0.2 : sheen === 'satin' ? 0.42 : 0.72,
+    metalness: 0,
+    varnishSheen: sheen,
+    stainOpacity: 0
+  };
+}
+
+export function materialFromSpecies(
+  species: WoodSpecies,
+  label: string
+): WoodMaterial {
+  const preset = PRESET_WOOD_MATERIALS[species];
+  return {
+    ...preset,
+    name: label,
+    stainColor: undefined,
+    stainOpacity: 0
+  };
+}
+
+export function matchesNamedPaint(mat: WoodMaterial, color: NamedPaintColor): boolean {
+  return mat.species === 'custom_paint'
+    && mat.baseColor.toLowerCase() === color.hex.toLowerCase();
+}
+
+function isSolidPaint(mat: WoodMaterial): boolean {
+  return mat.species === 'custom_paint'
+    && mat.grainIntensity <= 0.05
+    && !(mat.stainOpacity && mat.stainOpacity > 0.02);
+}
 
 export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
   const cacheKey = JSON.stringify({
@@ -217,11 +308,20 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
 }
 
 export function createWoodMeshMaterial(mat: WoodMaterial): THREE.MeshStandardMaterial {
-  const woodTex = generateWoodTexture(mat);
-  
   let roughness = mat.roughness;
   if (mat.varnishSheen === 'glossy') roughness = 0.15;
   if (mat.varnishSheen === 'matte') roughness = 0.7;
+
+  // Solid paint uses the named color directly so it is not darkened by a grain map.
+  if (isSolidPaint(mat)) {
+    return new THREE.MeshStandardMaterial({
+      color: mat.baseColor,
+      roughness,
+      metalness: 0
+    });
+  }
+
+  const woodTex = generateWoodTexture(mat);
 
   return new THREE.MeshStandardMaterial({
     map: woodTex,

@@ -1,12 +1,28 @@
 import React from 'react';
-import { Palette, Sparkles, Droplet } from 'lucide-react';
+import { Check, Palette } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
-import { PRESET_WOOD_MATERIALS } from '../../utils/woodTextureGenerator';
-import type { WoodSpecies } from '../../types/furniture';
+import {
+  FINISH_MATERIALS,
+  NAMED_PAINT_COLORS,
+  PRESET_WOOD_MATERIALS,
+  matchesNamedPaint,
+  materialFromSpecies,
+  paintMaterialFromColor
+} from '../../utils/woodTextureGenerator';
+import type { WoodMaterial } from '../../types/furniture';
+
+function swatchInk(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+  return luminance > 160 ? '#0f172a' : '#ffffff';
+}
 
 export const MaterialPicker: React.FC = () => {
   const isPhone = useIsPhone();
@@ -24,55 +40,18 @@ export const MaterialPicker: React.FC = () => {
   const object = currentProject.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
 
-  const speciesPresets = Object.values(PRESET_WOOD_MATERIALS);
-
-  const handleSelectSpecies = (speciesId: WoodSpecies) => {
-    const preset = PRESET_WOOD_MATERIALS[speciesId];
-    updateObject(object.id, {
-      material: {
-        ...preset,
-        stainColor: object.material.stainColor,
-        stainOpacity: object.material.stainOpacity
-      }
-    });
-  };
-
-  const handleStainColor = (color: string) => {
-    updateObject(object.id, {
-      material: {
-        ...object.material,
-        stainColor: color,
-        stainOpacity: object.material.stainOpacity || 0.4
-      }
-    });
-  };
-
-  const handleStainOpacity = (opacity: number) => {
-    updateObject(object.id, {
-      material: {
-        ...object.material,
-        stainOpacity: opacity
-      }
-    });
-  };
-
-  const handleSheenChange = (sheen: 'matte' | 'satin' | 'glossy') => {
-    updateObject(object.id, {
-      material: {
-        ...object.material,
-        varnishSheen: sheen
-      }
-    });
+  const applyMaterial = (material: WoodMaterial) => {
+    updateObject(object.id, { material });
   };
 
   return (
     <div
-      className={`project-overlay project-overlay-materials${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
+      className={`project-overlay project-overlay-materials finish-picker${isPhone ? ' phone-sheet-embed' : ' glass-panel'}`}
       data-testid="overlay-materials"
       style={isPhone ? {
         ...PHONE_SHEET_EMBEDDED_STYLE,
-        padding: '0 16px 12px',
-        gap: 12,
+        padding: '0 16px 16px',
+        gap: 14,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch'
       } : {
@@ -80,129 +59,104 @@ export const MaterialPicker: React.FC = () => {
         bottom: 24,
         right: 16,
         left: 'auto',
-        width: 320,
+        width: 340,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
-        maxHeight: 'none',
-        overflowY: 'visible'
+        gap: 14,
+        maxHeight: 'calc(100dvh - 120px)',
+        overflowY: 'auto'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Palette size={18} color="#e09f3e" />
-          <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            Wood Finish & Materials
-          </span>
+      <div className="finish-picker-header">
+        <div className="finish-picker-heading">
+          <Palette size={18} strokeWidth={2} />
+          <div className="finish-picker-titles">
+            <span className="finish-picker-title">Finish</span>
+            <span className="finish-picker-part" data-testid="finish-part-name">{object.name}</span>
+          </div>
         </div>
         <OverlayDismissButton onDismiss={() => setOverlayOpen('materials', false)} />
       </div>
 
-      {/* WOOD SPECIES GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        {speciesPresets.map((mat) => {
-          const isSelected = object.material.species === mat.species;
-
-          return (
-            <button
-              key={mat.id}
-              onClick={() => handleSelectSpecies(mat.species)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 4,
-                padding: 6,
-                borderRadius: 8,
-                background: isSelected ? 'rgba(224, 159, 62, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                border: isSelected ? '2px solid #e09f3e' : '1px solid rgba(255,255,255,0.1)',
-                cursor: 'pointer'
-              }}
-              title={mat.name}
-            >
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                backgroundColor: mat.baseColor,
-                border: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: 'inset 0 0 4px rgba(0,0,0,0.5)'
-              }} />
-              <span style={{ fontSize: 10, color: isSelected ? '#e09f3e' : '#9ca3af', fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                {mat.name.split(' ')[0]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* WOOD STAIN SHADE OVERLAY */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Droplet size={14} color="#e09f3e" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#f3f4f6' }}>Stain Shade Overlay</span>
-          </div>
-
-          <input
-            type="color"
-            value={object.material.stainColor || '#8b5a2b'}
-            onChange={(e) => handleStainColor(e.target.value)}
-            style={{ width: 28, height: 24, borderRadius: 4, border: 'none', cursor: 'pointer', background: 'none' }}
-          />
+      <section className="finish-section" aria-label="Color">
+        <h3 className="finish-section-label">Color</h3>
+        <div className="finish-chip-grid" data-testid="finish-colors">
+          {NAMED_PAINT_COLORS.map((color) => {
+            const selected = matchesNamedPaint(object.material, color);
+            return (
+              <button
+                key={color.id}
+                type="button"
+                className={`finish-chip${selected ? ' is-selected' : ''}`}
+                aria-pressed={selected}
+                aria-label={`${color.name} paint`}
+                data-testid={`finish-color-${color.id}`}
+                onClick={() => applyMaterial(paintMaterialFromColor(color, object.material.varnishSheen))}
+              >
+                <span className="finish-swatch" style={{ backgroundColor: color.hex }}>
+                  {selected && <Check size={14} color={swatchInk(color.hex)} strokeWidth={3} />}
+                </span>
+                <span className="finish-chip-label">{color.name}</span>
+              </button>
+            );
+          })}
         </div>
+      </section>
 
-        {object.material.stainColor && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>Density:</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={object.material.stainOpacity || 0}
-              onChange={(e) => handleStainOpacity(parseFloat(e.target.value))}
-              style={{ flex: 1, accentColor: '#e09f3e' }}
-            />
-            <span style={{ fontSize: 11, color: '#e09f3e', width: 28, textAlign: 'right' }}>
-              {Math.round((object.material.stainOpacity || 0) * 100)}%
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* VARNISH SHEEN */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Sparkles size={14} color="#e09f3e" />
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#f3f4f6' }}>Polish Sheen</span>
+      <section className="finish-section" aria-label="Material">
+        <h3 className="finish-section-label">Material</h3>
+        <div className="finish-chip-grid" data-testid="finish-materials">
+          {FINISH_MATERIALS.map((option) => {
+            const preset = PRESET_WOOD_MATERIALS[option.species];
+            const selected = object.material.species === option.species;
+            return (
+              <button
+                key={option.species}
+                type="button"
+                className={`finish-chip${selected ? ' is-selected' : ''}`}
+                aria-pressed={selected}
+                aria-label={`${option.label} material`}
+                data-testid={`finish-material-${option.species}`}
+                onClick={() => applyMaterial(materialFromSpecies(option.species, option.label))}
+              >
+                <span
+                  className={`finish-swatch finish-swatch-wood${option.species === 'metal_accent' ? ' is-metal' : ''}`}
+                  style={{
+                    backgroundColor: preset.baseColor,
+                    backgroundImage: option.species === 'metal_accent'
+                      ? 'linear-gradient(135deg, rgba(255,255,255,0.45), transparent 42%, rgba(0,0,0,0.18))'
+                      : `repeating-linear-gradient(90deg, ${preset.secondaryColor} 0 1px, transparent 1px 7px)`
+                  }}
+                >
+                  {selected && <Check size={14} color={swatchInk(preset.baseColor)} strokeWidth={3} />}
+                </span>
+                <span className="finish-chip-label">{option.label}</span>
+              </button>
+            );
+          })}
         </div>
+      </section>
 
-        <div style={{ display: 'flex', gap: 4 }}>
+      <section className="finish-section finish-sheen" aria-label="Sheen">
+        <h3 className="finish-section-label">Sheen</h3>
+        <div className="finish-sheen-row">
           {(['matte', 'satin', 'glossy'] as const).map(sheen => (
             <button
               key={sheen}
-              onClick={() => handleSheenChange(sheen)}
-              style={{
-                background: object.material.varnishSheen === sheen ? '#e09f3e' : 'rgba(255,255,255,0.08)',
-                color: object.material.varnishSheen === sheen ? '#000' : '#9ca3af',
-                border: 'none',
-                borderRadius: 4,
-                padding: '4px 8px',
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: 'capitalize',
-                cursor: 'pointer'
-              }}
+              type="button"
+              className={`finish-sheen-btn${object.material.varnishSheen === sheen ? ' is-selected' : ''}`}
+              aria-pressed={object.material.varnishSheen === sheen}
+              data-testid={`finish-sheen-${sheen}`}
+              onClick={() => applyMaterial({ ...object.material, varnishSheen: sheen })}
             >
               {sheen}
             </button>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
