@@ -7,12 +7,9 @@ import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import {
   FINISH_MATERIALS,
-  NAMED_PAINT_COLORS,
   PRESET_WOOD_MATERIALS,
-  matchesNamedPaint,
   materialFromSpecies,
   normalizePaintHex,
-  paintMaterialFromColor,
   paintMaterialFromHex
 } from '../../utils/woodTextureGenerator';
 import type { WoodMaterial } from '../../types/furniture';
@@ -47,7 +44,6 @@ export const MaterialPicker: React.FC = () => {
   };
 
   const paintHex = normalizePaintHex(object.material.baseColor);
-  const matchedShortcut = NAMED_PAINT_COLORS.find((color) => matchesNamedPaint(object.material, color));
 
   return (
     <div
@@ -86,50 +82,19 @@ export const MaterialPicker: React.FC = () => {
         <OverlayDismissButton onDismiss={() => setOverlayOpen('materials', false)} />
       </div>
 
-      <section className="finish-section" aria-label="Color">
-        <h3 className="finish-section-label">Color</h3>
-        <label className="finish-wheel">
-          <input
-            type="color"
-            className="finish-color-input"
-            value={paintHex}
-            aria-label="Color wheel"
-            data-testid="finish-color-wheel"
-            onInput={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value), true)}
-            onChange={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value))}
-          />
-        </label>
-        <div className="finish-wheel-meta">
-          <span className="finish-wheel-hex" data-testid="finish-color-value">{paintHex}</span>
-          <span className="finish-wheel-hint">
-            {matchedShortcut ? matchedShortcut.name : 'Opens the color wheel'}
-          </span>
-        </div>
-        <div className="finish-shortcut-block">
-          <span className="finish-shortcut-label">Shortcuts</span>
-          <div className="finish-chip-grid finish-chip-grid-shortcuts" data-testid="finish-colors">
-            {NAMED_PAINT_COLORS.map((color) => {
-              const selected = matchesNamedPaint(object.material, color);
-              return (
-                <button
-                  key={color.id}
-                  type="button"
-                  className={`finish-chip finish-chip-shortcut${selected ? ' is-selected' : ''}`}
-                  aria-pressed={selected}
-                  aria-label={`${color.name} paint`}
-                  data-testid={`finish-color-${color.id}`}
-                  onClick={() => applyMaterial(paintMaterialFromColor(color))}
-                >
-                  <span className="finish-swatch" style={{ backgroundColor: color.hex }}>
-                    {selected && <Check size={12} color={swatchInk(color.hex)} strokeWidth={3} />}
-                  </span>
-                  <span className="finish-chip-label">{color.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <label className="finish-color-row">
+        <span className="finish-section-label">Color</span>
+        <span className="finish-color-value" data-testid="finish-color-value">{paintHex}</span>
+        <input
+          type="color"
+          className="finish-color-input"
+          value={paintHex}
+          aria-label="Color"
+          data-testid="finish-color-wheel"
+          onInput={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value), true)}
+          onChange={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value))}
+        />
+      </label>
 
       <section className="finish-section" aria-label="Material">
         <h3 className="finish-section-label">Material</h3>

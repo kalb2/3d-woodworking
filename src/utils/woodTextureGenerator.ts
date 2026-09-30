@@ -204,13 +204,6 @@ export function paintMaterialFromHex(hex: string): WoodMaterial {
   };
 }
 
-export function paintMaterialFromColor(color: NamedPaintColor): WoodMaterial {
-  return {
-    ...paintMaterialFromHex(color.hex),
-    name: color.name
-  };
-}
-
 export function materialFromSpecies(
   species: WoodSpecies,
   label: string
@@ -222,11 +215,6 @@ export function materialFromSpecies(
     stainColor: undefined,
     stainOpacity: 0
   };
-}
-
-export function matchesNamedPaint(mat: WoodMaterial, color: NamedPaintColor): boolean {
-  return mat.species === 'custom_paint'
-    && normalizePaintHex(mat.baseColor) === color.hex.toLowerCase();
 }
 
 function isSolidPaint(mat: WoodMaterial): boolean {
