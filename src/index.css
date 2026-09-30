@@ -1215,7 +1215,7 @@ html, body, #root {
 }
 
 /* ============================================
-   FINISH PICKER — named paint + wood
+   FINISH PICKER — color wheel + wood
    ============================================ */
 
 .finish-picker {
@@ -1278,10 +1278,81 @@ html, body, #root {
   letter-spacing: -0.1px;
 }
 
+.finish-wheel {
+  display: block;
+  margin: 0;
+}
+
+.finish-color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 72px;
+  padding: 0;
+  border: 2px solid #0f172a;
+  border-radius: 14px;
+  background: #ffffff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.finish-color-input::-webkit-color-swatch-wrapper {
+  padding: 4px;
+}
+
+.finish-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 10px;
+}
+
+.finish-color-input::-moz-color-swatch {
+  border: none;
+  border-radius: 10px;
+}
+
+.finish-wheel-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.finish-wheel-hex {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.2px;
+}
+
+.finish-wheel-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.finish-shortcut-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.finish-shortcut-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
 .finish-chip-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+.finish-chip-grid-shortcuts {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .finish-chip {
@@ -1299,6 +1370,12 @@ html, body, #root {
   cursor: pointer;
   touch-action: manipulation;
   font-family: inherit;
+}
+
+.finish-chip-shortcut {
+  min-height: 52px;
+  padding: 6px 2px;
+  gap: 4px;
 }
 
 .finish-chip.is-selected {
@@ -1329,32 +1406,6 @@ html, body, #root {
   text-align: center;
   color: #0f172a;
   max-width: 100%;
-}
-
-.finish-sheen-row {
-  display: flex;
-  gap: 6px;
-}
-
-.finish-sheen-btn {
-  flex: 1;
-  min-height: 36px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  text-transform: capitalize;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.finish-sheen-btn.is-selected {
-  background: #0f172a;
-  border-color: #0f172a;
-  color: #ffffff;
 }
 
 .editor-root.is-phone .finish-picker.phone-sheet-embed {

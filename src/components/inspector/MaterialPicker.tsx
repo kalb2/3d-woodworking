@@ -11,7 +11,9 @@ import {
   PRESET_WOOD_MATERIALS,
   matchesNamedPaint,
   materialFromSpecies,
-  paintMaterialFromColor
+  normalizePaintHex,
+  paintMaterialFromColor,
+  paintMaterialFromHex
 } from '../../utils/woodTextureGenerator';
 import type { WoodMaterial } from '../../types/furniture';
 
@@ -40,9 +42,12 @@ export const MaterialPicker: React.FC = () => {
   const object = currentProject.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
 
-  const applyMaterial = (material: WoodMaterial) => {
-    updateObject(object.id, { material });
+  const applyMaterial = (material: WoodMaterial, skipHistory = false) => {
+    updateObject(object.id, { material }, skipHistory);
   };
+
+  const paintHex = normalizePaintHex(object.material.baseColor);
+  const matchedShortcut = NAMED_PAINT_COLORS.find((color) => matchesNamedPaint(object.material, color));
 
   return (
     <div
@@ -83,26 +88,46 @@ export const MaterialPicker: React.FC = () => {
 
       <section className="finish-section" aria-label="Color">
         <h3 className="finish-section-label">Color</h3>
-        <div className="finish-chip-grid" data-testid="finish-colors">
-          {NAMED_PAINT_COLORS.map((color) => {
-            const selected = matchesNamedPaint(object.material, color);
-            return (
-              <button
-                key={color.id}
-                type="button"
-                className={`finish-chip${selected ? ' is-selected' : ''}`}
-                aria-pressed={selected}
-                aria-label={`${color.name} paint`}
-                data-testid={`finish-color-${color.id}`}
-                onClick={() => applyMaterial(paintMaterialFromColor(color, object.material.varnishSheen))}
-              >
-                <span className="finish-swatch" style={{ backgroundColor: color.hex }}>
-                  {selected && <Check size={14} color={swatchInk(color.hex)} strokeWidth={3} />}
-                </span>
-                <span className="finish-chip-label">{color.name}</span>
-              </button>
-            );
-          })}
+        <label className="finish-wheel">
+          <input
+            type="color"
+            className="finish-color-input"
+            value={paintHex}
+            aria-label="Color wheel"
+            data-testid="finish-color-wheel"
+            onInput={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value), true)}
+            onChange={(event) => applyMaterial(paintMaterialFromHex(event.currentTarget.value))}
+          />
+        </label>
+        <div className="finish-wheel-meta">
+          <span className="finish-wheel-hex" data-testid="finish-color-value">{paintHex}</span>
+          <span className="finish-wheel-hint">
+            {matchedShortcut ? matchedShortcut.name : 'Opens the color wheel'}
+          </span>
+        </div>
+        <div className="finish-shortcut-block">
+          <span className="finish-shortcut-label">Shortcuts</span>
+          <div className="finish-chip-grid finish-chip-grid-shortcuts" data-testid="finish-colors">
+            {NAMED_PAINT_COLORS.map((color) => {
+              const selected = matchesNamedPaint(object.material, color);
+              return (
+                <button
+                  key={color.id}
+                  type="button"
+                  className={`finish-chip finish-chip-shortcut${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  aria-label={`${color.name} paint`}
+                  data-testid={`finish-color-${color.id}`}
+                  onClick={() => applyMaterial(paintMaterialFromColor(color))}
+                >
+                  <span className="finish-swatch" style={{ backgroundColor: color.hex }}>
+                    {selected && <Check size={12} color={swatchInk(color.hex)} strokeWidth={3} />}
+                  </span>
+                  <span className="finish-chip-label">{color.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -137,24 +162,6 @@ export const MaterialPicker: React.FC = () => {
               </button>
             );
           })}
-        </div>
-      </section>
-
-      <section className="finish-section finish-sheen" aria-label="Sheen">
-        <h3 className="finish-section-label">Sheen</h3>
-        <div className="finish-sheen-row">
-          {(['matte', 'satin', 'glossy'] as const).map(sheen => (
-            <button
-              key={sheen}
-              type="button"
-              className={`finish-sheen-btn${object.material.varnishSheen === sheen ? ' is-selected' : ''}`}
-              aria-pressed={object.material.varnishSheen === sheen}
-              data-testid={`finish-sheen-${sheen}`}
-              onClick={() => applyMaterial({ ...object.material, varnishSheen: sheen })}
-            >
-              {sheen}
-            </button>
-          ))}
         </div>
       </section>
     </div>

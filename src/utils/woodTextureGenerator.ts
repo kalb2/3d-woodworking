@@ -174,22 +174,40 @@ export const FINISH_MATERIALS: { species: WoodSpecies; label: string }[] = [
   { species: 'metal_accent', label: 'Brass' }
 ];
 
-export function paintMaterialFromColor(
-  color: NamedPaintColor,
-  sheen: WoodMaterial['varnishSheen'] = 'matte'
-): WoodMaterial {
+export function normalizePaintHex(input: string): string {
+  const raw = input.trim().replace('#', '');
+  if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`.toLowerCase();
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+    return `#${raw.toLowerCase()}`;
+  }
+  return '#2563eb';
+}
+
+/** Solid opaque paint. Sheen is stored only to satisfy the material shape and is not rendered. */
+export function paintMaterialFromHex(hex: string): WoodMaterial {
+  const baseColor = normalizePaintHex(hex);
+  const named = NAMED_PAINT_COLORS.find((color) => color.hex.toLowerCase() === baseColor);
   return {
     id: 'custom_paint',
-    name: color.name,
+    name: named?.name ?? 'Paint',
     species: 'custom_paint',
-    baseColor: color.hex,
-    secondaryColor: color.hex,
+    baseColor,
+    secondaryColor: baseColor,
     grainIntensity: 0,
     grainScale: 1,
-    roughness: sheen === 'glossy' ? 0.2 : sheen === 'satin' ? 0.42 : 0.72,
+    roughness: 1,
     metalness: 0,
-    varnishSheen: sheen,
+    varnishSheen: 'matte',
     stainOpacity: 0
+  };
+}
+
+export function paintMaterialFromColor(color: NamedPaintColor): WoodMaterial {
+  return {
+    ...paintMaterialFromHex(color.hex),
+    name: color.name
   };
 }
 
@@ -208,7 +226,7 @@ export function materialFromSpecies(
 
 export function matchesNamedPaint(mat: WoodMaterial, color: NamedPaintColor): boolean {
   return mat.species === 'custom_paint'
-    && mat.baseColor.toLowerCase() === color.hex.toLowerCase();
+    && normalizePaintHex(mat.baseColor) === color.hex.toLowerCase();
 }
 
 function isSolidPaint(mat: WoodMaterial): boolean {
@@ -223,9 +241,7 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
     baseColor: mat.baseColor,
     secondaryColor: mat.secondaryColor,
     grainIntensity: mat.grainIntensity,
-    grainScale: mat.grainScale,
-    stainColor: mat.stainColor,
-    stainOpacity: mat.stainOpacity
+    grainScale: mat.grainScale
   });
 
   if (textureCache.has(cacheKey)) {
@@ -290,12 +306,6 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
     }
   }
 
-  if (mat.stainColor && mat.stainOpacity && mat.stainOpacity > 0) {
-    ctx.globalAlpha = mat.stainOpacity;
-    ctx.fillStyle = mat.stainColor;
-    ctx.fillRect(0, 0, width, height);
-  }
-
   ctx.globalAlpha = 1.0;
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -307,26 +317,32 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
   return texture;
 }
 
-export function createWoodMeshMaterial(mat: WoodMaterial): THREE.MeshStandardMaterial {
-  let roughness = mat.roughness;
-  if (mat.varnishSheen === 'glossy') roughness = 0.15;
-  if (mat.varnishSheen === 'matte') roughness = 0.7;
+function solidSurface(params: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    ...params,
+    transparent: false,
+    opacity: 1,
+    depthWrite: true,
+    alphaTest: 0
+  });
+}
 
-  // Solid paint uses the named color directly so it is not darkened by a grain map.
+export function createWoodMeshMaterial(mat: WoodMaterial): THREE.MeshStandardMaterial {
+  // Paint is a flat opaque color. Sheen and stain are not applied.
   if (isSolidPaint(mat)) {
-    return new THREE.MeshStandardMaterial({
+    return solidSurface({
       color: mat.baseColor,
-      roughness,
+      roughness: 1,
       metalness: 0
     });
   }
 
   const woodTex = generateWoodTexture(mat);
 
-  return new THREE.MeshStandardMaterial({
+  return solidSurface({
     map: woodTex,
     color: mat.baseColor,
-    roughness: roughness,
+    roughness: mat.roughness,
     metalness: mat.metalness,
     bumpMap: woodTex,
     bumpScale: mat.grainIntensity * 0.02
