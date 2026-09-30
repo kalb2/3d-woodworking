@@ -1,6 +1,6 @@
 {
   "appId": "com.antigravity.woodworking3d",
-  "appName": "3D Woodworking",
+  "appName": "The Workbench",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
