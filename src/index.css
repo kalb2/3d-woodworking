@@ -1280,7 +1280,7 @@ html, body, #root {
 
 .finish-chip-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1290,8 +1290,8 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 72px;
-  padding: 8px 4px;
+  min-height: 64px;
+  padding: 8px 2px;
   border-radius: 12px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
@@ -1323,7 +1323,7 @@ html, body, #root {
 }
 
 .finish-chip-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   text-align: center;

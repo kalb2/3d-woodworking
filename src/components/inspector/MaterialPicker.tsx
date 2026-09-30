@@ -66,7 +66,7 @@ export const MaterialPicker: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: 14,
-        maxHeight: 'calc(100dvh - 120px)',
+        maxHeight: 'min(520px, calc(100dvh - 200px))',
         overflowY: 'auto'
       }}
     >
