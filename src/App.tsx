@@ -5,7 +5,7 @@ import { useAppStore } from './state/useAppStore';
 import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
 import { IPadHeader } from './components/layout/iPadHeader';
-import { CanvasReturnButton, OverlayLaunchTab } from './components/layout/OverlayChrome';
+import { OverlayLaunchTab } from './components/layout/OverlayChrome';
 import {
   PhoneBottomSheet,
   PhoneCanvasHeader,
@@ -67,7 +67,7 @@ export const App: React.FC = () => {
       {/* 3D Furniture Viewport */}
       <FurnitureCanvas />
 
-      {isPhone && anyOverlayOpen && (
+      {anyOverlayOpen && (
         <div
           className="overlay-backdrop"
           data-testid="overlay-backdrop"
@@ -127,10 +127,6 @@ export const App: React.FC = () => {
           placement="right-bottom"
           onOpen={() => openOverlay('materials', isPhone)}
         />
-      )}
-
-      {anyOverlayOpen && (
-        <CanvasReturnButton onHide={dismissOverlays} />
       )}
 
       {!isPhone && (

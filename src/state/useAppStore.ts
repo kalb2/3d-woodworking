@@ -74,6 +74,8 @@ export interface OverlayVisibility {
   menu: boolean;
 }
 
+let lastOverlayOpenAt = 0;
+
 const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
   sidebar: false,
   inspector: false,
@@ -146,7 +148,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       overlays: { ...state.overlays, [id]: open },
     })),
 
-  openOverlay: (id) =>
+  openOverlay: (id) => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    // pointerup opens the panel and can unmount that button before the
+    // synthesized click lands on the control underneath (Color under Properties).
+    if (now - lastOverlayOpenAt < 280) return;
+    lastOverlayOpenAt = now;
     set(() => ({
       overlays: {
         sidebar: id === 'sidebar',
@@ -155,7 +162,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         tools: id === 'tools',
         menu: id === 'menu',
       },
-    })),
+    }));
+  },
 
   dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED } }),
 
