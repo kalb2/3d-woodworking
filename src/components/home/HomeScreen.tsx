@@ -168,10 +168,8 @@ export const HomeScreen: React.FC = () => {
             <Box size={isPhone ? 18 : 22} />
           </div>
           <div className="home-brand-text">
-            <h1>3D Woodworking</h1>
-            {!isPhone && (
-              <div className="subtitle">Precision Woodworking & Parametric 3D Mockup Builder</div>
-            )}
+            <h1>The Workbench</h1>
+            <div className="subtitle">3D WOODWORKING</div>
           </div>
         </div>
 
@@ -612,7 +610,7 @@ export const HomeScreen: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-main)' }}>
-                Mastering 3D Woodworking
+                Mastering The Workbench
               </h3>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
                 Quick tips and gestures for building realistic woodworking mockups on iPad and desktop.
@@ -656,7 +654,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">5</div>
                 <div>
                   <h4>Procedural Wood & Stains</h4>
-                  <p>Select any part and choose from Natural Oak, Dark Walnut, Mahogany, Rustic Pine, and apply custom stain density or glossy sheen in the bottom-right palette.</p>
+                  <p>Select any part, then paint it with the color wheel or apply a wood such as oak, walnut, birch, pine, or plywood.</p>
                 </div>
               </div>
 

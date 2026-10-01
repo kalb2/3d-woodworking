@@ -1,6 +1,6 @@
 import React from 'react';
-import { ChevronDown, Eye, X } from 'lucide-react';
-import { fireReliableTap } from '../../utils/reliableTap';
+import { ChevronDown, X } from 'lucide-react';
+import { useReliableTap } from '../../utils/reliableTap';
 import { useIsPhone } from '../../hooks/useIsPhone';
 
 export const PhoneSheetGrab: React.FC = () => (
@@ -18,12 +18,13 @@ export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   label = 'Done',
 }) => {
   const isPhone = useIsPhone();
+  const onTap = useReliableTap(onDismiss);
   return (
     <button
       type="button"
       className={isPhone ? 'phone-sheet-dismiss' : 'glass-button overlay-dismiss-btn'}
-      onClick={(event) => fireReliableTap(event, onDismiss)}
-      onPointerUp={(event) => fireReliableTap(event, onDismiss)}
+      onClick={onTap}
+      onPointerUp={onTap}
       aria-label={label}
       title={label}
       data-testid="overlay-dismiss"
@@ -53,44 +54,20 @@ export const OverlayLaunchTab: React.FC<OverlayLaunchTabProps> = ({
   icon,
   onOpen,
   placement,
-}) => (
-  <button
-    type="button"
-    className={`glass-panel glass-button overlay-launch-tab overlay-launch-tab-${placement}`}
-    onClick={(event) => fireReliableTap(event, onOpen)}
-    onPointerUp={(event) => fireReliableTap(event, onOpen)}
-    aria-label={`Open ${label}`}
-    title={`Open ${label}`}
-    data-testid={`overlay-launch-${label.toLowerCase()}`}
-  >
-    {icon}
-    <span>{label}</span>
-  </button>
-);
-
-interface CanvasReturnButtonProps {
-  onHide: () => void;
-}
-
-/**
- * Always-on-top hide control. Sits in the iOS safe area, above the iPad header
- * z-index, so Shapes / properties / finish can still be dismissed when Done
- * is covered or the WKWebView dropped in-panel clicks.
- */
-export const CanvasReturnButton: React.FC<CanvasReturnButtonProps> = ({ onHide }) => {
-  const isPhone = useIsPhone();
+}) => {
+  const onTap = useReliableTap(onOpen);
   return (
     <button
       type="button"
-      className={`canvas-return-btn${isPhone ? ' is-phone-quiet' : ' glass-panel'}`}
-      onClick={(event) => fireReliableTap(event, onHide)}
-      onPointerUp={(event) => fireReliableTap(event, onHide)}
-      aria-label="Hide menus"
-      title="Hide menus and return to the 3D canvas"
-      data-testid="canvas-return"
+      className={`glass-panel glass-button overlay-launch-tab overlay-launch-tab-${placement}`}
+      onClick={onTap}
+      onPointerUp={onTap}
+      aria-label={`Open ${label}`}
+      title={`Open ${label}`}
+      data-testid={`overlay-launch-${label.toLowerCase()}`}
     >
-      <Eye size={18} strokeWidth={1.75} />
-      <span>Hide menus</span>
+      {icon}
+      <span>{label}</span>
     </button>
   );
 };

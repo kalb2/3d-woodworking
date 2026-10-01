@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
+import { PartColorSection } from './MaterialPicker';
 import { useReliableTap } from '../../utils/reliableTap';
 
 export const ObjectInspector: React.FC = () => {
@@ -104,7 +105,7 @@ export const ObjectInspector: React.FC = () => {
         top: 'var(--ipad-panel-top)',
         right: 16,
         left: 'auto',
-        width: 320,
+        width: 348,
         borderRadius: 16,
         zIndex: 40,
         padding: 16,
@@ -198,6 +199,8 @@ export const ObjectInspector: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <PartColorSection />
 
       {/* ROTATION & FINGER ROTATE BUTTONS */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
