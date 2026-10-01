@@ -25,25 +25,24 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     fadeStrength: 0.5,
   },
   /* glsl */ `
-    varying vec3 vRayOrigin;
-    varying vec3 vRayDir;
+    varying vec4 vNear4;
+    varying vec4 vFar4;
 
     void main() {
       vec2 p = position.xy;
       gl_Position = vec4(p, 0.0, 1.0);
 
+      // Keep these homogeneous. Dividing here and interpolating the
+      // world positions pulls the hit toward the camera, so the grid
+      // depth lands in front of solid parts.
       mat4 invViewProj = inverse(projectionMatrix * viewMatrix);
-      vec4 near4 = invViewProj * vec4(p, -1.0, 1.0);
-      vec4 far4 = invViewProj * vec4(p, 1.0, 1.0);
-      vec3 nearPos = near4.xyz / near4.w;
-      vec3 farPos = far4.xyz / far4.w;
-      vRayOrigin = nearPos;
-      vRayDir = farPos - nearPos;
+      vNear4 = invViewProj * vec4(p, -1.0, 1.0);
+      vFar4 = invViewProj * vec4(p, 1.0, 1.0);
     }
   `,
   /* glsl */ `
-    varying vec3 vRayOrigin;
-    varying vec3 vRayDir;
+    varying vec4 vNear4;
+    varying vec4 vFar4;
 
     uniform mat4 projectionMatrix;
     uniform float cellSize;
@@ -64,13 +63,16 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     }
 
     void main() {
-      float denom = vRayDir.y;
+      vec3 nearPos = vNear4.xyz / vNear4.w;
+      vec3 farPos = vFar4.xyz / vFar4.w;
+      vec3 rayDir = farPos - nearPos;
+      float denom = rayDir.y;
       if (abs(denom) < 1e-5) discard;
 
-      float t = (planeY - vRayOrigin.y) / denom;
+      float t = (planeY - nearPos.y) / denom;
       if (t < 0.0) discard;
 
-      vec3 hit = vRayOrigin + vRayDir * t;
+      vec3 hit = nearPos + rayDir * t;
       float minor = gridLine(hit.xz, cellSize, cellThickness);
       float major = gridLine(hit.xz, sectionSize, sectionThickness);
 
@@ -89,10 +91,11 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
       float ndcZ = clipPos.z / clipPos.w;
       if (alpha < 0.02 || ndcZ < -1.0 || ndcZ > 1.0) discard;
 
+      // Window depth of the ground hit. Parts in front fail this test.
+      gl_FragDepth = clamp(ndcZ * 0.5 + 0.5, 0.0, 1.0);
       gl_FragColor = vec4(mix(cellColor, sectionColor, clamp(major, 0.0, 1.0)), alpha);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
-      gl_FragDepth = ndcZ * 0.5 + 0.5;
     }
   `,
 );
