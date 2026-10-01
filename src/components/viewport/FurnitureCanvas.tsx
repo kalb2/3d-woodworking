@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { FurnitureMesh } from './FurnitureMesh';
@@ -8,6 +9,28 @@ import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
 import { DimensionOverlay } from './DimensionOverlay';
+
+/** Soft contact blob. Hidden with Floor off, and whenever the camera is under the ground. */
+const GroundContactShadow: React.FC = () => {
+  const group = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    if (group.current) group.current.visible = camera.position.y >= -0.02;
+  });
+  return (
+    <group ref={group}>
+      <ContactShadows
+        position={[0, -0.01, 0]}
+        opacity={0.34}
+        scale={220}
+        blur={2.6}
+        far={36}
+        resolution={512}
+        smooth
+        color="#94a3b8"
+      />
+    </group>
+  );
+};
 
 export const FurnitureCanvas: React.FC = () => {
   const {
@@ -27,7 +50,7 @@ export const FurnitureCanvas: React.FC = () => {
   if (!currentProject) return null;
 
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
-  const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#0f1117';
+  const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const handleCanvasClick = (e: any) => {
     // Deselect object if clicked background
@@ -75,22 +98,12 @@ export const FurnitureCanvas: React.FC = () => {
           maxPolarAngle={Math.PI / 2 + 0.05}
         />
 
-        {/* Single workshop grid while Floor is on — no extra plane */}
+        {/* Floor on: quiet infinite grid plus a soft contact shadow. No second plane. */}
         <TransparentFloor
           visible={currentProject.showFloor}
           opacity={currentProject.floorOpacity}
         />
-
-        {/* Shadow disc only when Floor is off — otherwise it reads as a second ground */}
-        {!currentProject.showFloor && (
-          <ContactShadows
-            position={[0, 0, 0]}
-            opacity={0.6}
-            scale={120}
-            blur={2}
-            far={10}
-          />
-        )}
+        {currentProject.showFloor && <GroundContactShadow />}
 
         {/* Render all furniture objects in active project */}
         {currentProject.objects.map((obj) => (

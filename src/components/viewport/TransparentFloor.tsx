@@ -8,21 +8,23 @@ interface TransparentFloorProps {
 }
 
 /**
- * Screen-space workshop grid. Each pixel that sees the ground draws a line
- * from the ray/plane hit, so zoom and pan never run into a finite quad.
- * Fine lines dissolve once they are only a pixel or two wide.
+ * Infinite workshop grid. Each pixel that sees the ground draws from the
+ * ray/plane hit, so zoom and pan never run into a finite quad.
+ *
+ * Major lines are a quiet gray square; minor lines subdivide each square
+ * five ways and fade out first. Both dissolve with distance, scaled to the
+ * camera, so the ground stays unbounded and the horizon stays a void.
+ * Depth is the real ground hit (homogeneous ray) so opaque parts occlude it.
  */
 const InfiniteWorkshopGridMaterial = shaderMaterial(
   {
-    cellSize: 2,
-    sectionSize: 12,
-    cellColor: new THREE.Color('#334155'),
-    sectionColor: new THREE.Color('#e09f3e'),
-    cellThickness: 0.65,
-    sectionThickness: 1.2,
+    cellSize: 4,
+    sectionSize: 20,
+    cellColor: new THREE.Color('#b7bec8'),
+    sectionColor: new THREE.Color('#8e97a3'),
+    cellThickness: 0.55,
+    sectionThickness: 1.15,
     planeY: -0.02,
-    fadeDistance: 12000,
-    fadeStrength: 0.5,
   },
   /* glsl */ `
     varying vec4 vNear4;
@@ -52,8 +54,6 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     uniform float cellThickness;
     uniform float sectionThickness;
     uniform float planeY;
-    uniform float fadeDistance;
-    uniform float fadeStrength;
 
     float gridLine(vec2 coord, float size, float thickness) {
       vec2 r = coord / size;
@@ -63,6 +63,9 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     }
 
     void main() {
+      // Underside views stay a clean void — no grid through the ground.
+      if (cameraPosition.y < planeY) discard;
+
       vec3 nearPos = vNear4.xyz / vNear4.w;
       vec3 farPos = vFar4.xyz / vFar4.w;
       vec3 rayDir = farPos - nearPos;
@@ -79,17 +82,25 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
       float pixelWorld = max(fwidth(hit.x), fwidth(hit.z));
       float pixelsPerCell = cellSize / max(pixelWorld, 1e-4);
       float pixelsPerSection = sectionSize / max(pixelWorld, 1e-4);
-      minor *= smoothstep(1.25, 3.5, pixelsPerCell);
-      major *= smoothstep(1.25, 3.5, pixelsPerSection);
+      // Minors drop out first when a cell is only a few pixels wide.
+      minor *= smoothstep(2.4, 8.0, pixelsPerCell);
+      major *= smoothstep(1.6, 5.0, pixelsPerSection);
 
-      float line = max(minor, major);
+      // Fade radius tracks the camera so zoom-out stays unbounded and the
+      // far ground dissolves into the void instead of a hard edge.
+      float height = max(cameraPosition.y - planeY, 0.5);
+      float reach = length(cameraPosition.xz);
+      float horizon = max(reach * 2.4, height * 5.0);
+      float fadeStart = horizon * 0.32;
       float dist = distance(hit.xz, cameraPosition.xz);
-      float fade = pow(clamp(1.0 - dist / fadeDistance, 0.0, 1.0), fadeStrength);
-      float alpha = line * mix(0.92, 1.0, clamp(major, 0.0, 1.0)) * fade;
+      float minorFade = smoothstep(horizon * 0.62, fadeStart, dist);
+      float majorFade = smoothstep(horizon, fadeStart * 0.85, dist);
+
+      float alpha = max(minor * 0.22 * minorFade, major * 0.46 * majorFade);
 
       vec4 clipPos = projectionMatrix * viewMatrix * vec4(hit, 1.0);
       float ndcZ = clipPos.z / clipPos.w;
-      if (alpha < 0.02 || ndcZ < -1.0 || ndcZ > 1.0) discard;
+      if (alpha < 0.015 || ndcZ < -1.0 || ndcZ > 1.0) discard;
 
       // Window depth of the ground hit. Parts in front fail this test.
       gl_FragDepth = clamp(ndcZ * 0.5 + 0.5, 0.0, 1.0);

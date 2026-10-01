@@ -65,7 +65,7 @@ export const WorkshopSettings: React.FC = () => {
         testId="tool-floor"
         icon={<Grid size={18} strokeWidth={1.8} />}
         label="Floor"
-        description="Workshop grid on the ground"
+        description="Quiet grid and soft shadows"
         on={floorOn}
         onToggle={toggleFloor}
       />
