@@ -45,6 +45,7 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     varying vec3 vRayOrigin;
     varying vec3 vRayDir;
 
+    uniform mat4 projectionMatrix;
     uniform float cellSize;
     uniform float sectionSize;
     uniform vec3 cellColor;
@@ -115,6 +116,7 @@ export const TransparentFloor: React.FC<TransparentFloorProps> = ({ visible }) =
     mat.depthTest = true;
     mat.depthWrite = false;
     mat.toneMapped = true;
+    mat.side = THREE.DoubleSide;
     return mat;
   }, []);
 
