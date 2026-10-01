@@ -11,6 +11,7 @@ import {
   PhoneCanvasHeader,
   PhoneMenuSheet,
 } from './components/layout/PhoneCanvasChrome';
+import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { ProjectModal } from './components/modals/ProjectModal';
@@ -58,7 +59,8 @@ export const App: React.FC = () => {
     overlays.inspector ||
     overlays.materials ||
     overlays.tools ||
-    overlays.menu;
+    overlays.menu ||
+    overlays.settings;
   const showDesktopLaunchers = !isPhone;
 
   return (
@@ -122,6 +124,7 @@ export const App: React.FC = () => {
         <>
           <SidebarNav />
           <ObjectInspector />
+          <WorkshopSettings />
         </>
       )}
 

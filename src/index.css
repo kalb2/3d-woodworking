@@ -837,6 +837,127 @@ html, body, #root {
   display: none;
 }
 
+.workshop-settings {
+  position: absolute;
+  top: var(--ipad-panel-top);
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  border-radius: 16px;
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.workshop-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 4px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px 14px;
+}
+
+.settings-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: none;
+  background: #f8fafc;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-main);
+  min-height: 64px;
+  touch-action: manipulation;
+}
+
+.settings-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.settings-row-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row-copy strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-row-copy span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.settings-switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.settings-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.settings-row.is-on .settings-switch {
+  background: var(--accent-primary);
+}
+
+.settings-row.is-on .settings-switch::after {
+  transform: translateX(18px);
+}
+
+.settings-row.is-on .settings-row-icon {
+  color: var(--accent-primary);
+}
+
+.editor-root.is-phone .settings-row.is-on .settings-switch {
+  background: var(--phone-accent);
+}
+
+.editor-root.is-phone .settings-row.is-on .settings-row-icon {
+  color: var(--phone-accent);
+}
+
 /* ============================================
    HOME SCREEN STYLES
    ============================================ */

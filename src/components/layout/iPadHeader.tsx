@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import {
   Undo,
   Redo,
-  Magnet,
-  Grid,
+  Settings,
   Move,
   Scaling,
   RotateCw,
@@ -43,12 +42,10 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
     historyStack,
     undo,
     redo,
-    toggleFloor,
-    updateSnapSettings,
     createProject
   } = useProjectStore();
 
-  const { setView } = useAppStore();
+  const { setView, overlays, openOverlay, setOverlayOpen } = useAppStore();
   const isPhone = useIsPhone();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -211,31 +208,27 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       </div>
       )}
 
-      {/* Right section: Magnet Snap, Floor Toggle, Cut List & Export */}
+      {/* Right section: Settings, Cut List & Export */}
       {!isPhone && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
-        {/* Floor Toggle Button */}
         <button
-          className={`glass-panel glass-button ${currentProject?.showFloor ? 'active' : ''}`}
-          onClick={toggleFloor}
-          title="Toggle Transparent Floor Barrier"
-        >
-          <Grid size={18} />
-          <span>Floor</span>
-        </button>
-
-        {/* Magnet Snap Toggle Button */}
-        <button
-          className={`glass-panel glass-button ${currentProject?.snapSettings.enabled ? 'active' : ''}`}
+          type="button"
+          className={`glass-panel glass-button ${overlays.settings ? 'active' : ''}`}
           onClick={() => {
-            if (currentProject) {
-              updateSnapSettings({ enabled: !currentProject.snapSettings.enabled });
+            setShowExportMenu(false);
+            if (overlays.settings) {
+              setOverlayOpen('settings', false);
+              return;
             }
+            openOverlay('settings');
           }}
-          title="Toggle 3D Magnetization & Surface Snapping"
+          title="Floor and magnet"
+          aria-label="Settings"
+          aria-expanded={overlays.settings}
+          data-testid="tool-settings"
         >
-          <Magnet size={18} />
-          <span>Magnet</span>
+          <Settings size={18} />
+          <span>Settings</span>
         </button>
 
         <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />

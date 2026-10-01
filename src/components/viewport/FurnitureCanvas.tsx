@@ -43,7 +43,8 @@ export const FurnitureCanvas: React.FC = () => {
     >
       <Canvas
         shadows="percentage"
-        camera={{ position: [50, 45, 65], fov: 45 }}
+        /* far stays past the grid fade so the horizon dissolves instead of clipping */
+        camera={{ position: [50, 45, 65], fov: 45, near: 0.1, far: 20000 }}
         gl={{ preserveDrawingBuffer: true, antialias: true }}
       >
         {/* Customizable canvas background color */}

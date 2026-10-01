@@ -7,10 +7,8 @@ import {
   FileCode,
   FileSpreadsheet,
   FolderOpen,
-  Grid,
   Home,
   Layers,
-  Magnet,
   Menu,
   Ellipsis,
   Move,
@@ -18,6 +16,7 @@ import {
   RotateCw,
   Ruler,
   Scaling,
+  Settings,
   Share2,
   SlidersHorizontal,
   Trash2,
@@ -27,6 +26,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
+import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -223,8 +223,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     setGizmoMode,
     duplicateObject,
     deleteObject,
-    toggleFloor,
-    updateSnapSettings,
     showDimensions,
     toggleDimensions,
   } = useProjectStore();
@@ -232,7 +230,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
 
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
-  const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials;
+  const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
   const propertiesOpen = overlays.inspector;
 
   useEffect(() => {
@@ -244,6 +242,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     setOverlayOpen('sidebar', false);
     setOverlayOpen('materials', false);
     setOverlayOpen('tools', false);
+    setOverlayOpen('settings', false);
   };
 
   const selectGizmo = (mode: 'move' | 'resize' | 'rotate') => {
@@ -260,6 +259,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
+          <WorkshopSettings />
         </div>
       )}
       {hasSelection && selectedObject && (
@@ -352,22 +352,16 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
       <nav className="phone-tool-sheet-secondary" aria-label="Measure and view">
         <DockItem
           compact
-          label="Floor"
-          testId="tool-floor"
-          icon={<Grid size={18} strokeWidth={1.7} />}
-          active={Boolean(currentProject?.showFloor)}
-          onTap={toggleFloor}
-        />
-        <DockItem
-          compact
-          label="Magnet"
-          testId="tool-magnet"
-          icon={<Magnet size={18} strokeWidth={1.7} />}
-          active={Boolean(currentProject?.snapSettings.enabled)}
+          label="Settings"
+          testId="tool-settings"
+          icon={<Settings size={18} strokeWidth={1.7} />}
+          active={overlays.settings}
           onTap={() => {
-            if (currentProject) {
-              updateSnapSettings({ enabled: !currentProject.snapSettings.enabled });
+            if (overlays.settings) {
+              setOverlayOpen('settings', false);
+              return;
             }
+            openOverlay('settings', true);
           }}
         />
         <PhoneTapButton
