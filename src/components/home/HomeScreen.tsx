@@ -654,7 +654,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">5</div>
                 <div>
                   <h4>Procedural Wood & Stains</h4>
-                  <p>Select any part and choose from Natural Oak, Dark Walnut, Mahogany, Rustic Pine, and apply custom stain density or glossy sheen in the bottom-right palette.</p>
+                  <p>Select any part, then paint it with the color wheel or apply a wood such as oak, walnut, birch, pine, or plywood.</p>
                 </div>
               </div>
 

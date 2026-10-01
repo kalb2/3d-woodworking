@@ -225,29 +225,10 @@ html, body, #root {
 .overlay-backdrop {
   position: absolute;
   inset: 0;
-  z-index: 25;
+  /* Above the canvas, below the iPad header (z-index 20) and the panels. */
+  z-index: 15;
   background: rgba(15, 23, 42, 0.18);
   touch-action: manipulation;
-}
-
-.canvas-return-btn {
-  position: absolute;
-  z-index: 60;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  padding: 12px 18px;
-  min-height: 48px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 14px;
-  gap: 8px;
-  pointer-events: auto;
-  touch-action: manipulation;
-  background: var(--accent-primary);
-  color: #ffffff;
-  border: 1px solid var(--accent-primary);
-  box-shadow: 0 8px 24px var(--accent-primary-glow);
 }
 
 .editor-root {
@@ -496,13 +477,41 @@ html, body, #root {
   padding-bottom: 4px;
 }
 
+.phone-dock-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  grid-template-rows: auto auto;
+  align-items: stretch;
+}
+
+.phone-dock-grid > .phone-tool-sheet-tools {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.phone-dock-grid > .phone-tool-sheet-secondary {
+  grid-column: 1;
+  grid-row: 2;
+}
+
 .phone-tool-sheet-tools {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
   gap: 4px;
   flex-shrink: 0;
-  padding: 6px 10px 4px;
+  padding: 6px 6px 4px 10px;
+}
+
+.phone-dock-item.phone-dock-part {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  height: auto;
+  min-height: 108px;
+  margin: 8px 8px 10px 0;
+  padding: 8px 4px;
+  font-size: 10px;
 }
 
 .phone-tool-sheet.is-expanded .phone-tool-sheet-tools {
@@ -516,7 +525,7 @@ html, body, #root {
   justify-content: space-between;
   gap: 4px;
   flex-shrink: 0;
-  padding: 4px 10px 12px;
+  padding: 4px 6px 12px 10px;
 }
 
 .phone-dock-item {
@@ -810,19 +819,6 @@ html, body, #root {
   color: var(--phone-accent);
   border-color: transparent;
   box-shadow: none;
-}
-
-.canvas-return-btn.is-phone-quiet {
-  background: #ffffff;
-  color: #334155;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
-  font-weight: 600;
-}
-
-.editor-root.is-phone .canvas-return-btn {
-  top: calc(68px + env(safe-area-inset-top, 0px));
-  bottom: auto;
 }
 
 .editor-root.is-phone .overlay-launch-tab {
@@ -1212,6 +1208,180 @@ html, body, #root {
   font-size: 13.5px;
   color: var(--text-main);
   font-weight: 500;
+}
+
+/* ============================================
+   FINISH PICKER — color wheel + wood
+   ============================================ */
+
+.finish-picker {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.finish-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.finish-picker-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #0f172a;
+}
+
+.finish-picker-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.finish-picker-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.finish-picker-part {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finish-section-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.1px;
+}
+
+.finish-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.finish-color-row .finish-section-label {
+  flex: 1;
+}
+
+.finish-color-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.finish-color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+
+.finish-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.finish-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+}
+
+.finish-color-input::-moz-color-swatch {
+  border: none;
+  border-radius: 5px;
+}
+
+.finish-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.finish-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 64px;
+  padding: 8px 2px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+.finish-chip.is-selected {
+  border: 2px solid #0f172a;
+  background: #f8fafc;
+}
+
+.finish-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.finish-swatch-wood {
+  background-blend-mode: multiply;
+}
+
+.finish-chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: #0f172a;
+  max-width: 100%;
+}
+
+.part-color-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
 }
 
 /* Color swatch pill button */

@@ -16,6 +16,7 @@ export type WoodSpecies =
   | 'cherry'
   | 'ebony'
   | 'birch'
+  | 'plywood'
   | 'custom_paint'
   | 'metal_accent';
 
