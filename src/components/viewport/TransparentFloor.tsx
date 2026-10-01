@@ -22,8 +22,8 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     sectionSize: 20,
     cellColor: new THREE.Color('#b7bec8'),
     sectionColor: new THREE.Color('#8e97a3'),
-    cellThickness: 0.55,
-    sectionThickness: 1.15,
+    cellThickness: 0.85,
+    sectionThickness: 1.35,
     planeY: -0.02,
   },
   /* glsl */ `
@@ -96,7 +96,7 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
       float minorFade = smoothstep(horizon * 0.62, fadeStart, dist);
       float majorFade = smoothstep(horizon, fadeStart * 0.85, dist);
 
-      float alpha = max(minor * 0.22 * minorFade, major * 0.46 * majorFade);
+      float alpha = max(minor * 0.32 * minorFade, major * 0.5 * majorFade);
 
       vec4 clipPos = projectionMatrix * viewMatrix * vec4(hit, 1.0);
       float ndcZ = clipPos.z / clipPos.w;

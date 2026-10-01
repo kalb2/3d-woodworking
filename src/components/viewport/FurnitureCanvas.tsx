@@ -20,9 +20,9 @@ const GroundContactShadow: React.FC = () => {
     <group ref={group}>
       <ContactShadows
         position={[0, -0.01, 0]}
-        opacity={0.34}
-        scale={220}
-        blur={2.6}
+        opacity={0.28}
+        scale={200}
+        blur={3.2}
         far={36}
         resolution={512}
         smooth
