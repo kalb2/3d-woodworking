@@ -96,7 +96,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       position: 'absolute',
       left: 16,
       right: 16,
-      zIndex: 20,
+      zIndex: 55,
       height: 56,
       display: 'flex',
       alignItems: 'center',

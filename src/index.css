@@ -208,12 +208,12 @@ html, body, #root {
 }
 
 .overlay-launch-tab-left {
-  top: calc(88px + env(safe-area-inset-top, 0px));
+  top: var(--ipad-panel-top, calc(88px + env(safe-area-inset-top, 0px)));
   left: calc(8px + env(safe-area-inset-left, 0px));
 }
 
 .overlay-launch-tab-right-top {
-  top: calc(88px + env(safe-area-inset-top, 0px));
+  top: var(--ipad-panel-top, calc(88px + env(safe-area-inset-top, 0px)));
   right: calc(8px + env(safe-area-inset-right, 0px));
 }
 
@@ -239,6 +239,14 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* iPad / desktop: side panels sit under the top nav, including safe-area. */
+.editor-root:not(.is-phone) {
+  --ipad-header-offset: calc(12px + env(safe-area-inset-top, 0px));
+  --ipad-header-height: 56px;
+  --ipad-panel-gap: 16px;
+  --ipad-panel-top: calc(var(--ipad-header-offset) + var(--ipad-header-height) + var(--ipad-panel-gap));
+}
+
 .project-overlay {
   z-index: 40;
 }
@@ -247,6 +255,10 @@ html, body, #root {
   overflow: hidden;
   max-width: 100%;
   top: calc(12px + env(safe-area-inset-top, 0px));
+}
+
+.editor-root:not(.is-phone) .editor-header {
+  z-index: 55;
 }
 
 /* ============================================
