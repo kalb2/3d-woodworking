@@ -896,10 +896,12 @@ html, body, #root {
 }
 
 .home-header .subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .home-tabs {
@@ -1411,6 +1413,11 @@ html, body, #root {
   font-size: 20px;
   letter-spacing: -0.3px;
   white-space: nowrap;
+}
+
+.home-screen.is-phone .home-header .subtitle {
+  font-size: 10px;
+  letter-spacing: 0.12em;
 }
 
 .home-screen.is-phone .home-tabs {
