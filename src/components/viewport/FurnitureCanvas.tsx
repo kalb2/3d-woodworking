@@ -27,6 +27,7 @@ const GroundContactShadow: React.FC = () => {
         resolution={512}
         smooth
         color="#94a3b8"
+        depthWrite={false}
       />
     </group>
   );

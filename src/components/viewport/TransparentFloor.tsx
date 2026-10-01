@@ -14,7 +14,8 @@ interface TransparentFloorProps {
  * Major lines are a quiet gray square; minor lines subdivide each square
  * five ways and fade out first. Both dissolve with distance, scaled to the
  * camera, so the ground stays unbounded and the horizon stays a void.
- * Depth is the real ground hit (homogeneous ray) so opaque parts occlude it.
+ * The triangle sits on the far clip plane and writes that same depth, so the
+ * lines fail the depth test wherever a solid part already drew.
  */
 const InfiniteWorkshopGridMaterial = shaderMaterial(
   {
@@ -32,11 +33,13 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
 
     void main() {
       vec2 p = position.xy;
-      gl_Position = vec4(p, 0.0, 1.0);
+      // Far side of the clip volume. This pass is transparent, so it runs
+      // after solid parts. A clip z of 0 sits in front of every mesh when
+      // gl_FragDepth is ignored, and the lines show through the wood.
+      gl_Position = vec4(p, 0.9999998, 1.0);
 
       // Keep these homogeneous. Dividing here and interpolating the
-      // world positions pulls the hit toward the camera, so the grid
-      // depth lands in front of solid parts.
+      // world positions pulls the hit toward the camera.
       mat4 invViewProj = inverse(projectionMatrix * viewMatrix);
       vNear4 = invViewProj * vec4(p, -1.0, 1.0);
       vFar4 = invViewProj * vec4(p, 1.0, 1.0);
@@ -46,7 +49,6 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
     varying vec4 vNear4;
     varying vec4 vFar4;
 
-    uniform mat4 projectionMatrix;
     uniform float cellSize;
     uniform float sectionSize;
     uniform vec3 cellColor;
@@ -97,13 +99,11 @@ const InfiniteWorkshopGridMaterial = shaderMaterial(
       float majorFade = smoothstep(horizon, fadeStart * 0.85, dist);
 
       float alpha = max(minor * 0.32 * minorFade, major * 0.5 * majorFade);
+      if (alpha < 0.015) discard;
 
-      vec4 clipPos = projectionMatrix * viewMatrix * vec4(hit, 1.0);
-      float ndcZ = clipPos.z / clipPos.w;
-      if (alpha < 0.015 || ndcZ < -1.0 || ndcZ > 1.0) discard;
-
-      // Window depth of the ground hit. Parts in front fail this test.
-      gl_FragDepth = clamp(ndcZ * 0.5 + 0.5, 0.0, 1.0);
+      // Behind every real surface. Solid parts already wrote a closer depth,
+      // so this fragment is rejected on wood and only survives on empty ground.
+      gl_FragDepth = 0.9999999;
       gl_FragColor = vec4(mix(cellColor, sectionColor, clamp(major, 0.0, 1.0)), alpha);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
