@@ -5,7 +5,6 @@ import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
 import { GIZMO_AXIS } from '../../theme/gizmo';
-import { meshRingAxes } from '../../theme/partSurface';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
@@ -219,10 +218,6 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     handleDragStart(axis, event.point.clone());
   };
 
-  const ringX = meshRingAxes(object.shape, object.dimensions, 'x');
-  const ringY = meshRingAxes(object.shape, object.dimensions, 'y');
-  const ringZ = meshRingAxes(object.shape, object.dimensions, 'z');
-
   const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; color: string }[] = [
     { axis: '+x', drag: 'x', color: GIZMO_AXIS.x },
     { axis: '+y', drag: 'y', color: GIZMO_AXIS.y },
@@ -247,9 +242,9 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
         </>
       ) : activeGizmoMode === 'rotate' ? (
         <>
-          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} rx={ringX.rx} ry={ringX.ry} onPointerDown={beginAxis('x')} />
-          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} rx={ringY.rx} ry={ringY.ry} onPointerDown={beginAxis('y')} />
-          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} rx={ringZ.rx} ry={ringZ.ry} onPointerDown={beginAxis('z')} />
+          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
+          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
+          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
         </>
       ) : null}
     </group>

@@ -9,9 +9,6 @@ export interface MeshExtents {
   kind: MeshKind;
 }
 
-/** Small lift so a rotate hoop sits just outside the face, not on the corner diagonal. */
-export const MESH_RING_PAD = 0.22;
-
 /**
  * Half-extents of the *drawn* mesh, not the authored AABB.
  * Cylinders / poles use min(length, width) / 2. Spheres use min(l, w, h) / 2.
@@ -35,23 +32,6 @@ export function meshExtents(shape: ShapeType, dimensions: Dimensions3D): MeshExt
     hz: Math.max(dimensions.width, 0.01) / 2,
     kind: 'box',
   };
-}
-
-/**
- * Semi-axes of the rotate hoop in its local XY plane.
- * X ring (local X → depth, local Y → height), Y ring (local X → length, local Y → depth),
- * Z ring (local X → length, local Y → height). Each axis is the face half-extent plus a small pad,
- * so the hoop hugs the part instead of circling the corner-to-corner diagonal.
- */
-export function meshRingAxes(
-  shape: ShapeType,
-  dimensions: Dimensions3D,
-  axis: 'x' | 'y' | 'z',
-): { rx: number; ry: number } {
-  const { hx, hy, hz } = meshExtents(shape, dimensions);
-  const pair: [number, number] = axis === 'x' ? [hz, hy] : axis === 'y' ? [hx, hz] : [hx, hy];
-  const pad = Math.max(MESH_RING_PAD, Math.min(pair[0], pair[1]) * 0.06);
-  return { rx: pair[0] + pad, ry: pair[1] + pad };
 }
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
