@@ -352,6 +352,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           testId="overlay-launch-tools"
           icon={<Move size={22} strokeWidth={1.8} />}
           active={activeGizmoMode === 'move'}
+          showLabel
           onTap={() => setGizmoMode('move')}
         />
         <DockItem
@@ -359,6 +360,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           testId="tool-resize"
           icon={<Scaling size={22} strokeWidth={1.8} />}
           active={activeGizmoMode === 'resize'}
+          showLabel
           onTap={() => setGizmoMode('resize')}
         />
         <DockItem
@@ -366,6 +368,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           testId="tool-rotate"
           icon={<RotateCw size={22} strokeWidth={1.8} />}
           active={activeGizmoMode === 'rotate'}
+          showLabel
           onTap={() => setGizmoMode('rotate')}
         />
         {selectedObjectIds.length >= 2 && (
@@ -421,11 +424,12 @@ const DockItem: React.FC<{
   active: boolean;
   disabled?: boolean;
   compact?: boolean;
+  showLabel?: boolean;
   className?: string;
   onTap: () => void;
-}> = ({ label, testId, icon, active, disabled, compact, className, onTap }) => (
+}> = ({ label, testId, icon, active, disabled, compact, showLabel, className, onTap }) => (
   <PhoneTapButton
-    className={`phone-dock-item${compact ? ' is-compact' : ''}${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
+    className={`phone-dock-item${compact ? ' is-compact' : ''}${showLabel ? ' has-caption' : ''}${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
     disabled={disabled}
     onTap={onTap}
     aria-label={disabled ? `${label} (select a part)` : label}

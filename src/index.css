@@ -1926,6 +1926,12 @@ html, body, #root {
   border-radius: 14px;
 }
 
+.phone-transform-bar .phone-dock-item.has-caption {
+  min-height: 56px;
+  padding: 5px 2px 4px;
+  gap: 1px;
+}
+
 .phone-transform-bar .phone-dock-item span {
   position: absolute;
   width: 1px;
@@ -1935,6 +1941,20 @@ html, body, #root {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+}
+
+.phone-transform-bar .phone-dock-item.has-caption span {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .size-inline {
