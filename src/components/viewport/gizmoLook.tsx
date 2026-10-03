@@ -283,22 +283,39 @@ export const RotateRing: React.FC<{
 };
 
 const PAD_SIDE = 1.35;
-const PAD_THICK = 0.32;
+const PAD_THICK = 0.28;
+/** Faces pointing away from the camera stay visible, but much smaller. */
+const FAR_PAD_SCALE = 0.24;
 
-/** Moblo resize: square RGB pad on the face you'd pull. Not a capsule. */
+const _padNormal = new THREE.Vector3();
+const _padPos = new THREE.Vector3();
+const _padToCam = new THREE.Vector3();
+
+/** Square on the face center. Near faces are full size; far faces shrink as the camera orbits. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
   active: boolean;
-  /** Lay the pad flat on the top rim so a thin board still shows it. */
-  flat?: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, flat = false, onPointerDown }) => {
+}> = ({ axis, color, active, onPointerDown }) => {
+  const faceRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
   const side = PAD_SIDE;
   const thick = PAD_THICK;
 
+  useFrame(() => {
+    const face = faceRef.current;
+    if (!face) return;
+    face.updateWorldMatrix(true, false);
+    _padNormal.set(0, 1, 0).transformDirection(face.matrixWorld);
+    face.getWorldPosition(_padPos);
+    _padToCam.copy(camera.position).sub(_padPos);
+    const near = _padNormal.dot(_padToCam) > 0;
+    face.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
+  });
+
   return (
-    <group rotation={flat ? [0, 0, 0] : FACE_OUT[axis]}>
+    <group ref={faceRef} rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
           <boxGeometry args={[side, thick, side]} />
@@ -313,7 +330,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 0.7, thick + 0.8, side + 0.7]} />
+          <boxGeometry args={[side + 0.55, thick + 0.5, side + 0.55]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>
