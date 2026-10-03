@@ -299,6 +299,16 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
             {selectedObject.name}
           </span>
           <PhoneTapButton
+            className="phone-selected-part-delete"
+            onTap={() => deleteObject(selectedObject.id)}
+            aria-label={`Delete ${selectedObject.name}`}
+            title="Delete part"
+            data-testid="selected-part-delete"
+          >
+            <Trash2 size={15} strokeWidth={1.8} />
+            <span>Delete</span>
+          </PhoneTapButton>
+          <PhoneTapButton
             className={`phone-selected-part-more${partMenuOpen ? ' is-open' : ''}`}
             onTap={() => setPartMenuOpen((open) => !open)}
             aria-label="Part actions"

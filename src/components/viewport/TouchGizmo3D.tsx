@@ -18,6 +18,24 @@ type DragAxis = 'x' | 'y' | 'z' | 'xz' | null;
 const _readoutRight = new THREE.Vector3();
 const _readoutQuat = new THREE.Quaternion();
 
+/** Half-width of the catch on 0°, 45°, 90°, and the other 45° marks. */
+const MAJOR_DETENT_DEGREES = 2;
+/** Half-width of the catch on the older 5° stops (0, 5, 10, …, 50, …). */
+const MINOR_DETENT_DEGREES = 1;
+
+/**
+ * Free rotation, rounded to a degree, with a light pull onto the old stops.
+ * A drag inside either window lands on that stop. Anywhere else, including 47° or 52°, it stays put.
+ * 50° is both a 5° stop and a place a drag can rest.
+ */
+function rotateWithDetents(degrees: number): number {
+  const major = Math.round(degrees / 45) * 45;
+  if (Math.abs(degrees - major) < MAJOR_DETENT_DEGREES) return major;
+  const minor = Math.round(degrees / 5) * 5;
+  if (Math.abs(degrees - minor) < MINOR_DETENT_DEGREES) return minor;
+  return Math.round(degrees);
+}
+
 /** Screen-size degree pill parked just to the right of the rotate sphere. */
 const RotateReadout: React.FC<{
   axis: 'x' | 'y' | 'z';
@@ -212,11 +230,10 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
 
         const angleDeg = THREE.MathUtils.radToDeg(angle);
         const newRotation = { ...session.startRotation };
-        const snapStop = (start: number) => Math.round((start + angleDeg) / 45) * 45;
         switch (session.axis) {
-          case 'x': newRotation.x = snapStop(session.startRotation.x); break;
-          case 'y': newRotation.y = snapStop(session.startRotation.y); break;
-          case 'z': newRotation.z = snapStop(session.startRotation.z); break;
+          case 'x': newRotation.x = rotateWithDetents(session.startRotation.x + angleDeg); break;
+          case 'y': newRotation.y = rotateWithDetents(session.startRotation.y + angleDeg); break;
+          case 'z': newRotation.z = rotateWithDetents(session.startRotation.z + angleDeg); break;
         }
 
         updateObject(object.id, { rotation: newRotation }, true);

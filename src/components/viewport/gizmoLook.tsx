@@ -228,8 +228,8 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 0.38;
-const PILL_LENGTH = 0.85;
+const PILL_RADIUS = 0.62;
+const PILL_LENGTH = 1.7;
 /** Flatten along the outward axis so the pill lies on the ring. */
 const PILL_FLAT = 0.7;
 const RING_TUBE = 0.085;
