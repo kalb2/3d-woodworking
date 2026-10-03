@@ -30,6 +30,75 @@ function commitSize(pushHistoryState: () => void, saveCurrentProject: () => void
   saveCurrentProject();
 }
 
+/** Distance from the floor while Move is active. Drag or type to raise the part. */
+export const MoveFloorRow: React.FC = () => {
+  const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
+  const [draft, setDraft] = useState<string | null>(null);
+  if (activeGizmoMode !== 'move' || !project || !object) return null;
+
+  const scale = unitScale(project.unit);
+  const gapInches = Math.max(object.position.y - object.dimensions.height / 2, 0);
+  const step = project.unit === 'mm' ? 1 : project.unit === 'ft' ? 0.01 : 0.1;
+  const display = gapInches * scale;
+  const maxDisplay = Math.max(96, gapInches + 24) * scale;
+
+  const write = (displayValue: number) => {
+    if (!Number.isFinite(displayValue)) return;
+    const inches = Math.max(displayValue / scale, 0);
+    updateObject(object.id, {
+      position: { ...object.position, y: inches + object.dimensions.height / 2 },
+    }, true);
+  };
+
+  const commit = () => {
+    setDraft(null);
+    commitSize(pushHistoryState, saveCurrentProject);
+  };
+
+  return (
+    <div className="size-inline floor-distance" data-testid="floor-distance" role="group" aria-label="Distance from the floor">
+      <span className="floor-distance-label">Floor</span>
+      <input
+        className="size-figure"
+        data-testid="floor-distance-input"
+        type="number"
+        inputMode="decimal"
+        step={step}
+        min={0}
+        aria-label={`Distance from the floor in ${project.unit}`}
+        style={{ color: GIZMO_AXIS.y, borderBottomColor: GIZMO_AXIS.y }}
+        value={draft ?? formatSize(gapInches, project.unit)}
+        onFocus={() => setDraft(formatSize(gapInches, project.unit))}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          write(Number(event.target.value));
+        }}
+        onBlur={commit}
+        onKeyUp={(event) => {
+          if (event.key === 'Enter') commit();
+        }}
+      />
+      <input
+        type="range"
+        data-testid="floor-distance-drag"
+        min={0}
+        max={maxDisplay}
+        step={step}
+        value={Math.min(display, maxDisplay)}
+        aria-label={`Drag distance from the floor in ${project.unit}`}
+        style={{ accentColor: GIZMO_AXIS.y }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          setDraft(null);
+          write(Number(event.target.value));
+        }}
+        onPointerUp={() => commitSize(pushHistoryState, saveCurrentProject)}
+        onKeyUp={() => commitSize(pushHistoryState, saveCurrentProject)}
+      />
+    </div>
+  );
+};
+
 /** One underlined number per axis, in the same bar as the transform tools. */
 export const ResizeSizeRow: React.FC = () => {
   const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();

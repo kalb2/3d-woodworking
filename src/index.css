@@ -1974,6 +1974,39 @@ html, body, #root {
   white-space: nowrap;
 }
 
+.phone-transform-bar .phone-dock-item.is-duplicate {
+  color: #2563eb;
+}
+
+.phone-transform-bar .phone-dock-item.is-delete {
+  color: #dc2626;
+}
+
+.floor-distance {
+  gap: 10px;
+  padding: 0 14px 10px;
+}
+
+.floor-distance-label {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.floor-distance .size-figure {
+  width: 72px;
+  flex: none;
+}
+
+.floor-distance input[type='range'] {
+  flex: 1;
+  min-width: 72px;
+  height: 36px;
+  margin: 0;
+  touch-action: none;
+}
+
 .size-inline {
   display: flex;
   align-items: center;

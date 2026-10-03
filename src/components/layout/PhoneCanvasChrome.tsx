@@ -31,7 +31,7 @@ import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
-import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
+import { MoveFloorRow, ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onTap: () => void;
@@ -254,7 +254,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
   hasSelection,
   children,
 }) => {
-  const { overlays } = useAppStore();
+  const { overlays, openOverlay } = useAppStore();
   const {
     projects,
     activeProjectId,
@@ -371,6 +371,38 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           showLabel
           onTap={() => setGizmoMode('rotate')}
         />
+        <DockItem
+          label="Duplicate"
+          testId="toolbar-duplicate"
+          icon={<Copy size={22} strokeWidth={1.8} />}
+          active={false}
+          disabled={!selectedObject}
+          showLabel
+          className="is-duplicate"
+          onTap={() => {
+            if (selectedObject) duplicateObject(selectedObject.id);
+          }}
+        />
+        <DockItem
+          label="Delete"
+          testId="toolbar-delete"
+          icon={<Trash2 size={22} strokeWidth={1.8} />}
+          active={false}
+          disabled={!selectedObject}
+          showLabel
+          className="is-delete"
+          onTap={() => {
+            if (selectedObject) deleteObject(selectedObject.id);
+          }}
+        />
+        <DockItem
+          label="Add"
+          testId="toolbar-add"
+          icon={<Plus size={22} strokeWidth={1.8} />}
+          active={false}
+          showLabel
+          onTap={() => openOverlay('sidebar')}
+        />
         {selectedObjectIds.length >= 2 && (
           <DockItem
             label="Group"
@@ -408,6 +440,7 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           />
         )}
       </nav>
+      <MoveFloorRow />
       <ResizeSizeRow />
       <RotateAngleRow />
     </div>
