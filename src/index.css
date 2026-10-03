@@ -1999,6 +1999,80 @@ html, body, #root {
   accent-color: #ff3b30;
 }
 
+.rotate-angle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rotate-angle .size-figure {
+  width: 52px;
+}
+
+.rotate-angle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.rotate-degree-mark {
+  font-size: 16px;
+  font-weight: 700;
+  color: #64748b;
+  margin-left: -2px;
+}
+
+.rotate-readout-anchor {
+  pointer-events: auto !important;
+}
+
+.rotate-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+}
+
+.rotate-readout input {
+  width: 52px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  padding: 0;
+}
+
+.rotate-readout-diamond {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  flex: none;
+}
+
+.rotate-readout-edit {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
 .size-nudge.is-canvas {
   position: absolute;
   left: 16px;

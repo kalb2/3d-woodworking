@@ -27,4 +27,4 @@ export const GIZMO_OUTLINE_WIDTH = 2.25;
  * Rotate sphere radius in inches. Same circle on every axis, and it does not
  * follow the part's size — a huge part keeps this sphere and the camera zooms in.
  */
-export const ROTATE_SPHERE_RADIUS = 4;
+export const ROTATE_SPHERE_RADIUS = 6;

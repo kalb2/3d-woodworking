@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
-import { GIZMO_AXIS } from '../../theme/gizmo';
+import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
+import { RotateDegreePill } from '../layout/SizeBar';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
@@ -13,11 +15,45 @@ interface TouchGizmo3DProps {
 
 type DragAxis = 'x' | 'y' | 'z' | 'xz' | null;
 
+const _readoutRight = new THREE.Vector3();
+const _readoutQuat = new THREE.Quaternion();
+
+/** Screen-size degree pill parked just to the right of the rotate sphere. */
+const RotateReadout: React.FC<{
+  axis: 'x' | 'y' | 'z';
+  degrees: number;
+  onChange: (degrees: number) => void;
+  onCommit: () => void;
+}> = ({ axis, degrees, onChange, onCommit }) => {
+  const anchor = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    const node = anchor.current;
+    const parent = node?.parent;
+    if (!node || !parent) return;
+    _readoutRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    parent.getWorldQuaternion(_readoutQuat);
+    _readoutRight.applyQuaternion(_readoutQuat.invert());
+    if (_readoutRight.lengthSq() < 1e-6) _readoutRight.set(1, 0, 0);
+    node.position.copy(_readoutRight.normalize().multiplyScalar(ROTATE_SPHERE_RADIUS + 1.8));
+  });
+
+  return (
+    <group ref={anchor}>
+      <Html center zIndexRange={[30, 0]} wrapperClass="rotate-readout-anchor">
+        <RotateDegreePill axis={axis} degrees={degrees} onChange={onChange} onCommit={onCommit} />
+      </Html>
+    </group>
+  );
+};
+
 export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const {
     activeGizmoMode,
     updateObject,
     pushHistoryState,
+    saveCurrentProject,
     projects,
     activeProjectId
   } = useProjectStore();
@@ -25,6 +61,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const { camera, raycaster, gl, controls } = useThree() as any;
 
   const [activeAxis, setActiveAxis] = useState<DragAxis>(null);
+  const [readoutAxis, setReadoutAxis] = useState<'x' | 'y' | 'z' | null>(null);
 
   const dragRef = useRef<{
     axis: DragAxis;
@@ -174,13 +211,12 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
         if (cross.dot(rotAxisWorld) < 0) angle = -angle;
 
         const angleDeg = THREE.MathUtils.radToDeg(angle);
-        const snappedAngle = Math.round(angleDeg / 5) * 5;
-
         const newRotation = { ...session.startRotation };
+        const snapStop = (start: number) => Math.round((start + angleDeg) / 45) * 45;
         switch (session.axis) {
-          case 'x': newRotation.x = session.startRotation.x + snappedAngle; break;
-          case 'y': newRotation.y = session.startRotation.y + snappedAngle; break;
-          case 'z': newRotation.z = session.startRotation.z + snappedAngle; break;
+          case 'x': newRotation.x = snapStop(session.startRotation.x); break;
+          case 'y': newRotation.y = snapStop(session.startRotation.y); break;
+          case 'z': newRotation.z = snapStop(session.startRotation.z); break;
         }
 
         updateObject(object.id, { rotation: newRotation }, true);
@@ -215,8 +251,11 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   if (activeGizmoMode === 'resize') return null;
 
   const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
+    if (axis === 'x' || axis === 'y' || axis === 'z') setReadoutAxis(axis);
     handleDragStart(axis, event.point.clone());
   };
+
+  const shownAxis = activeAxis === 'x' || activeAxis === 'y' || activeAxis === 'z' ? activeAxis : readoutAxis;
 
   const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; color: string }[] = [
     { axis: '+x', drag: 'x', color: GIZMO_AXIS.x },
@@ -245,6 +284,19 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
           <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
           <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
+          {shownAxis && (
+            <RotateReadout
+              axis={shownAxis}
+              degrees={object.rotation[shownAxis]}
+              onChange={(degrees) => {
+                updateObject(object.id, { rotation: { ...object.rotation, [shownAxis]: degrees } }, true);
+              }}
+              onCommit={() => {
+                pushHistoryState();
+                saveCurrentProject();
+              }}
+            />
+          )}
         </>
       ) : null}
     </group>

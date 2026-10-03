@@ -3,7 +3,7 @@ import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check } from 'lucide-r
 import { useProjectStore } from '../../state/useProjectStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap } from '../../utils/reliableTap';
-import { MoveSizeNudge, ResizeSizeRow } from './SizeBar';
+import { MoveSizeNudge, ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
 export const TransformMenu: React.FC = () => {
   const {
@@ -34,6 +34,7 @@ export const TransformMenu: React.FC = () => {
     <MoveSizeNudge placement="canvas" />
     <div className="transform-menu" data-testid="transform-menu" role="toolbar" aria-label="Move, resize, and rotate">
       <ResizeSizeRow />
+      <RotateAngleRow />
       <div className="transform-menu-icons">
       <button
         type="button"
