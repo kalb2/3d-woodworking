@@ -119,6 +119,18 @@ const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
 };
 
 /**
+ * Report a hit in front of any solid the handle passes through.
+ * The real intersection point is unchanged; only the sort distance moves up.
+ */
+function raycastInFrontOfSolid(this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+  const before = intersects.length;
+  THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+  for (let i = before; i < intersects.length; i += 1) {
+    intersects[i].distance -= 1e6;
+  }
+}
+
+/**
  * Arrow grows from the object center along its axis.
  * The shaft start is the offset, so the head is not glued to a face.
  */
@@ -147,6 +159,7 @@ export const AxisArrow: React.FC<{
           position={[0, hitLength / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
@@ -215,6 +228,7 @@ export const MoveHub: React.FC<{
           rotation={[Math.PI / 2, 0, 0]}
           renderOrder={21}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
@@ -235,18 +249,6 @@ const PILL_FLAT = 0.7;
 const RING_TUBE = 0.085;
 /** Invisible grab thickness so a thin ring is still easy to pinch. */
 const RING_HIT_TUBE = 0.62;
-
-/**
- * Report a hit in front of any solid the ring passes through.
- * The real intersection point is unchanged; only the sort distance moves up.
- */
-function raycastInFrontOfSolid(this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
-  const before = intersects.length;
-  THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
-  for (let i = before; i < intersects.length; i += 1) {
-    intersects[i].distance -= 1e6;
-  }
-}
 
 function pillPose(radius: number, angle: number) {
   const position = new THREE.Vector3(radius * Math.cos(angle), radius * Math.sin(angle), 0);
