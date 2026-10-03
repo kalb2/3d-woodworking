@@ -11,8 +11,14 @@ import {
   Layers,
   Menu,
   Ellipsis,
+  Group,
+  Move,
+  Pencil,
   Plus,
+  RotateCw,
   Ruler,
+  Scaling,
+  Ungroup,
   Settings,
   Share2,
   SlidersHorizontal,
@@ -25,6 +31,7 @@ import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
+import { MoveSizeNudge, ResizeSizeRow } from './SizeBar';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onTap: () => void;
@@ -101,8 +108,8 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
   onOpenCutList,
   onNewProject,
 }) => {
-  const { overlays, setOverlayOpen } = useAppStore();
-  const { activeProjectId, projects } = useProjectStore();
+  const { overlays, openOverlay, setOverlayOpen } = useAppStore();
+  const { activeProjectId, projects, setGizmoMode } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const [copiedNotification, setCopiedNotification] = useState(false);
 
@@ -146,6 +153,38 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
         <OverlayDismissButton onDismiss={close} />
       </div>
       <div className="phone-sheet-body">
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="tool-settings"
+          onTap={() => { close(); openOverlay('settings', true); }}
+        >
+          <Settings size={18} />
+          <span>Settings</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="overlay-launch-shapes"
+          onTap={() => { close(); openOverlay('sidebar', true); }}
+        >
+          <Box size={18} />
+          <span>Parts</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="overlay-launch-properties"
+          onTap={() => { close(); openOverlay('inspector', true); }}
+        >
+          <SlidersHorizontal size={18} />
+          <span>Properties</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="tool-dims"
+          onTap={() => { close(); setGizmoMode('move'); }}
+        >
+          <Ruler size={18} />
+          <span>Measure</span>
+        </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"
           onTap={() => { close(); onOpenProjectModal(); }}
@@ -215,22 +254,28 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
   hasSelection,
   children,
 }) => {
-  const { overlays, openOverlay, setOverlayOpen } = useAppStore();
+  const { overlays } = useAppStore();
   const {
     projects,
     activeProjectId,
     selectedObjectId,
+    selectedObjectIds,
+    editingGroupId,
+    activeGizmoMode,
+    setGizmoMode,
+    groupSelected,
+    ungroup,
+    enterGroup,
+    exitGroup,
     duplicateObject,
     deleteObject,
-    showDimensions,
-    toggleDimensions,
   } = useProjectStore();
   const [partMenuOpen, setPartMenuOpen] = useState(false);
 
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
-  const propertiesOpen = overlays.inspector;
+  const groupId = selectedObject?.shape === 'group' ? selectedObject.id : editingGroupId;
 
   useEffect(() => {
     setPartMenuOpen(false);
@@ -253,16 +298,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           <span className="phone-selected-part-name" title={selectedObject.name}>
             {selectedObject.name}
           </span>
-          <PhoneTapButton
-            className="phone-selected-part-delete"
-            onTap={() => deleteObject(selectedObject.id)}
-            aria-label={`Delete ${selectedObject.name}`}
-            title="Delete part"
-            data-testid="selected-part-delete"
-          >
-            <Trash2 size={15} strokeWidth={1.8} />
-            <span>Delete</span>
-          </PhoneTapButton>
           <PhoneTapButton
             className={`phone-selected-part-more${partMenuOpen ? ' is-open' : ''}`}
             onTap={() => setPartMenuOpen((open) => !open)}
@@ -301,65 +336,67 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           )}
         </div>
       )}
-      <div className="phone-dock-grid">
-      <nav className="phone-tool-sheet-secondary" aria-label="Measure and view">
+      <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem
-          compact
-          label="Settings"
-          testId="tool-settings"
-          icon={<Settings size={18} strokeWidth={1.7} />}
-          active={overlays.settings}
-          onTap={() => {
-            if (overlays.settings) {
-              setOverlayOpen('settings', false);
-              return;
-            }
-            openOverlay('settings', true);
-          }}
+          label="Move"
+          testId="overlay-launch-tools"
+          icon={<Move size={22} strokeWidth={1.8} />}
+          active={activeGizmoMode === 'move'}
+          onTap={() => setGizmoMode('move')}
         />
-        <PhoneTapButton
-          className={`phone-measure-pill${showDimensions ? ' is-active' : ''}`}
-          onTap={toggleDimensions}
-          aria-label="Toggle dimensions"
-          aria-pressed={showDimensions}
-          title="Toggle dimensions"
-          data-testid="tool-dims"
-        >
-          <Ruler size={16} strokeWidth={1.8} />
-          <span>Measure</span>
-        </PhoneTapButton>
         <DockItem
-          compact
-          label="Parts"
-          testId="overlay-launch-shapes"
-          icon={<Box size={18} strokeWidth={1.7} />}
-          active={overlays.sidebar}
-          onTap={() => {
-            if (overlays.sidebar) {
-              setOverlayOpen('sidebar', false);
-              return;
-            }
-            openOverlay('sidebar', true);
-          }}
+          label="Resize"
+          testId="tool-resize"
+          icon={<Scaling size={22} strokeWidth={1.8} />}
+          active={activeGizmoMode === 'resize'}
+          onTap={() => setGizmoMode('resize')}
         />
+        <DockItem
+          label="Rotate"
+          testId="tool-rotate"
+          icon={<RotateCw size={22} strokeWidth={1.8} />}
+          active={activeGizmoMode === 'rotate'}
+          onTap={() => setGizmoMode('rotate')}
+        />
+        {selectedObjectIds.length >= 2 && (
+          <DockItem
+            label="Group"
+            testId="transform-group"
+            icon={<Group size={22} strokeWidth={1.8} />}
+            active={false}
+            onTap={() => groupSelected()}
+          />
+        )}
+        {groupId && selectedObject?.shape === 'group' && !editingGroupId && (
+          <>
+            <DockItem
+              label="Edit"
+              testId="transform-edit-group"
+              icon={<Pencil size={22} strokeWidth={1.8} />}
+              active={false}
+              onTap={() => enterGroup(groupId)}
+            />
+            <DockItem
+              label="Ungroup"
+              testId="transform-ungroup"
+              icon={<Ungroup size={22} strokeWidth={1.8} />}
+              active={false}
+              onTap={() => ungroup(groupId)}
+            />
+          </>
+        )}
+        {editingGroupId && (
+          <DockItem
+            label="Done"
+            testId="transform-done-group"
+            icon={<Check size={22} strokeWidth={1.8} />}
+            active
+            onTap={() => exitGroup()}
+          />
+        )}
       </nav>
-      <DockItem
-        className="phone-dock-part"
-        label="Properties"
-        testId="overlay-launch-properties"
-        icon={<SlidersHorizontal size={22} strokeWidth={1.6} />}
-        active={propertiesOpen}
-        disabled={!hasSelection}
-        onTap={() => {
-          if (!hasSelection) return;
-          if (overlays.inspector) {
-            setOverlayOpen('inspector', false);
-            return;
-          }
-          openOverlay('inspector', true);
-        }}
-      />
-      </div>
+      <ResizeSizeRow />
+      <MoveSizeNudge placement="dock" />
     </div>
   );
 };

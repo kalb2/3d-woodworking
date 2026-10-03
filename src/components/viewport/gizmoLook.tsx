@@ -4,23 +4,17 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import {
+  GIZMO_DISTANCE_REF,
   GIZMO_HUB_CHEVRON,
   GIZMO_HUB_EDGE,
   GIZMO_HUB_FILL,
   GIZMO_OUTLINE_WIDTH,
+  GIZMO_SCALE_MAX,
+  GIZMO_SCALE_MIN,
 } from '../../theme/gizmo';
 import { gripAnchor, type MeshExtents } from '../../theme/partSurface';
 
 const _world = new THREE.Vector3();
-
-/** World size of one screen pixel at a point, so grips stay thumb-sized while zooming. */
-export function worldUnitsPerPixel(camera: THREE.Camera, viewHeight: number, worldPoint: THREE.Vector3) {
-  const persp = camera as THREE.PerspectiveCamera;
-  const dist = Math.max(camera.position.distanceTo(worldPoint), 0.35);
-  const fov = ((persp.fov || 45) * Math.PI) / 180;
-  const height = Math.max(viewHeight, 1);
-  return (2 * Math.tan(fov / 2) * dist) / height;
-}
 
 /** Draw gizmos on top of the scene while still depth-testing themselves — solid, not glass. */
 export const GizmoDepthClear: React.FC = () => (
@@ -42,13 +36,15 @@ export const GizmoDepthClear: React.FC = () => (
  */
 export const GripSize: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const ref = useRef<THREE.Group>(null);
-  const { camera, size } = useThree();
+  const { camera } = useThree();
 
   useFrame(() => {
     if (!ref.current) return;
     ref.current.getWorldPosition(_world);
-    // Children are authored in pixels. This keeps a 64px head 64px on a phone.
-    ref.current.scale.setScalar(worldUnitsPerPixel(camera, size.height, _world));
+    const dist = camera.position.distanceTo(_world);
+    // Modest zoom compensation. The cap keeps grips on the part instead of filling the screen.
+    const scale = THREE.MathUtils.clamp(dist / GIZMO_DISTANCE_REF, GIZMO_SCALE_MIN, GIZMO_SCALE_MAX);
+    ref.current.scale.setScalar(scale);
   });
 
   return (
@@ -102,13 +98,13 @@ const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: 0,
 };
 
-const SHAFT_START = 10;
-const SHAFT_LENGTH = 86;
-const SHAFT_RADIUS = 15;
-const CONE_LENGTH = 58;
-const CONE_RADIUS = 34;
-const ARROW_HIT_RADIUS = 46;
-const ARROW_HIT_EXTRA = 18;
+const SHAFT_START = 1.0;
+const SHAFT_LENGTH = 2.7;
+const SHAFT_RADIUS = 0.38;
+const CONE_LENGTH = 1.3;
+const CONE_RADIUS = 0.82;
+const ARROW_HIT_RADIUS = 1.15;
+const ARROW_HIT_EXTRA = 0.35;
 
 /** Local +Y maps onto the face normal — pull outward from the side. */
 const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
@@ -126,9 +122,11 @@ export const AxisArrow: React.FC<{
   extents: MeshExtents;
   color: string;
   active: boolean;
+  /** When set, the arrow grows from this point (top-face move gizmo) instead of the side face. */
+  anchor?: [number, number, number];
   onPointerDown: (event: any) => void;
-}> = ({ axis, extents, color, active, onPointerDown }) => {
-  const position = gripAnchor(axis, extents);
+}> = ({ axis, extents, color, active, anchor, onPointerDown }) => {
+  const position = anchor ?? gripAnchor(axis, extents);
   const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
   const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
   const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
@@ -161,11 +159,11 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 42;
-const HUB_THICKNESS = 14;
-const CHEVRON_RADIUS = 11;
-const CHEVRON_LENGTH = 24;
-const HUB_HIT_RADIUS = 56;
+const HUB_RADIUS = 0.85;
+const HUB_THICKNESS = 0.16;
+const CHEVRON_RADIUS = 0.18;
+const CHEVRON_LENGTH = 0.38;
+const HUB_HIT_RADIUS = 1.15;
 
 /** Light hub that sits on the part's top face (not a floating origin ball). */
 export const MoveHub: React.FC<{
@@ -193,7 +191,7 @@ export const MoveHub: React.FC<{
           <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-          <torusGeometry args={[HUB_RADIUS, 2.4, 8, 40]} />
+          <torusGeometry args={[HUB_RADIUS, 0.06, 8, 32]} />
           <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
         </mesh>
         {chevrons.map((chevron) => (
@@ -217,7 +215,7 @@ export const MoveHub: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 36, 20]} />
+          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.7, 20]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </group>
@@ -225,11 +223,10 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 22;
-const PILL_HEIGHT = 58;
+const PILL_RADIUS = 0.34;
+const PILL_HEIGHT = 0.85;
 const PILL_FLAT = 0.55;
-const RING_TUBE_PX = 11;
-const RING_HIT_TUBE = 2.4;
+const RING_HIT_TUBE = 0.55;
 
 function pillPose(radius: number, angle: number) {
   const position: [number, number, number] = [
@@ -253,25 +250,11 @@ export const RotateRing: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, radius, tube, pillAngle = SIDE_PILL_ANGLE[axis], onPointerDown }) => {
   const pose = useMemo(() => pillPose(radius, pillAngle), [radius, pillAngle]);
-  const ringRef = useRef<THREE.Mesh>(null);
-  const { camera, size } = useThree();
-  const tubeRef = useRef(tube);
-
-  useFrame(() => {
-    const mesh = ringRef.current;
-    if (!mesh) return;
-    mesh.getWorldPosition(_world);
-    const next = Math.max(RING_TUBE_PX * worldUnitsPerPixel(camera, size.height, _world), 0.04);
-    if (Math.abs(next - tubeRef.current) < tubeRef.current * 0.08) return;
-    tubeRef.current = next;
-    mesh.geometry.dispose();
-    mesh.geometry = new THREE.TorusGeometry(radius, next, 12, 72);
-  });
 
   return (
     <group rotation={RING_ROTATION[axis]}>
-      <mesh ref={ringRef} renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[radius, Math.max(tube, 0.2), 12, 72]} />
+      <mesh renderOrder={11} frustumCulled={false}>
+        <torusGeometry args={[radius, tube, 10, 64]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
@@ -297,21 +280,23 @@ export const RotateRing: React.FC<{
   );
 };
 
-const PAD_SIDE = 76;
-const PAD_THICK = 30;
+const PAD_SIDE = 1.35;
+const PAD_THICK = 0.32;
 
 /** Moblo resize: square RGB pad on the face you'd pull. Not a capsule. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
   active: boolean;
+  /** Lay the pad flat on the top rim so a thin board still shows it. */
+  flat?: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, onPointerDown }) => {
+}> = ({ axis, color, active, flat = false, onPointerDown }) => {
   const side = PAD_SIDE;
   const thick = PAD_THICK;
 
   return (
-    <group rotation={FACE_OUT[axis]}>
+    <group rotation={flat ? [0, 0, 0] : FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
           <boxGeometry args={[side, thick, side]} />
@@ -326,7 +311,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 20, thick + 24, side + 20]} />
+          <boxGeometry args={[side + 0.7, thick + 0.8, side + 0.7]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>

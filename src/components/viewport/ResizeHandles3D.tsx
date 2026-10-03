@@ -35,13 +35,14 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   const rotRadZ = THREE.MathUtils.degToRad(rotZ);
 
   const extents = meshExtents(object.shape, object.dimensions);
-  const handles: { axis: HandleAxis; pos: [number, number, number]; color: string }[] = [
-    { axis: '+x', pos: gripAnchor('+x', extents), color: GIZMO_AXIS.x },
-    { axis: '-x', pos: gripAnchor('-x', extents), color: GIZMO_AXIS.x },
-    { axis: '+y', pos: gripAnchor('+y', extents), color: GIZMO_AXIS.y },
-    { axis: '-y', pos: gripAnchor('-y', extents), color: GIZMO_AXIS.y },
-    { axis: '+z', pos: gripAnchor('+z', extents), color: GIZMO_AXIS.z },
-    { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z }
+  const { hx, hy, hz } = extents;
+  const handles: { axis: HandleAxis; pos: [number, number, number]; color: string; flat: boolean }[] = [
+    { axis: '+x', pos: [hx, hy, 0], color: GIZMO_AXIS.x, flat: true },
+    { axis: '-x', pos: [-hx, hy, 0], color: GIZMO_AXIS.x, flat: true },
+    { axis: '+y', pos: gripAnchor('+y', extents), color: GIZMO_AXIS.y, flat: false },
+    { axis: '-y', pos: gripAnchor('-y', extents), color: GIZMO_AXIS.y, flat: false },
+    { axis: '+z', pos: [0, hy, hz], color: GIZMO_AXIS.z, flat: true },
+    { axis: '-z', pos: [0, hy, -hz], color: GIZMO_AXIS.z, flat: true },
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
@@ -149,11 +150,12 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
       <GizmoDepthClear />
-      {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color }) => (
+      {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color, flat }) => (
         <group key={axis} position={pos}>
             <FacePad
               axis={axis}
               color={color}
+              flat={flat}
               active={activeAxis === axis}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />

@@ -379,12 +379,17 @@ html, body, #root {
 }
 
 .phone-tool-sheet-handle {
+  display: none;
   width: 36px;
   height: 4px;
   border-radius: 999px;
   background: #dbe3ee;
   margin: 10px auto 2px;
   flex-shrink: 0;
+}
+
+.phone-tool-sheet.is-expanded .phone-tool-sheet-handle {
+  display: block;
 }
 
 .phone-tool-sheet-body {
@@ -398,17 +403,23 @@ html, body, #root {
 }
 
 .phone-selected-part {
-  position: relative;
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 8px);
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin: 4px 10px 2px;
+  gap: 4px;
+  max-width: 70%;
+  margin: 0;
   padding: 4px 4px 4px 14px;
-  min-height: 44px;
-  background: #f8fafc;
+  min-height: 40px;
+  background: #ffffff;
   border-radius: 999px;
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
   overflow: visible;
+  z-index: 2;
 }
 
 .phone-selected-part-name {
@@ -1856,8 +1867,9 @@ html, body, #root {
   transform: translateX(-50%);
   z-index: 45;
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   padding: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
@@ -1894,60 +1906,108 @@ html, body, #root {
   color: #ffffff;
 }
 
-.editor-root.is-phone .transform-menu {
-  bottom: calc(168px + env(safe-area-inset-bottom, 0px));
-}
-
-.size-bar {
-  position: absolute;
-  left: 50%;
-  bottom: 100px;
-  transform: translateX(-50%);
-  z-index: 46;
-  width: min(460px, calc(100% - 28px));
+.transform-menu-icons {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 14px 10px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
-  pointer-events: auto;
-}
-
-.size-bar-row {
-  display: grid;
-  grid-template-columns: 14px 64px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  min-height: 48px;
+  gap: 4px;
 }
 
-.size-bar-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
+.phone-transform-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 4px;
+  padding: 6px 8px 2px;
 }
 
-.size-bar-value {
-  font-size: 20px;
+.phone-transform-bar .phone-dock-item {
+  min-height: 44px;
+  padding: 4px 2px;
+  border-radius: 14px;
+}
+
+.phone-transform-bar .phone-dock-item span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.size-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 44px;
+  padding: 0 12px 8px;
+}
+
+.size-figure {
+  width: 64px;
+  border: none;
+  border-bottom: 2px solid currentColor;
+  background: transparent;
+  text-align: center;
+  font-size: 18px;
   font-weight: 700;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  min-height: 40px;
+  padding: 0 2px 2px;
 }
 
-.size-bar input[type='range'] {
-  width: 100%;
+.size-figure-read {
+  width: auto;
+  min-width: 36px;
+  border-bottom-color: #ff3b30;
+}
+
+.size-link {
+  width: 44px;
   height: 44px;
-  margin: 0;
-  cursor: pointer;
-  touch-action: manipulation;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.editor-root.is-phone .size-bar {
-  bottom: calc(236px + env(safe-area-inset-bottom, 0px));
-  width: calc(100% - 16px);
+.size-link.is-on {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.size-nudge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px 8px;
+}
+
+.size-nudge input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: #ff3b30;
+}
+
+.size-nudge.is-canvas {
+  position: absolute;
+  left: 16px;
+  bottom: 24px;
+  z-index: 44;
+  width: min(200px, 42vw);
+  padding: 0;
+  background: transparent;
+  pointer-events: auto;
 }
 
 .new-project-backdrop {

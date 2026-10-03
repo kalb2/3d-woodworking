@@ -242,6 +242,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
               key={axis}
               axis={axis}
               extents={extents}
+              anchor={[0, hy, 0]}
               color={color}
               active={activeAxis === drag}
               onPointerDown={beginAxis(drag)}

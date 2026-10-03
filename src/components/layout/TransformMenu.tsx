@@ -1,7 +1,9 @@
 import React from 'react';
 import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
+import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap } from '../../utils/reliableTap';
+import { MoveSizeNudge, ResizeSizeRow } from './SizeBar';
 
 export const TransformMenu: React.FC = () => {
   const {
@@ -22,10 +24,17 @@ export const TransformMenu: React.FC = () => {
   const selected = project?.objects.find((item) => item.id === selectedObjectId);
   const groupId = selected?.shape === 'group' ? selected.id : editingGroupId;
 
+  const isPhone = useIsPhone();
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
 
+  if (isPhone) return null;
+
   return (
+    <>
+    <MoveSizeNudge placement="canvas" />
     <div className="transform-menu" data-testid="transform-menu" role="toolbar" aria-label="Move, resize, and rotate">
+      <ResizeSizeRow />
+      <div className="transform-menu-icons">
       <button
         type="button"
         className={activeGizmoMode === 'move' ? 'is-active' : ''}
@@ -101,6 +110,8 @@ export const TransformMenu: React.FC = () => {
           <span>Done</span>
         </button>
       )}
+      </div>
     </div>
+    </>
   );
 };
