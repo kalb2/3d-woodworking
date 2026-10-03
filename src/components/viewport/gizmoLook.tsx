@@ -233,6 +233,20 @@ const PILL_LENGTH = 0.85;
 /** Flatten along the outward axis so the pill lies on the ring. */
 const PILL_FLAT = 0.7;
 const RING_TUBE = 0.085;
+/** Invisible grab thickness so a thin ring is still easy to pinch. */
+const RING_HIT_TUBE = 0.62;
+
+/**
+ * Report a hit in front of any solid the ring passes through.
+ * The real intersection point is unchanged; only the sort distance moves up.
+ */
+function raycastInFrontOfSolid(this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+  const before = intersects.length;
+  THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+  for (let i = before; i < intersects.length; i += 1) {
+    intersects[i].distance -= 1e6;
+  }
+}
 
 function pillPose(radius: number, angle: number) {
   const position = new THREE.Vector3(radius * Math.cos(angle), radius * Math.sin(angle), 0);
@@ -255,14 +269,23 @@ export const RotateRing: React.FC<{
   const radius = ROTATE_SPHERE_RADIUS;
   const pose = useMemo(() => pillPose(radius, SIDE_PILL_ANGLE[axis]), [radius, axis]);
 
+  const grab = (event: any) => {
+    event.stopPropagation();
+    onPointerDown(event);
+  };
+
   return (
     <group rotation={RING_ROTATION[axis]}>
       <mesh renderOrder={11} frustumCulled={false} raycast={() => null}>
         <torusGeometry args={[radius, RING_TUBE, 12, 72]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
+      <mesh renderOrder={21} frustumCulled={false} raycast={raycastInFrontOfSolid} onPointerDown={grab}>
+        <torusGeometry args={[radius, RING_HIT_TUBE, 8, 48]} />
+        <meshBasicMaterial visible={false} depthTest={false} />
+      </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
-        <mesh scale={[PILL_FLAT, 1, 1]} renderOrder={13} frustumCulled={false}>
+        <mesh scale={[PILL_FLAT, 1, 1]} renderOrder={13} frustumCulled={false} raycast={() => null}>
           <capsuleGeometry args={[PILL_RADIUS, PILL_LENGTH, 8, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
@@ -270,10 +293,8 @@ export const RotateRing: React.FC<{
           scale={[1.05, 1.15, 1.2]}
           renderOrder={22}
           frustumCulled={false}
-          onPointerDown={(event) => {
-            event.stopPropagation();
-            onPointerDown(event);
-          }}
+          raycast={raycastInFrontOfSolid}
+          onPointerDown={grab}
         >
           <capsuleGeometry args={[PILL_RADIUS + 0.2, PILL_LENGTH + 0.15, 6, 10]} />
           <meshBasicMaterial visible={false} depthTest={false} />
