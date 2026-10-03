@@ -9,8 +9,8 @@ export interface MeshExtents {
   kind: MeshKind;
 }
 
-/** Tight pad so rotate hoops kiss the silhouette instead of a loose AABB. */
-export const MESH_RING_PAD = 0.18;
+/** Small lift so a rotate hoop sits just outside the face, not on the corner diagonal. */
+export const MESH_RING_PAD = 0.22;
 
 /**
  * Half-extents of the *drawn* mesh, not the authored AABB.
@@ -37,16 +37,21 @@ export function meshExtents(shape: ShapeType, dimensions: Dimensions3D): MeshExt
   };
 }
 
-/** Ring that wraps this axis’ silhouette of the real mesh. */
-export function meshRingRadius(
+/**
+ * Semi-axes of the rotate hoop in its local XY plane.
+ * X ring (local X → depth, local Y → height), Y ring (local X → length, local Y → depth),
+ * Z ring (local X → length, local Y → height). Each axis is the face half-extent plus a small pad,
+ * so the hoop hugs the part instead of circling the corner-to-corner diagonal.
+ */
+export function meshRingAxes(
   shape: ShapeType,
   dimensions: Dimensions3D,
   axis: 'x' | 'y' | 'z',
-  pad = MESH_RING_PAD,
-) {
+): { rx: number; ry: number } {
   const { hx, hy, hz } = meshExtents(shape, dimensions);
-  const pair = axis === 'x' ? [hy, hz] : axis === 'y' ? [hx, hz] : [hx, hy];
-  return Math.hypot(pair[0], pair[1]) + pad;
+  const pair: [number, number] = axis === 'x' ? [hz, hy] : axis === 'y' ? [hx, hz] : [hx, hy];
+  const pad = Math.max(MESH_RING_PAD, Math.min(pair[0], pair[1]) * 0.06);
+  return { rx: pair[0] + pad, ry: pair[1] + pad };
 }
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';

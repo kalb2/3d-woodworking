@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -88,13 +88,15 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
 };
 
 /**
- * Rotate pills on the hoop equator — the side you'd grab, not the top.
- * X hoop (YZ): +Z. Y hoop (XZ): +Z. Z hoop (XY): +X.
+ * One grip on each hoop.
+ * X (red, depth/height): front of the hoop, above center, so the pill stays nearly vertical.
+ * Y (green, length/depth): front of the hoop — reads lower on the face when the camera is above.
+ * Z (blue, length/height): top of the hoop.
  */
 const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI,
+  x: Math.PI - 0.42,
   y: Math.PI / 2,
-  z: 0,
+  z: Math.PI / 2,
 };
 
 const SHAFT_START = 1.55;
@@ -225,59 +227,82 @@ export const MoveHub: React.FC<{
   );
 };
 
-const PILL_RADIUS = 0.34;
-const PILL_HEIGHT = 0.85;
-const PILL_FLAT = 0.55;
-const RING_HIT_TUBE = 0.55;
+const PILL_RADIUS = 0.42;
+const PILL_LENGTH = 0.95;
+/** Flatten along the outward axis so the pill lies on the face. */
+const PILL_FLAT = 0.72;
+const RING_TUBE = 0.11;
 
-function pillPose(radius: number, angle: number) {
-  const position: [number, number, number] = [
-    radius * Math.cos(angle),
-    radius * Math.sin(angle),
-    0,
-  ];
-  // Rz(angle) maps capsule +Y onto the circle tangent — always well-defined.
-  const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+class FlatEllipseCurve extends THREE.Curve<THREE.Vector3> {
+  rx: number;
+  ry: number;
+
+  constructor(rx: number, ry: number) {
+    super();
+    this.rx = rx;
+    this.ry = ry;
+  }
+
+  getPoint(t: number, optionalTarget = new THREE.Vector3()) {
+    const angle = t * Math.PI * 2;
+    return optionalTarget.set(Math.cos(angle) * this.rx, Math.sin(angle) * this.ry, 0);
+  }
+}
+
+function pillPose(rx: number, ry: number, angle: number) {
+  const position = new THREE.Vector3(rx * Math.cos(angle), ry * Math.sin(angle), 0);
+  const tangent = new THREE.Vector3(-rx * Math.sin(angle), ry * Math.cos(angle), 0).normalize();
+  const normal = new THREE.Vector3(0, 0, 1);
+  const outward = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(outward, tangent, normal)
+  );
   return { position, quaternion };
 }
 
-/** Full opaque RGB hoop + flattened pill on the side you'd grab. Not a cone or cube. */
+/** Tight elliptical track around the part, plus one pill you drag. */
 export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
   active: boolean;
-  radius: number;
-  tube: number;
-  pillAngle?: number;
+  rx: number;
+  ry: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, radius, tube, pillAngle = SIDE_PILL_ANGLE[axis], onPointerDown }) => {
-  const pose = useMemo(() => pillPose(radius, pillAngle), [radius, pillAngle]);
+}> = ({ axis, color, active, rx, ry, onPointerDown }) => {
+  const pose = useMemo(() => pillPose(rx, ry, SIDE_PILL_ANGLE[axis]), [rx, ry, axis]);
+  const tube = Math.min(RING_TUBE, Math.min(rx, ry) * 0.2);
+  const geometry = useMemo(() => {
+    const curve = new FlatEllipseCurve(rx, ry);
+    return new THREE.TubeGeometry(curve, 80, tube, 8, true);
+  }, [rx, ry, tube]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <group rotation={RING_ROTATION[axis]}>
-      <mesh renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[radius, tube, 10, 64]} />
+      <mesh geometry={geometry} renderOrder={11} frustumCulled={false} raycast={() => null}>
         <GizmoMaterial color={color} active={active} />
       </mesh>
       <group position={pose.position} quaternion={pose.quaternion}>
         <GripSize>
-          <mesh scale={[1.12, 1, PILL_FLAT]} renderOrder={13} frustumCulled={false}>
-            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 6, 16]} />
+          <mesh scale={[PILL_FLAT, 1, 1]} renderOrder={13} frustumCulled={false}>
+            <capsuleGeometry args={[PILL_RADIUS, PILL_LENGTH, 8, 16]} />
             <GizmoMaterial color={color} active={active} />
+          </mesh>
+          <mesh
+            scale={[1.05, 1.2, 1.25]}
+            renderOrder={22}
+            frustumCulled={false}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              onPointerDown(event);
+            }}
+          >
+            <capsuleGeometry args={[PILL_RADIUS + 0.22, PILL_LENGTH + 0.2, 6, 10]} />
+            <meshBasicMaterial visible={false} depthTest={false} />
           </mesh>
         </GripSize>
       </group>
-      <mesh
-        renderOrder={22}
-        frustumCulled={false}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onPointerDown(event);
-        }}
-      >
-        <torusGeometry args={[radius, RING_HIT_TUBE, 8, 56]} />
-        <meshBasicMaterial visible={false} depthTest={false} />
-      </mesh>
     </group>
   );
 };

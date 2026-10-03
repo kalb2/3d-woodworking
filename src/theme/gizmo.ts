@@ -22,11 +22,3 @@ export const GIZMO_SCALE_MIN = 0.85;
 export const GIZMO_SCALE_MAX = 1.35;
 
 export const GIZMO_OUTLINE_WIDTH = 2.25;
-
-export function boundRingTube(radius: number) {
-  return THREE_CLAMP(radius * 0.012, 0.08, 0.2);
-}
-
-function THREE_CLAMP(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}

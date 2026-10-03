@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
-import { GIZMO_AXIS, boundRingTube } from '../../theme/gizmo';
-import { meshRingRadius } from '../../theme/partSurface';
+import { GIZMO_AXIS } from '../../theme/gizmo';
+import { meshRingAxes } from '../../theme/partSurface';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
@@ -219,10 +219,9 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     handleDragStart(axis, event.point.clone());
   };
 
-  const ringX = meshRingRadius(object.shape, object.dimensions, 'x');
-  const ringY = meshRingRadius(object.shape, object.dimensions, 'y');
-  const ringZ = meshRingRadius(object.shape, object.dimensions, 'z');
-  const ringTube = boundRingTube(Math.max(ringX, ringY, ringZ));
+  const ringX = meshRingAxes(object.shape, object.dimensions, 'x');
+  const ringY = meshRingAxes(object.shape, object.dimensions, 'y');
+  const ringZ = meshRingAxes(object.shape, object.dimensions, 'z');
 
   const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; color: string }[] = [
     { axis: '+x', drag: 'x', color: GIZMO_AXIS.x },
@@ -246,13 +245,13 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           ))}
           <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
         </>
-      ) : (
+      ) : activeGizmoMode === 'rotate' ? (
         <>
-          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} radius={ringX} tube={ringTube} onPointerDown={beginAxis('x')} />
-          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} radius={ringY} tube={ringTube} onPointerDown={beginAxis('y')} />
-          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} radius={ringZ} tube={ringTube} onPointerDown={beginAxis('z')} />
+          <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} rx={ringX.rx} ry={ringX.ry} onPointerDown={beginAxis('x')} />
+          <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} rx={ringY.rx} ry={ringY.ry} onPointerDown={beginAxis('y')} />
+          <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} rx={ringZ.rx} ry={ringZ.ry} onPointerDown={beginAxis('z')} />
         </>
-      )}
+      ) : null}
     </group>
   );
 };
