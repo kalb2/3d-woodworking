@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Edges } from '@react-three/drei';
 import type { FurnitureObject } from '../../types/furniture';
 import { createWoodMeshMaterial } from '../../utils/woodTextureGenerator';
+import { createBoardGeometry, defaultBoardOptions } from '../../utils/boardGeometry';
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
@@ -10,15 +11,19 @@ import { SphereOutline } from './gizmoLook';
 interface FurnitureMeshProps {
   object: FurnitureObject;
   isSelected: boolean;
+  /** Group volumes stay pickable until the group is opened for editing. */
+  pickGroup?: boolean;
   onPointerDown?: (e: any) => void;
 }
 
 export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   object,
   isSelected,
+  pickGroup = true,
   onPointerDown
 }) => {
   const { shape, dimensions, position, rotation, material } = object;
+  const isGroup = shape === 'group';
 
   const meshMaterial = useMemo(() => {
     return createWoodMeshMaterial(material);
@@ -91,29 +96,45 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       case 'cushion': {
         return new THREE.BoxGeometry(l, h, w, 8, 8, 8);
       }
+      case 'board':
+        return createBoardGeometry(dimensions, object.board ?? defaultBoardOptions());
+      case 'group':
       case 'cube':
       default:
         return new THREE.BoxGeometry(l, h, w);
     }
-  }, [shape, dimensions.length, dimensions.width, dimensions.height]);
+  }, [shape, dimensions, object.board]);
+
+  const groupOutline = useMemo(() => {
+    if (shape !== 'group') return null;
+    return new THREE.EdgesGeometry(
+      new THREE.BoxGeometry(dimensions.length, dimensions.height, dimensions.width)
+    );
+  }, [shape, dimensions.length, dimensions.height, dimensions.width]);
 
   const rotRadX = (rotation.x * Math.PI) / 180;
   const rotRadY = (rotation.y * Math.PI) / 180;
   const rotRadZ = (rotation.z * Math.PI) / 180;
 
+  if (object.visible === false) return null;
+
   return (
     <group position={[position.x, position.y, position.z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
       <mesh
         geometry={geometry}
-        material={meshMaterial}
-        castShadow
-        receiveShadow
+        material={isGroup ? undefined : meshMaterial}
+        castShadow={!isGroup}
+        receiveShadow={!isGroup}
+        raycast={isGroup && !pickGroup ? () => undefined : undefined}
         onPointerDown={onPointerDown}
       >
-        {isSelected && shape === 'sphere' && (
+        {isGroup && (
+          <meshBasicMaterial colorWrite={false} depthWrite={false} toneMapped={false} />
+        )}
+        {isSelected && !isGroup && shape === 'sphere' && (
           <SphereOutline radius={Math.min(dimensions.length, dimensions.width, dimensions.height) / 2} />
         )}
-        {isSelected && shape !== 'sphere' && (
+        {isSelected && !isGroup && shape !== 'sphere' && (
           <Edges
             threshold={24}
             color={SELECTION_COLOR}
@@ -123,6 +144,11 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
           />
         )}
       </mesh>
+      {isGroup && isSelected && groupOutline && (
+        <lineSegments geometry={groupOutline}>
+          <lineBasicMaterial color={SELECTION_COLOR} depthTest={false} toneMapped={false} />
+        </lineSegments>
+      )}
     </group>
   );
 };

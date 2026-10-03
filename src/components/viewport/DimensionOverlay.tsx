@@ -1,11 +1,12 @@
 import React from 'react';
 import { Html } from '@react-three/drei';
-import type { FurnitureObject } from '../../types/furniture';
+import type { FurnitureObject, LengthUnit } from '../../types/furniture';
 import { useIsPhone } from '../../hooks/useIsPhone';
+import { unitScale } from '../../utils/units';
 
 interface DimensionOverlayProps {
   object: FurnitureObject;
-  unit: 'in' | 'cm' | 'mm';
+  unit: LengthUnit;
 }
 
 export const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ object, unit }) => {
@@ -13,9 +14,7 @@ export const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ object, unit
   const { length, width, height } = object.dimensions;
   const { x, y, z } = object.position;
 
-  let scale = 1;
-  if (unit === 'cm') scale = 2.54;
-  if (unit === 'mm') scale = 25.4;
+  const scale = unitScale(unit);
 
   const displayL = (length * scale).toFixed(1);
   const displayW = (width * scale).toFixed(1);

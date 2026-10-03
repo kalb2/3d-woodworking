@@ -7,6 +7,9 @@ import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { PartColorSection } from './MaterialPicker';
 import { useReliableTap } from '../../utils/reliableTap';
+import { unitScale } from '../../utils/units';
+import type { LengthUnit, RoutedEdge } from '../../types/furniture';
+import { defaultBoardOptions } from '../../utils/boardGeometry';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -35,19 +38,18 @@ export const ObjectInspector: React.FC = () => {
   if (!object) return null;
 
   const unit = currentProject.unit;
+  const scale = unitScale(unit);
+  const isGroup = object.shape === 'group';
+  const board = object.board ?? defaultBoardOptions();
 
-  let unitScale = 1;
-  if (unit === 'cm') unitScale = 2.54;
-  if (unit === 'mm') unitScale = 25.4;
-
-  const displayLength = (object.dimensions.length * unitScale).toFixed(2);
-  const displayWidth = (object.dimensions.width * unitScale).toFixed(2);
-  const displayHeight = (object.dimensions.height * unitScale).toFixed(2);
+  const displayLength = (object.dimensions.length * scale).toFixed(2);
+  const displayWidth = (object.dimensions.width * scale).toFixed(2);
+  const displayHeight = (object.dimensions.height * scale).toFixed(2);
 
   const handleDimensionChange = (key: 'length' | 'width' | 'height', valueStr: string) => {
     const num = parseFloat(valueStr);
     if (isNaN(num) || num <= 0) return;
-    const valueInInches = num / unitScale;
+    const valueInInches = num / scale;
 
     updateObject(object.id, {
       dimensions: {
@@ -142,7 +144,7 @@ export const ObjectInspector: React.FC = () => {
           </span>
 
           <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.3)', padding: 2, borderRadius: 6 }}>
-            {(['in', 'cm', 'mm'] as const).map(u => (
+            {(['in', 'cm', 'mm', 'ft'] as LengthUnit[]).map(u => (
               <button
                 key={u}
                 onClick={() => setUnit(u)}
@@ -172,6 +174,7 @@ export const ObjectInspector: React.FC = () => {
               className="glass-input"
               value={displayLength}
               step="0.5"
+              disabled={isGroup}
               onChange={(e) => handleDimensionChange('length', e.target.value)}
             />
           </div>
@@ -183,6 +186,7 @@ export const ObjectInspector: React.FC = () => {
               className="glass-input"
               value={displayWidth}
               step="0.5"
+              disabled={isGroup}
               onChange={(e) => handleDimensionChange('width', e.target.value)}
             />
           </div>
@@ -194,13 +198,95 @@ export const ObjectInspector: React.FC = () => {
               className="glass-input"
               value={displayHeight}
               step="0.5"
+              disabled={isGroup}
               onChange={(e) => handleDimensionChange('height', e.target.value)}
             />
           </div>
         </div>
+        {isGroup && (
+          <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }} data-testid="group-properties-note">
+            This group moves and rotates as one piece. Choose Edit parts to change a member.
+          </p>
+        )}
       </div>
 
-      <PartColorSection />
+      {object.shape === 'board' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="board-tools">
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#e09f3e', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Board
+          </span>
+          <label style={{ fontSize: 11, color: '#9ca3af' }}>
+            Corner radius ({unit})
+            <input
+              type="number"
+              className="glass-input"
+              data-testid="board-corner-radius"
+              min={0}
+              step="0.25"
+              value={(board.cornerRadius * scale).toFixed(2)}
+              onChange={(e) => {
+                const num = parseFloat(e.target.value);
+                if (Number.isNaN(num) || num < 0) return;
+                updateObject(object.id, { board: { ...board, cornerRadius: num / scale } });
+              }}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['none', 'roundover', 'chamfer'] as RoutedEdge[]).map((edge) => (
+              <button
+                key={edge}
+                type="button"
+                data-testid={`board-edge-${edge}`}
+                className="glass-button"
+                onClick={() => updateObject(object.id, { board: { ...board, edge } })}
+                style={{
+                  flex: 1,
+                  minHeight: 40,
+                  background: board.edge === edge ? '#e09f3e' : undefined,
+                  color: board.edge === edge ? '#000' : undefined,
+                }}
+              >
+                {edge === 'none' ? 'Square' : edge === 'roundover' ? 'Round' : 'Chamfer'}
+              </button>
+            ))}
+          </div>
+          <label style={{ fontSize: 11, color: '#9ca3af' }}>
+            Hole diameter ({unit})
+            <input
+              type="number"
+              className="glass-input"
+              data-testid="board-hole-diameter"
+              min={0}
+              step="0.25"
+              value={((board.holes[0]?.diameter ?? 0) * scale).toFixed(2)}
+              onChange={(e) => {
+                const num = parseFloat(e.target.value);
+                if (Number.isNaN(num) || num < 0) return;
+                const diameter = num / scale;
+                const holes = board.holes.length
+                  ? board.holes.map((hole, index) => index === 0 ? { ...hole, diameter } : hole)
+                  : [{ id: `hole_${Date.now()}`, x: 0, z: 0, diameter }];
+                updateObject(object.id, { board: { ...board, holes } });
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="glass-button"
+            data-testid="board-add-hole"
+            onClick={() => updateObject(object.id, {
+              board: {
+                ...board,
+                holes: [...board.holes, { id: `hole_${Date.now()}`, x: board.holes.length * 2, z: 0, diameter: 1 }],
+              },
+            })}
+          >
+            Add hole
+          </button>
+        </div>
+      )}
+
+      {!isGroup && <PartColorSection />}
 
       {/* ROTATION & FINGER ROTATE BUTTONS */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

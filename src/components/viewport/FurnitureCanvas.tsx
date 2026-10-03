@@ -38,10 +38,15 @@ export const FurnitureCanvas: React.FC = () => {
     projects,
     activeProjectId,
     selectedObjectId,
+    selectedObjectIds,
+    editingGroupId,
     selectObject,
+    enterGroup,
+    exitGroup,
     activeGizmoMode,
     showDimensions,
   } = useProjectStore();
+  const lastTap = useRef<{ id: string; time: number } | null>(null);
 
   const { preferences } = useAppStore();
 
@@ -53,11 +58,48 @@ export const FurnitureCanvas: React.FC = () => {
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
+  const clearSelection = () => {
+    if (editingGroupId) exitGroup();
+    else selectObject(null);
+  };
+
   const handleCanvasClick = (e: any) => {
-    // Deselect object if clicked background
-    if (e.target === e.currentTarget) {
-      selectObject(null);
+    if (e.target === e.currentTarget) clearSelection();
+  };
+
+  const handlePartPointerDown = (event: any, objId: string) => {
+    event.stopPropagation();
+    const obj = currentProject.objects.find((item) => item.id === objId);
+    if (!obj) return;
+    const additive = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
+    const now = performance.now();
+    const previous = lastTap.current;
+    const doubleTap = Boolean(previous && previous.id === obj.id && now - previous.time < 420);
+    lastTap.current = { id: obj.id, time: now };
+
+    const parent = obj.parentId
+      ? currentProject.objects.find((item) => item.id === obj.parentId && item.shape === 'group')
+      : undefined;
+
+    if (editingGroupId) {
+      if (obj.parentId === editingGroupId) {
+        selectObject(obj.id, { additive });
+        return;
+      }
+      exitGroup();
+      selectObject(obj.shape === 'group' ? obj.id : (parent?.id ?? obj.id), { additive });
+      return;
     }
+    const groupTarget = obj.shape === 'group' ? obj : parent;
+    if (groupTarget && doubleTap) {
+      enterGroup(groupTarget.id);
+      return;
+    }
+    if (groupTarget && obj.shape !== 'group') {
+      selectObject(groupTarget.id, { additive });
+      return;
+    }
+    selectObject(obj.id, { additive });
   };
 
   return (
@@ -70,21 +112,23 @@ export const FurnitureCanvas: React.FC = () => {
         /* far stays past the grid fade so the horizon dissolves instead of clipping */
         camera={{ position: [50, 45, 65], fov: 45, near: 0.1, far: 20000 }}
         gl={{ preserveDrawingBuffer: true, antialias: true }}
+        onPointerMissed={clearSelection}
       >
         {/* Customizable canvas background color */}
         <color attach="background" args={[bgColor]} />
         {/* Soft Studio Lighting setup tuned for realistic wood textures */}
-        <ambientLight intensity={0.7} />
+        <hemisphereLight args={['#fff8f1', '#d5dee8', 0.62]} />
+        <ambientLight intensity={0.28} />
         <directionalLight
-          position={[60, 80, 50]}
-          intensity={1.2}
+          position={[80, 120, 46]}
+          intensity={1.55}
+          color="#fffaf3"
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          shadow-bias={-0.0001}
+          shadow-bias={-0.00015}
         />
-        <directionalLight position={[-40, 50, -50]} intensity={0.4} />
-        <pointLight position={[0, 40, 0]} intensity={0.3} />
+        <directionalLight position={[-55, 36, -28]} intensity={0.32} color="#e8eef6" />
 
         {/* Orbit Camera controls for iPad.
             Default touch gestures: 1-finger = orbit, 2-finger = dolly+pan.
@@ -111,11 +155,9 @@ export const FurnitureCanvas: React.FC = () => {
           <FurnitureMesh
             key={obj.id}
             object={obj}
-            isSelected={obj.id === selectedObjectId}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              selectObject(obj.id);
-            }}
+            isSelected={selectedObjectIds.includes(obj.id)}
+            pickGroup={editingGroupId !== obj.id}
+            onPointerDown={(e) => handlePartPointerDown(e, obj.id)}
           />
         ))}
 

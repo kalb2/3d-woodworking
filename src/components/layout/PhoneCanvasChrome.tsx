@@ -11,11 +11,8 @@ import {
   Layers,
   Menu,
   Ellipsis,
-  Move,
   Plus,
-  RotateCw,
   Ruler,
-  Scaling,
   Settings,
   Share2,
   SlidersHorizontal,
@@ -45,7 +42,8 @@ export const PhoneCanvasHeader: React.FC = () => {
   const unit = currentProject?.unit ?? 'in';
 
   const cycleUnit = () => {
-    const next = unit === 'in' ? 'cm' : unit === 'cm' ? 'mm' : 'in';
+    const order = ['in', 'cm', 'mm', 'ft'] as const;
+    const next = order[(order.indexOf(unit as typeof order[number]) + 1) % order.length] ?? 'in';
     setUnit(next);
   };
 
@@ -95,14 +93,16 @@ export const PhoneCanvasHeader: React.FC = () => {
 interface PhoneMenuSheetProps {
   onOpenProjectModal: () => void;
   onOpenCutList: () => void;
+  onNewProject: () => void;
 }
 
 export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
   onOpenProjectModal,
   onOpenCutList,
+  onNewProject,
 }) => {
   const { overlays, setOverlayOpen } = useAppStore();
-  const { projects, activeProjectId, createProject } = useProjectStore();
+  const { activeProjectId, projects } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const [copiedNotification, setCopiedNotification] = useState(false);
 
@@ -155,9 +155,10 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
         </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"
+          data-testid="menu-new-project"
           onTap={() => {
-            createProject(`Project ${projects.length + 1}`);
             close();
+            onNewProject();
           }}
         >
           <Plus size={18} />
@@ -219,8 +220,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     projects,
     activeProjectId,
     selectedObjectId,
-    activeGizmoMode,
-    setGizmoMode,
     duplicateObject,
     deleteObject,
     showDimensions,
@@ -236,19 +235,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
   useEffect(() => {
     setPartMenuOpen(false);
   }, [selectedObjectId]);
-
-  const closeContent = () => {
-    setOverlayOpen('inspector', false);
-    setOverlayOpen('sidebar', false);
-    setOverlayOpen('materials', false);
-    setOverlayOpen('tools', false);
-    setOverlayOpen('settings', false);
-  };
-
-  const selectGizmo = (mode: 'move' | 'resize' | 'rotate') => {
-    setGizmoMode(mode);
-    closeContent();
-  };
 
   return (
     <div
@@ -316,39 +302,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
         </div>
       )}
       <div className="phone-dock-grid">
-      <nav className="phone-tool-sheet-tools" aria-label="Basic tools">
-        <DockItem
-          label="Move"
-          testId="overlay-launch-tools"
-          icon={<Move size={22} strokeWidth={1.6} />}
-          active={!propertiesOpen && activeGizmoMode === 'move'}
-          onTap={() => selectGizmo('move')}
-        />
-        <DockItem
-          label="Copy"
-          testId="tool-copy"
-          icon={<Copy size={22} strokeWidth={1.6} />}
-          active={false}
-          disabled={!hasSelection}
-          onTap={() => {
-            if (selectedObjectId) duplicateObject(selectedObjectId);
-          }}
-        />
-        <DockItem
-          label="Rotate"
-          testId="tool-rotate"
-          icon={<RotateCw size={22} strokeWidth={1.6} />}
-          active={!propertiesOpen && activeGizmoMode === 'rotate'}
-          onTap={() => selectGizmo('rotate')}
-        />
-        <DockItem
-          label="Resize"
-          testId="tool-resize"
-          icon={<Scaling size={22} strokeWidth={1.6} />}
-          active={!propertiesOpen && activeGizmoMode === 'resize'}
-          onTap={() => selectGizmo('resize')}
-        />
-      </nav>
       <nav className="phone-tool-sheet-secondary" aria-label="Measure and view">
         <DockItem
           compact

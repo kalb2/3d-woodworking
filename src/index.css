@@ -490,10 +490,10 @@ html, body, #root {
 }
 
 .phone-dock-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px;
-  grid-template-rows: auto auto;
+  display: flex;
   align-items: stretch;
+  gap: 4px;
+  padding: 4px 8px 10px;
 }
 
 .phone-dock-grid > .phone-tool-sheet-tools {
@@ -516,14 +516,13 @@ html, body, #root {
 }
 
 .phone-dock-item.phone-dock-part {
-  grid-column: 2;
-  grid-row: 1 / span 2;
   align-self: stretch;
   height: auto;
-  min-height: 108px;
-  margin: 8px 8px 10px 0;
+  min-height: 52px;
+  margin: 0;
   padding: 8px 4px;
   font-size: 10px;
+  flex: 1;
 }
 
 .phone-tool-sheet.is-expanded .phone-tool-sheet-tools {
@@ -1848,4 +1847,98 @@ html, body, #root {
     overflow-x: auto;
     touch-action: pan-x;
   }
+}
+
+.transform-menu {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  pointer-events: auto;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+}
+
+.transform-menu button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #334155;
+  min-height: 48px;
+  min-width: 64px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.transform-menu button.is-active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.editor-root.is-phone .transform-menu {
+  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+}
+
+.new-project-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+
+.new-project-card-sheet {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.new-project-units {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.new-project-units button {
+  flex: 1;
+  min-height: 48px;
+  min-width: 72px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.new-project-units button.is-active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
 }

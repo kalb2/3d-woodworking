@@ -3,9 +3,6 @@ import {
   Undo,
   Redo,
   Settings,
-  Move,
-  Scaling,
-  RotateCw,
   FolderOpen,
   Plus,
   Download,
@@ -27,22 +24,21 @@ import { fireReliableTap } from '../../utils/reliableTap';
 interface IPadHeaderProps {
   onOpenProjectModal: () => void;
   onOpenCutList: () => void;
+  onNewProject: () => void;
 }
 
 export const IPadHeader: React.FC<IPadHeaderProps> = ({
   onOpenProjectModal,
-  onOpenCutList
+  onOpenCutList,
+  onNewProject
 }) => {
   const {
-    projects,
     activeProjectId,
-    activeGizmoMode,
-    setGizmoMode,
     historyIndex,
     historyStack,
     undo,
     redo,
-    createProject
+    projects,
   } = useProjectStore();
 
   const { setView, overlays, openOverlay, setOverlayOpen } = useAppStore();
@@ -136,11 +132,9 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         {/* New Project Quick Button */}
         <button
           className="glass-panel glass-button"
-          onClick={() => {
-            const name = prompt('Enter new woodworking project name:', `Project ${projects.length + 1}`);
-            if (name) createProject(name);
-          }}
-          title="New Project (starts with cube)"
+          onClick={onNewProject}
+          title="New project"
+          data-testid="header-new-project"
         >
           <Plus size={18} />
         </button>
@@ -168,45 +162,6 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
           <Redo size={18} />
         </button>
       </div>
-
-      {/* Middle section: Gizmo Mode Controls (Move, Grab Resize, Rotate) */}
-      {!isPhone && (
-      <div
-        className="glass-panel"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: 4,
-          borderRadius: 12,
-          pointerEvents: 'auto'
-        }}
-      >
-        <button
-          className={`glass-button ${activeGizmoMode === 'move' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('move')}
-        >
-          <Move size={18} />
-          <span>Move</span>
-        </button>
-
-        <button
-          className={`glass-button ${activeGizmoMode === 'resize' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('resize')}
-        >
-          <Scaling size={18} />
-          <span>Grab Resize</span>
-        </button>
-
-        <button
-          className={`glass-button ${activeGizmoMode === 'rotate' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('rotate')}
-        >
-          <RotateCw size={18} />
-          <span>Rotate</span>
-        </button>
-      </div>
-      )}
 
       {/* Right section: Settings, Cut List & Export */}
       {!isPhone && (
