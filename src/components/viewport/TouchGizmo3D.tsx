@@ -5,7 +5,7 @@ import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
 import { GIZMO_AXIS, boundRingTube } from '../../theme/gizmo';
-import { meshExtents, meshRingRadius } from '../../theme/partSurface';
+import { meshRingRadius } from '../../theme/partSurface';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
@@ -40,8 +40,6 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const currentProject = projects.find(p => p.id === activeProjectId);
   const isMove = activeGizmoMode === 'move';
 
-  const extents = meshExtents(object.shape, object.dimensions);
-  const { hy } = extents;
   const objPos: [number, number, number] = [object.position.x, object.position.y, object.position.z];
   const objRot: [number, number, number] = [
     THREE.MathUtils.degToRad(object.rotation.x),
@@ -241,16 +239,12 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
             <AxisArrow
               key={axis}
               axis={axis}
-              extents={extents}
-              anchor={[0, hy, 0]}
               color={color}
               active={activeAxis === drag}
               onPointerDown={beginAxis(drag)}
             />
           ))}
-          <group position={[0, hy, 0]}>
-            <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
-          </group>
+          <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
         </>
       ) : (
         <>

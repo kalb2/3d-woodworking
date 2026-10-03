@@ -12,7 +12,6 @@ import {
   GIZMO_SCALE_MAX,
   GIZMO_SCALE_MIN,
 } from '../../theme/gizmo';
-import { gripAnchor, type MeshExtents } from '../../theme/partSurface';
 
 const _world = new THREE.Vector3();
 
@@ -98,7 +97,7 @@ const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
   z: 0,
 };
 
-const SHAFT_START = 1.0;
+const SHAFT_START = 1.55;
 const SHAFT_LENGTH = 2.7;
 const SHAFT_RADIUS = 0.38;
 const CONE_LENGTH = 1.3;
@@ -116,23 +115,22 @@ const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
   '-z': [-Math.PI / 2, 0, 0],
 };
 
-/** Moblo move: shaft + cone on the face you'd pull. Not a capsule. */
+/**
+ * Arrow grows from the object center along its axis.
+ * The shaft start is the offset, so the head is not glued to a face.
+ */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
-  extents: MeshExtents;
   color: string;
   active: boolean;
-  /** When set, the arrow grows from this point (top-face move gizmo) instead of the side face. */
-  anchor?: [number, number, number];
   onPointerDown: (event: any) => void;
-}> = ({ axis, extents, color, active, anchor, onPointerDown }) => {
-  const position = anchor ?? gripAnchor(axis, extents);
+}> = ({ axis, color, active, onPointerDown }) => {
   const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
   const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
   const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
 
   return (
-    <group position={position} rotation={FACE_OUT[axis]}>
+    <group position={[0, 0, 0]} rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
           <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 20]} />
@@ -159,46 +157,50 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 0.85;
-const HUB_THICKNESS = 0.16;
-const CHEVRON_RADIUS = 0.18;
-const CHEVRON_LENGTH = 0.38;
-const HUB_HIT_RADIUS = 1.15;
+const HUB_RADIUS = 0.62;
+const HUB_THICKNESS = 0.08;
+const CHEVRON_RADIUS = 0.16;
+const CHEVRON_LENGTH = 0.34;
+const HUB_HIT_RADIUS = 1.05;
 
-/** Light hub that sits on the part's top face (not a floating origin ball). */
+/** Circle and four triangles at the object center. Faces the camera; arrows stay on the axes. */
 export const MoveHub: React.FC<{
   active: boolean;
   onPointerDown: (event: any) => void;
 }> = ({ active, onPointerDown }) => {
+  const faceRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
   const chevrons = useMemo(() => {
-    return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle) => {
-      const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const reach = HUB_RADIUS * 0.42;
-      return {
-        angle,
-        quaternion,
-        position: [dir.x * reach, HUB_THICKNESS * 0.2, dir.z * reach] as [number, number, number],
-      };
-    });
+    const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.15;
+    return [
+      { key: 'up', position: [0, reach, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] },
+      { key: 'down', position: [0, -reach, 0] as [number, number, number], rotation: [0, 0, Math.PI] as [number, number, number] },
+      { key: 'right', position: [reach, 0, 0] as [number, number, number], rotation: [0, 0, -Math.PI / 2] as [number, number, number] },
+      { key: 'left', position: [-reach, 0, 0] as [number, number, number], rotation: [0, 0, Math.PI / 2] as [number, number, number] },
+    ];
   }, []);
+
+  useFrame(() => {
+    if (!faceRef.current) return;
+    faceRef.current.lookAt(camera.position);
+  });
 
   return (
     <GripSize>
-      <group position={[0, HUB_THICKNESS / 2, 0]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
+      <group ref={faceRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
           <cylinderGeometry args={[HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 32]} />
           <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
         </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
-          <torusGeometry args={[HUB_RADIUS, 0.06, 8, 32]} />
+        <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
+          <torusGeometry args={[HUB_RADIUS, 0.045, 8, 32]} />
           <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
         </mesh>
         {chevrons.map((chevron) => (
           <mesh
-            key={chevron.angle}
+            key={chevron.key}
             position={chevron.position}
-            quaternion={chevron.quaternion}
+            rotation={chevron.rotation}
             renderOrder={14}
             frustumCulled={false}
           >
@@ -207,7 +209,7 @@ export const MoveHub: React.FC<{
           </mesh>
         ))}
         <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
           renderOrder={21}
           frustumCulled={false}
           onPointerDown={(event) => {
@@ -215,7 +217,7 @@ export const MoveHub: React.FC<{
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.7, 20]} />
+          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.7, 16]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </group>
