@@ -1,8 +1,8 @@
 import React from 'react';
-import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check } from 'lucide-react';
+import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check, Copy, Trash2 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { fireReliableTap } from '../../utils/reliableTap';
+import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
 export const TransformMenu: React.FC = () => {
@@ -18,6 +18,8 @@ export const TransformMenu: React.FC = () => {
     ungroup,
     enterGroup,
     exitGroup,
+    duplicateObject,
+    deleteObject,
   } = useProjectStore();
 
   const project = projects.find((item) => item.id === activeProjectId);
@@ -26,6 +28,13 @@ export const TransformMenu: React.FC = () => {
 
   const isPhone = useIsPhone();
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
+  const canEditSelection = Boolean(selected);
+  const duplicateSelection = useReliableTap(() => {
+    if (selected) duplicateObject(selected.id);
+  });
+  const deleteSelection = useReliableTap(() => {
+    if (selected) deleteObject(selected.id);
+  });
 
   if (isPhone) return null;
 
@@ -63,6 +72,26 @@ export const TransformMenu: React.FC = () => {
       >
         <RotateCw size={18} />
         <span>Rotate</span>
+      </button>
+      <button
+        type="button"
+        data-testid="toolbar-duplicate"
+        disabled={!canEditSelection}
+        onClick={duplicateSelection}
+        onPointerUp={duplicateSelection}
+      >
+        <Copy size={18} />
+        <span>Duplicate</span>
+      </button>
+      <button
+        type="button"
+        data-testid="toolbar-delete"
+        disabled={!canEditSelection}
+        onClick={deleteSelection}
+        onPointerUp={deleteSelection}
+      >
+        <Trash2 size={18} />
+        <span>Delete</span>
       </button>
       {selectedObjectIds.length >= 2 && (
         <button

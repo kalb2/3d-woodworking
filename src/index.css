@@ -1906,6 +1906,15 @@ html, body, #root {
   color: #ffffff;
 }
 
+.transform-menu button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.transform-menu button span {
+  white-space: nowrap;
+}
+
 .transform-menu-icons {
   display: flex;
   align-items: center;
