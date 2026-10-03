@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import Sentry
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Main thread, before the rest of launch, so crash reporting and app-start tracing attach.
+        SentrySDK.start { options in
+            options.dsn = "https://c83f4de83a239f3305591f36023ed75a@o4512189585227776.ingest.us.sentry.io/4512189597024256"
+            #if DEBUG
+            options.debug = true
+            options.environment = "debug"
+            #else
+            options.environment = "production"
+            #endif
+            options.sendDefaultPii = true
+            // Error monitoring is on by default. Tracing stays off until a sample rate is set.
+            // 1.0 captures every transaction while this is new; lower it once volume is known.
+            options.tracesSampleRate = 1.0
+            // sentry-cocoa 9.12+ turns metrics on unless this is set. This install is errors + tracing only.
+            options.enableMetrics = false
+        }
         return true
     }
 
