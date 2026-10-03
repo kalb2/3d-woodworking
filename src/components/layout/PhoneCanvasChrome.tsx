@@ -31,7 +31,7 @@ import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
-import { MoveSizeNudge, ResizeSizeRow, RotateAngleRow } from './SizeBar';
+import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
 interface PhoneTapButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onTap: () => void;
@@ -406,7 +406,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
         )}
       </nav>
       <ResizeSizeRow />
-      <MoveSizeNudge placement="dock" />
       <RotateAngleRow />
     </div>
   );

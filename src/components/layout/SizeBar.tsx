@@ -222,39 +222,3 @@ export const RotateDegreePill: React.FC<{
   );
 };
 
-/** Small bottom-left length readout used while moving. Not a second sheet. */
-export const MoveSizeNudge: React.FC<{ placement?: 'dock' | 'canvas' }> = ({ placement = 'dock' }) => {
-  const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
-  if (activeGizmoMode !== 'move' || !project || !object || object.shape === 'group') return null;
-
-  const scale = unitScale(project.unit);
-  const display = object.dimensions.length * scale;
-  const step = project.unit === 'mm' ? 1 : project.unit === 'ft' ? 0.01 : 0.1;
-  const maxDisplay = Math.max(96, object.dimensions.length * 2, 12) * scale;
-
-  return (
-    <label className={`size-nudge${placement === 'canvas' ? ' is-canvas' : ''}`} data-testid="size-move">
-      <span className="size-figure size-figure-read" style={{ color: GIZMO_AXIS.x }}>
-        {formatSize(object.dimensions.length, project.unit)}
-      </span>
-      <input
-        type="range"
-        min={0.125 * scale}
-        max={Math.max(maxDisplay, display)}
-        step={step}
-        value={display}
-        aria-label={`Length in ${project.unit}`}
-        style={{ accentColor: GIZMO_AXIS.x }}
-        onChange={(event) => {
-          const next = Number(event.target.value);
-          if (!Number.isFinite(next)) return;
-          updateObject(object.id, {
-            dimensions: { ...object.dimensions, length: Math.max(next / scale, 0.05) },
-          }, true);
-        }}
-        onPointerUp={() => commitSize(pushHistoryState, saveCurrentProject)}
-        onKeyUp={() => commitSize(pushHistoryState, saveCurrentProject)}
-      />
-    </label>
-  );
-};
