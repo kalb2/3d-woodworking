@@ -40,7 +40,6 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const currentProject = projects.find(p => p.id === activeProjectId);
   const isMove = activeGizmoMode === 'move';
 
-  const { height } = object.dimensions;
   const extents = meshExtents(object.shape, object.dimensions);
   const { hy } = extents;
   const objPos: [number, number, number] = [object.position.x, object.position.y, object.position.z];
@@ -226,15 +225,11 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const ringY = meshRingRadius(object.shape, object.dimensions, 'y');
   const ringZ = meshRingRadius(object.shape, object.dimensions, 'z');
   const ringTube = boundRingTube(Math.max(ringX, ringY, ringZ));
-  const showMinusY = height >= 3 && object.shape !== 'sphere';
 
   const moveHandles: { axis: FaceAxis; drag: Exclude<DragAxis, null>; color: string }[] = [
     { axis: '+x', drag: 'x', color: GIZMO_AXIS.x },
-    { axis: '-x', drag: 'x', color: GIZMO_AXIS.x },
     { axis: '+y', drag: 'y', color: GIZMO_AXIS.y },
-    ...(showMinusY ? [{ axis: '-y' as const, drag: 'y' as const, color: GIZMO_AXIS.y }] : []),
     { axis: '+z', drag: 'z', color: GIZMO_AXIS.z },
-    { axis: '-z', drag: 'z', color: GIZMO_AXIS.z },
   ];
 
   return (

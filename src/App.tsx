@@ -18,6 +18,7 @@ import { ProjectModal } from './components/modals/ProjectModal';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
+import { SizeBar } from './components/layout/SizeBar';
 import { NewProjectSheet } from './components/modals/NewProjectSheet';
 
 export const App: React.FC = () => {
@@ -133,6 +134,7 @@ export const App: React.FC = () => {
         </>
       )}
 
+      <SizeBar />
       <TransformMenu />
 
       <NewProjectSheet

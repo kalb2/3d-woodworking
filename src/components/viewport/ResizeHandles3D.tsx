@@ -155,9 +155,6 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
               axis={axis}
               color={color}
               active={activeAxis === axis}
-              length={extents.hx * 2}
-              height={extents.hy * 2}
-              width={extents.hz * 2}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />
         </group>

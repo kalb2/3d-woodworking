@@ -8,7 +8,6 @@ import { FurnitureMesh } from './FurnitureMesh';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
-import { DimensionOverlay } from './DimensionOverlay';
 
 /** Soft contact blob. Hidden with Floor off, and whenever the camera is under the ground. */
 const GroundContactShadow: React.FC = () => {
@@ -44,7 +43,6 @@ export const FurnitureCanvas: React.FC = () => {
     enterGroup,
     exitGroup,
     activeGizmoMode,
-    showDimensions,
   } = useProjectStore();
   const lastTap = useRef<{ id: string; time: number } | null>(null);
 
@@ -164,13 +162,6 @@ export const FurnitureCanvas: React.FC = () => {
         {/* Active Selected Object Controls */}
         {selectedObject && (
           <>
-            {showDimensions && (
-              <DimensionOverlay
-                object={selectedObject}
-                unit={currentProject.unit}
-              />
-            )}
-
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (
               <ResizeHandles3D object={selectedObject} />
