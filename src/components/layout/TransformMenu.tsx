@@ -1,6 +1,7 @@
 import React from 'react';
-import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check, Copy, Trash2 } from 'lucide-react';
+import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check, Copy, Trash2, Plus } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
+import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
@@ -26,6 +27,7 @@ export const TransformMenu: React.FC = () => {
   const selected = project?.objects.find((item) => item.id === selectedObjectId);
   const groupId = selected?.shape === 'group' ? selected.id : editingGroupId;
 
+  const openOverlay = useAppStore((state) => state.openOverlay);
   const isPhone = useIsPhone();
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
   const canEditSelection = Boolean(selected);
@@ -34,6 +36,9 @@ export const TransformMenu: React.FC = () => {
   });
   const deleteSelection = useReliableTap(() => {
     if (selected) deleteObject(selected.id);
+  });
+  const addPart = useReliableTap(() => {
+    openOverlay('sidebar');
   });
 
   if (isPhone) return null;
@@ -75,6 +80,7 @@ export const TransformMenu: React.FC = () => {
       </button>
       <button
         type="button"
+        className="is-duplicate"
         data-testid="toolbar-duplicate"
         disabled={!canEditSelection}
         onClick={duplicateSelection}
@@ -85,6 +91,7 @@ export const TransformMenu: React.FC = () => {
       </button>
       <button
         type="button"
+        className="is-delete"
         data-testid="toolbar-delete"
         disabled={!canEditSelection}
         onClick={deleteSelection}
@@ -92,6 +99,15 @@ export const TransformMenu: React.FC = () => {
       >
         <Trash2 size={18} />
         <span>Delete</span>
+      </button>
+      <button
+        type="button"
+        data-testid="toolbar-add"
+        onClick={addPart}
+        onPointerUp={addPart}
+      >
+        <Plus size={18} />
+        <span>Add</span>
       </button>
       {selectedObjectIds.length >= 2 && (
         <button

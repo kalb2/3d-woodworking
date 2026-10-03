@@ -1906,6 +1906,14 @@ html, body, #root {
   color: #ffffff;
 }
 
+.transform-menu button.is-duplicate {
+  color: #2563eb;
+}
+
+.transform-menu button.is-delete {
+  color: #dc2626;
+}
+
 .transform-menu button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
