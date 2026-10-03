@@ -241,7 +241,7 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
 
   if (!ctx) {
     const fallbackKey = `fallback-${mat.species}`;
@@ -305,14 +305,25 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
   return texture;
 }
 
+/** Parts are solid. No blending, no alpha cutout, no depth tricks. */
 function solidSurface(params: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     ...params,
     transparent: false,
     opacity: 1,
     depthWrite: true,
-    alphaTest: 0
+    depthTest: true,
+    alphaTest: 0,
+    blending: THREE.NoBlending,
   });
+  material.alphaMap = null;
+  material.transparent = false;
+  material.opacity = 1;
+  material.depthWrite = true;
+  material.depthTest = true;
+  material.alphaTest = 0;
+  material.blending = THREE.NoBlending;
+  return material;
 }
 
 export function createWoodMeshMaterial(mat: WoodMaterial): THREE.MeshStandardMaterial {

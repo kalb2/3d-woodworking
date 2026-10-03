@@ -9,9 +9,6 @@ export interface MeshExtents {
   kind: MeshKind;
 }
 
-/** Tight pad so rotate hoops kiss the silhouette instead of a loose AABB. */
-export const MESH_RING_PAD = 0.18;
-
 /**
  * Half-extents of the *drawn* mesh, not the authored AABB.
  * Cylinders / poles use min(length, width) / 2. Spheres use min(l, w, h) / 2.
@@ -35,18 +32,6 @@ export function meshExtents(shape: ShapeType, dimensions: Dimensions3D): MeshExt
     hz: Math.max(dimensions.width, 0.01) / 2,
     kind: 'box',
   };
-}
-
-/** Ring that wraps this axis’ silhouette of the real mesh. */
-export function meshRingRadius(
-  shape: ShapeType,
-  dimensions: Dimensions3D,
-  axis: 'x' | 'y' | 'z',
-  pad = MESH_RING_PAD,
-) {
-  const { hx, hy, hz } = meshExtents(shape, dimensions);
-  const pair = axis === 'x' ? [hy, hz] : axis === 'y' ? [hx, hz] : [hx, hy];
-  return Math.hypot(pair[0], pair[1]) + pad;
 }
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';

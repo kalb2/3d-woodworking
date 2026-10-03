@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import {
   Undo,
   Redo,
-  Magnet,
-  Grid,
-  Move,
-  Scaling,
-  RotateCw,
+  Settings,
   FolderOpen,
   Plus,
   Download,
@@ -28,27 +24,24 @@ import { fireReliableTap } from '../../utils/reliableTap';
 interface IPadHeaderProps {
   onOpenProjectModal: () => void;
   onOpenCutList: () => void;
+  onNewProject: () => void;
 }
 
 export const IPadHeader: React.FC<IPadHeaderProps> = ({
   onOpenProjectModal,
-  onOpenCutList
+  onOpenCutList,
+  onNewProject
 }) => {
   const {
-    projects,
     activeProjectId,
-    activeGizmoMode,
-    setGizmoMode,
     historyIndex,
     historyStack,
     undo,
     redo,
-    toggleFloor,
-    updateSnapSettings,
-    createProject
+    projects,
   } = useProjectStore();
 
-  const { setView } = useAppStore();
+  const { setView, overlays, openOverlay, setOverlayOpen } = useAppStore();
   const isPhone = useIsPhone();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -139,11 +132,9 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         {/* New Project Quick Button */}
         <button
           className="glass-panel glass-button"
-          onClick={() => {
-            const name = prompt('Enter new woodworking project name:', `Project ${projects.length + 1}`);
-            if (name) createProject(name);
-          }}
-          title="New Project (starts with cube)"
+          onClick={onNewProject}
+          title="New project"
+          data-testid="header-new-project"
         >
           <Plus size={18} />
         </button>
@@ -172,70 +163,27 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         </button>
       </div>
 
-      {/* Middle section: Gizmo Mode Controls (Move, Grab Resize, Rotate) */}
-      {!isPhone && (
-      <div
-        className="glass-panel"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: 4,
-          borderRadius: 12,
-          pointerEvents: 'auto'
-        }}
-      >
-        <button
-          className={`glass-button ${activeGizmoMode === 'move' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('move')}
-        >
-          <Move size={18} />
-          <span>Move</span>
-        </button>
-
-        <button
-          className={`glass-button ${activeGizmoMode === 'resize' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('resize')}
-        >
-          <Scaling size={18} />
-          <span>Grab Resize</span>
-        </button>
-
-        <button
-          className={`glass-button ${activeGizmoMode === 'rotate' ? 'active' : ''}`}
-          onClick={() => setGizmoMode('rotate')}
-        >
-          <RotateCw size={18} />
-          <span>Rotate</span>
-        </button>
-      </div>
-      )}
-
-      {/* Right section: Magnet Snap, Floor Toggle, Cut List & Export */}
+      {/* Right section: Settings, Cut List & Export */}
       {!isPhone && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
-        {/* Floor Toggle Button */}
         <button
-          className={`glass-panel glass-button ${currentProject?.showFloor ? 'active' : ''}`}
-          onClick={toggleFloor}
-          title="Toggle Transparent Floor Barrier"
-        >
-          <Grid size={18} />
-          <span>Floor</span>
-        </button>
-
-        {/* Magnet Snap Toggle Button */}
-        <button
-          className={`glass-panel glass-button ${currentProject?.snapSettings.enabled ? 'active' : ''}`}
+          type="button"
+          className={`glass-panel glass-button ${overlays.settings ? 'active' : ''}`}
           onClick={() => {
-            if (currentProject) {
-              updateSnapSettings({ enabled: !currentProject.snapSettings.enabled });
+            setShowExportMenu(false);
+            if (overlays.settings) {
+              setOverlayOpen('settings', false);
+              return;
             }
+            openOverlay('settings');
           }}
-          title="Toggle 3D Magnetization & Surface Snapping"
+          title="Floor and magnet"
+          aria-label="Settings"
+          aria-expanded={overlays.settings}
+          data-testid="tool-settings"
         >
-          <Magnet size={18} />
-          <span>Magnet</span>
+          <Settings size={18} />
+          <span>Settings</span>
         </button>
 
         <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />

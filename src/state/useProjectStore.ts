@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { FurnitureObject, FurnitureProject, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
 export interface WoodPreset {
@@ -152,6 +153,9 @@ interface ProjectState {
   projects: FurnitureProject[];
   activeProjectId: string;
   selectedObjectId: string | null;
+  selectedObjectIds: string[];
+  multiSelect: boolean;
+  editingGroupId: string | null;
   activeGizmoMode: 'move' | 'resize' | 'rotate';
   showDimensions: boolean;
 
@@ -160,14 +164,19 @@ interface ProjectState {
 
   loadProjects: () => void;
   saveCurrentProject: () => void;
-  createProject: (name: string) => void;
+  createProject: (name: string, unit?: LengthUnit) => void;
   renameProject: (id: string, newName: string) => void;
   duplicateProject: (id: string) => void;
   deleteProject: (id: string) => void;
   switchProject: (id: string) => void;
   importProject: (project: FurnitureProject) => void;
 
-  selectObject: (id: string | null) => void;
+  selectObject: (id: string | null, options?: { additive?: boolean }) => void;
+  toggleMultiSelect: () => void;
+  groupSelected: () => void;
+  ungroup: (id: string) => void;
+  enterGroup: (id: string) => void;
+  exitGroup: () => void;
   addObject: (shape: ShapeType, name?: string) => void;
   addWoodPreset: (presetId: string) => void;
   addPresetTemplate: (templateType: 'table' | 'chair' | 'bookshelf' | 'desk' | 'sofa') => void;
@@ -185,13 +194,16 @@ interface ProjectState {
   setFloorOpacity: (opacity: number) => void;
   setProjectBackgroundColor: (color: string) => void;
   updateSnapSettings: (settings: Partial<SnapSettings>) => void;
-  setUnit: (unit: 'in' | 'cm' | 'mm') => void;
+  setUnit: (unit: LengthUnit) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [createInitialProject()],
   activeProjectId: 'proj_default',
   selectedObjectId: 'tabletop_1',
+  selectedObjectIds: ['tabletop_1'],
+  multiSelect: false,
+  editingGroupId: null,
   activeGizmoMode: 'move',
   showDimensions: true,
   historyStack: [[...createInitialProject().objects]],
@@ -204,9 +216,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const projects = withLightStartingWood(parsed);
+          const firstId = projects[0].objects[0]?.id ?? null;
           set({
             projects,
             activeProjectId: projects[0].id,
+            selectedObjectId: firstId,
+            selectedObjectIds: firstId ? [firstId] : [],
+            editingGroupId: null,
             historyStack: [[...projects[0].objects]],
             historyIndex: 0
           });
@@ -235,7 +251,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  createProject: (name: string) => {
+  createProject: (name: string, unit: LengthUnit = 'in') => {
     const defaultCube: FurnitureObject = {
       id: `obj_${Date.now()}_cube`,
       name: 'Starting Cube',
@@ -252,7 +268,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       name: name || 'Untitled Furniture',
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      unit: 'in',
+      unit,
       objects: [defaultCube],
       snapSettings: {
         enabled: true,
@@ -269,6 +285,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: [...state.projects, newProj],
       activeProjectId: newProj.id,
       selectedObjectId: defaultCube.id,
+      selectedObjectIds: [defaultCube.id],
+      editingGroupId: null,
+      multiSelect: false,
       historyStack: [[defaultCube]],
       historyIndex: 0
     }));
@@ -300,6 +319,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: [...state.projects, dupProj],
       activeProjectId: dupProj.id,
       selectedObjectId: dupProj.objects[0]?.id || null,
+      selectedObjectIds: dupProj.objects[0] ? [dupProj.objects[0].id] : [],
+      editingGroupId: null,
       historyStack: [[...dupProj.objects]],
       historyIndex: 0
     }));
@@ -319,6 +340,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: remaining,
       activeProjectId: newActiveId,
       selectedObjectId: newActiveProj.objects[0]?.id || null,
+      selectedObjectIds: newActiveProj.objects[0] ? [newActiveProj.objects[0].id] : [],
+      editingGroupId: null,
       historyStack: [[...newActiveProj.objects]],
       historyIndex: 0
     });
@@ -335,6 +358,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({
       activeProjectId: id,
       selectedObjectId: proj.objects[0]?.id || null,
+      selectedObjectIds: proj.objects[0] ? [proj.objects[0].id] : [],
+      editingGroupId: null,
       historyStack: [[...proj.objects]],
       historyIndex: 0
     });
@@ -345,6 +370,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: [...state.projects, project],
       activeProjectId: project.id,
       selectedObjectId: project.objects[0]?.id || null,
+      selectedObjectIds: project.objects[0] ? [project.objects[0].id] : [],
+      editingGroupId: null,
       historyStack: [[...project.objects]],
       historyIndex: 0
     }));
@@ -352,7 +379,133 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     get().saveCurrentProject();
   },
 
-  selectObject: (id: string | null) => set({ selectedObjectId: id }),
+  selectObject: (id, options) => {
+    const additive = Boolean(options?.additive || get().multiSelect);
+    if (!id) {
+      set({ selectedObjectId: null, selectedObjectIds: [] });
+      return;
+    }
+    if (!additive) {
+      set({ selectedObjectId: id, selectedObjectIds: [id] });
+      return;
+    }
+    const current = get().selectedObjectIds;
+    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+    set({
+      selectedObjectIds: next,
+      selectedObjectId: next[next.length - 1] ?? null,
+    });
+  },
+
+  toggleMultiSelect: () => set((state) => ({ multiSelect: !state.multiSelect })),
+
+  groupSelected: () => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+
+    const members = proj.objects.filter((object) =>
+      selectedObjectIds.includes(object.id) && object.shape !== 'group' && !object.parentId
+    );
+    if (members.length < 2) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    for (const object of members) {
+      const hx = object.dimensions.length / 2;
+      const hy = object.dimensions.height / 2;
+      const hz = object.dimensions.width / 2;
+      minX = Math.min(minX, object.position.x - hx);
+      maxX = Math.max(maxX, object.position.x + hx);
+      minY = Math.min(minY, object.position.y - hy);
+      maxY = Math.max(maxY, object.position.y + hy);
+      minZ = Math.min(minZ, object.position.z - hz);
+      maxZ = Math.max(maxZ, object.position.z + hz);
+    }
+
+    const group: FurnitureObject = {
+      id: `grp_${Date.now()}`,
+      name: 'Group',
+      shape: 'group',
+      dimensions: {
+        length: Math.max(maxX - minX, 0.5),
+        height: Math.max(maxY - minY, 0.5),
+        width: Math.max(maxZ - minZ, 0.5),
+      },
+      position: {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+        z: (minZ + maxZ) / 2,
+      },
+      rotation: { x: 0, y: 0, z: 0 },
+      material: LIGHT_STARTING_WOOD,
+      visible: true,
+    };
+
+    const memberIds = new Set(members.map((object) => object.id));
+    const objects = proj.objects.map((object) =>
+      memberIds.has(object.id) ? { ...object, parentId: group.id } : object
+    );
+
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects: [...objects, group] } : p
+      ),
+      selectedObjectId: group.id,
+      selectedObjectIds: [group.id],
+      multiSelect: false,
+      editingGroupId: null,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  ungroup: (id) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const group = proj.objects.find((object) => object.id === id && object.shape === 'group');
+    if (!group) return;
+    const children = proj.objects.filter((object) => object.parentId === id);
+    const objects = proj.objects
+      .filter((object) => object.id !== id)
+      .map((object) => (object.parentId === id ? { ...object, parentId: undefined } : object));
+    const nextId = children[0]?.id ?? objects[0]?.id ?? null;
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects } : p
+      ),
+      selectedObjectId: nextId,
+      selectedObjectIds: nextId ? [nextId] : [],
+      editingGroupId: state.editingGroupId === id ? null : state.editingGroupId,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  enterGroup: (id) => {
+    const proj = get().projects.find((p) => p.id === get().activeProjectId);
+    const child = proj?.objects.find((object) => object.parentId === id);
+    set({
+      editingGroupId: id,
+      multiSelect: false,
+      selectedObjectId: child?.id ?? id,
+      selectedObjectIds: child ? [child.id] : [id],
+    });
+  },
+
+  exitGroup: () => {
+    const id = get().editingGroupId;
+    set({
+      editingGroupId: null,
+      selectedObjectId: id,
+      selectedObjectIds: id ? [id] : [],
+    });
+  },
 
   addObject: (shape: ShapeType, customName?: string) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
@@ -360,15 +513,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!proj) return;
 
     const defaultMaterial: WoodMaterial = LIGHT_STARTING_WOOD;
+    const isBoard = shape === 'board';
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: customName || `${shape.charAt(0).toUpperCase() + shape.slice(1)} Component`,
+      name: customName || (isBoard ? 'Board' : `${shape.charAt(0).toUpperCase() + shape.slice(1)} Component`),
       shape,
-      dimensions: { length: 12, width: 12, height: 12 },
-      position: { x: 0, y: 6, z: 0 },
+      dimensions: isBoard
+        ? { length: 24, width: 16, height: 0.75 }
+        : { length: 12, width: 12, height: 12 },
+      position: { x: 0, y: isBoard ? 0.375 : 6, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
       material: defaultMaterial,
-      visible: true
+      visible: true,
+      board: isBoard ? defaultBoardOptions() : undefined,
     };
 
     const updatedObjects = [...proj.objects, newObj];
@@ -377,7 +534,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: state.projects.map(p =>
         p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
       ),
-      selectedObjectId: newObj.id
+      selectedObjectId: newObj.id,
+      selectedObjectIds: [newObj.id],
+      multiSelect: false,
     }));
 
     pushHistoryState();
@@ -409,7 +568,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: state.projects.map(p =>
         p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
       ),
-      selectedObjectId: newObj.id
+      selectedObjectId: newObj.id,
+      selectedObjectIds: [newObj.id],
+      multiSelect: false,
     }));
 
     pushHistoryState();
@@ -464,7 +625,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projects: state.projects.map(p =>
         p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
       ),
-      selectedObjectId: newObjs[0].id
+      selectedObjectId: newObjs[0].id,
+      selectedObjectIds: [newObjs[0].id],
+      multiSelect: false,
     }));
 
     pushHistoryState();
@@ -476,19 +639,69 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
 
-    // Enforce floor collision if position is being updated
-    if (updates.position && proj.snapSettings.floorCollision) {
-      const existingObj = proj.objects.find(o => o.id === id);
-      if (existingObj) {
-        const objHeight = updates.dimensions?.height ?? existingObj.dimensions.height;
-        const minY = objHeight / 2;
-        if (updates.position.y < minY) {
-          updates = { ...updates, position: { ...updates.position, y: minY } };
-        }
+    const existingObj = proj.objects.find(o => o.id === id);
+    if (!existingObj) return;
+
+    // Groups keep their own pivot. Members stay on the floor themselves.
+    if (updates.position && proj.snapSettings.floorCollision && existingObj.shape !== 'group') {
+      const objHeight = updates.dimensions?.height ?? existingObj.dimensions.height;
+      const minY = objHeight / 2;
+      if (updates.position.y < minY) {
+        updates = { ...updates, position: { ...updates.position, y: minY } };
       }
     }
 
-    const updatedObjects = proj.objects.map(o => (o.id === id ? { ...o, ...updates } : o));
+    let updatedObjects = proj.objects.map(o => (o.id === id ? { ...o, ...updates } : o));
+
+    if (existingObj.shape === 'group' && (updates.position || updates.rotation)) {
+      const dx = (updates.position?.x ?? existingObj.position.x) - existingObj.position.x;
+      const dy = (updates.position?.y ?? existingObj.position.y) - existingObj.position.y;
+      const dz = (updates.position?.z ?? existingObj.position.z) - existingObj.position.z;
+      const drx = (updates.rotation?.x ?? existingObj.rotation.x) - existingObj.rotation.x;
+      const dry = (updates.rotation?.y ?? existingObj.rotation.y) - existingObj.rotation.y;
+      const drz = (updates.rotation?.z ?? existingObj.rotation.z) - existingObj.rotation.z;
+      const pivot = existingObj.position;
+      const rad = (deg: number) => (deg * Math.PI) / 180;
+      updatedObjects = updatedObjects.map((object) => {
+        if (object.parentId !== id) return object;
+        let x = object.position.x - pivot.x;
+        let y = object.position.y - pivot.y;
+        let z = object.position.z - pivot.z;
+        if (dry) {
+          const c = Math.cos(rad(dry));
+          const s = Math.sin(rad(dry));
+          const nx = x * c - z * s;
+          const nz = x * s + z * c;
+          x = nx;
+          z = nz;
+        }
+        if (drx) {
+          const c = Math.cos(rad(drx));
+          const s = Math.sin(rad(drx));
+          const ny = y * c - z * s;
+          const nz = y * s + z * c;
+          y = ny;
+          z = nz;
+        }
+        if (drz) {
+          const c = Math.cos(rad(drz));
+          const s = Math.sin(rad(drz));
+          const nx = x * c - y * s;
+          const ny = x * s + y * c;
+          x = nx;
+          y = ny;
+        }
+        return {
+          ...object,
+          position: { x: x + pivot.x + dx, y: y + pivot.y + dy, z: z + pivot.z + dz },
+          rotation: {
+            x: object.rotation.x + drx,
+            y: object.rotation.y + dry,
+            z: object.rotation.z + drz,
+          },
+        };
+      });
+    }
 
     set(state => ({
       projects: state.projects.map(p =>
@@ -503,17 +716,30 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   deleteObject: (id: string) => {
-    const { projects, activeProjectId, selectedObjectId, pushHistoryState, saveCurrentProject } = get();
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
 
-    const updatedObjects = proj.objects.filter(o => o.id !== id);
+    const target = proj.objects.find(o => o.id === id);
+    let updatedObjects = proj.objects.filter(o => o.id !== id);
+    if (target?.shape === 'group') {
+      updatedObjects = updatedObjects.map(o =>
+        o.parentId === id ? { ...o, parentId: undefined } : o
+      );
+    }
+
+    const remaining = get().selectedObjectIds.filter(
+      (item) => item !== id && updatedObjects.some((object) => object.id === item)
+    );
+    const nextSelected = remaining[remaining.length - 1] ?? updatedObjects[0]?.id ?? null;
 
     set(state => ({
       projects: state.projects.map(p =>
         p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
       ),
-      selectedObjectId: selectedObjectId === id ? (updatedObjects[0]?.id || null) : selectedObjectId
+      selectedObjectId: nextSelected,
+      selectedObjectIds: nextSelected ? (remaining.length ? remaining : [nextSelected]) : [],
+      editingGroupId: state.editingGroupId === id ? null : state.editingGroupId,
     }));
 
     pushHistoryState();
@@ -528,9 +754,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const source = proj.objects.find(o => o.id === id);
     if (!source) return;
 
+    const dupId = `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
     const dup: FurnitureObject = {
       ...source,
-      id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: dupId,
       name: `${source.name} Copy`,
       position: {
         x: source.position.x + 4,
@@ -539,13 +766,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
     };
 
-    const updatedObjects = [...proj.objects, dup];
+    const copies: FurnitureObject[] = [dup];
+    if (source.shape === 'group') {
+      proj.objects.filter((object) => object.parentId === source.id).forEach((child, index) => {
+        copies.push({
+          ...child,
+          id: `${dupId}_c${index}`,
+          parentId: dupId,
+          position: {
+            x: child.position.x + 4,
+            y: child.position.y,
+            z: child.position.z + 4,
+          },
+        });
+      });
+    }
+
+    const updatedObjects = [...proj.objects, ...copies];
 
     set(state => ({
       projects: state.projects.map(p =>
         p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
       ),
-      selectedObjectId: dup.id
+      selectedObjectId: dup.id,
+      selectedObjectIds: [dup.id],
+      multiSelect: false,
     }));
 
     pushHistoryState();

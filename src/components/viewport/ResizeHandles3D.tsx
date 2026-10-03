@@ -26,7 +26,6 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     inverseRotationMatrix: THREE.Matrix4;
   } | null>(null);
 
-  const { height } = object.dimensions;
   const { x, y, z } = object.position;
   const { x: rotX, y: rotY, z: rotZ } = object.rotation;
 
@@ -41,7 +40,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     { axis: '+y', pos: gripAnchor('+y', extents), color: GIZMO_AXIS.y },
     { axis: '-y', pos: gripAnchor('-y', extents), color: GIZMO_AXIS.y },
     { axis: '+z', pos: gripAnchor('+z', extents), color: GIZMO_AXIS.z },
-    { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z }
+    { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z },
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
@@ -144,18 +143,17 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     };
   }, [activeAxis, camera, gl, raycaster, controls, object.id, updateObject, pushHistoryState]);
 
+  if (object.shape === 'group') return null;
+
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
       <GizmoDepthClear />
-      {handles.filter(({ axis }) => !(axis === '-y' && height < 3)).map(({ axis, pos, color }) => (
+      {handles.map(({ axis, pos, color }) => (
         <group key={axis} position={pos}>
             <FacePad
               axis={axis}
               color={color}
               active={activeAxis === axis}
-              length={extents.hx * 2}
-              height={extents.hy * 2}
-              width={extents.hz * 2}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />
         </group>
