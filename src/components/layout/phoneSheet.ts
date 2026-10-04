@@ -29,7 +29,7 @@ export const PHONE_SHEET_EMBEDDED_STYLE: CSSProperties = {
   zIndex: 'auto',
   display: 'flex',
   flexDirection: 'column',
-  overflow: 'hidden',
+  overflow: 'visible',
   boxShadow: 'none',
   border: 'none',
   background: 'transparent',

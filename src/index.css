@@ -398,6 +398,7 @@ html, body, #root {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   background: #ffffff;
   border-radius: 20px 20px 0 0;
 }
@@ -1912,12 +1913,35 @@ html, body, #root {
   flex: none;
 }
 
-.floor-distance input[type='range'] {
+.floor-distance-slider {
+  position: relative;
   flex: 1;
-  min-width: 72px;
-  height: 36px;
-  margin: 0;
+  min-width: 88px;
+  height: 44px;
   touch-action: none;
+  display: flex;
+  align-items: center;
+}
+
+.floor-distance-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  pointer-events: none;
+}
+
+.floor-distance-thumb {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .size-inline {
