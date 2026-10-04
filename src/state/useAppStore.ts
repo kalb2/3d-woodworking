@@ -64,7 +64,7 @@ export function applyThemeVariables(accentColor: string) {
   root.style.setProperty('--accent-primary-subtle', hexToRgba(accentColor, 0.1));
 }
 
-export type OverlayId = 'sidebar' | 'inspector' | 'materials' | 'tools' | 'menu';
+export type OverlayId = 'sidebar' | 'inspector' | 'materials' | 'tools' | 'menu' | 'settings';
 
 export interface OverlayVisibility {
   sidebar: boolean;
@@ -72,6 +72,7 @@ export interface OverlayVisibility {
   materials: boolean;
   tools: boolean;
   menu: boolean;
+  settings: boolean;
 }
 
 let lastOverlayOpenAt = 0;
@@ -82,6 +83,7 @@ const ALL_OVERLAYS_CLOSED: OverlayVisibility = {
   materials: false,
   tools: false,
   menu: false,
+  settings: false,
 };
 
 function initialOverlayVisibility(): OverlayVisibility {
@@ -161,6 +163,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         materials: id === 'materials',
         tools: id === 'tools',
         menu: id === 'menu',
+        settings: id === 'settings',
       },
     }));
   },

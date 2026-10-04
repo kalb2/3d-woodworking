@@ -5,7 +5,28 @@ export type ShapeType =
   | 'wedge'
   | 'bevel_top'
   | 'pole'
-  | 'cushion';
+  | 'cushion'
+  | 'board'
+  | 'group';
+
+export type LengthUnit = 'in' | 'cm' | 'mm' | 'ft';
+
+export type RoutedEdge = 'none' | 'roundover' | 'chamfer';
+
+export interface BoardHole {
+  id: string;
+  /** Offset from the board center, along length (X). */
+  x: number;
+  /** Offset from the board center, along width (Z). */
+  z: number;
+  diameter: number;
+}
+
+export interface BoardOptions {
+  cornerRadius: number;
+  holes: BoardHole[];
+  edge: RoutedEdge;
+}
 
 export type WoodSpecies =
   | 'oak'
@@ -63,7 +84,8 @@ export interface FurnitureObject {
   material: WoodMaterial;
   locked?: boolean;
   visible?: boolean;
-  parentId?: string; // For grouped assemblies
+  parentId?: string;
+  board?: BoardOptions;
 }
 
 export interface SnapSettings {
@@ -79,7 +101,7 @@ export interface FurnitureProject {
   name: string;
   createdAt: number;
   updatedAt: number;
-  unit: 'in' | 'cm' | 'mm';
+  unit: LengthUnit;
   objects: FurnitureObject[];
   snapSettings: SnapSettings;
   showFloor: boolean;

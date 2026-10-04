@@ -25,6 +25,7 @@ import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectSt
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportProjectJSON, importProjectFromJSON, copyProjectToClipboard } from '../../utils/exportUtils';
+import { NewProjectSheet } from '../modals/NewProjectSheet';
 
 export const HomeScreen: React.FC = () => {
   const isPhone = useIsPhone();
@@ -33,6 +34,7 @@ export const HomeScreen: React.FC = () => {
   const [editingName, setEditingName] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +42,6 @@ export const HomeScreen: React.FC = () => {
     projects,
     activeProjectId,
     switchProject,
-    createProject,
     renameProject,
     duplicateProject,
     deleteProject,
@@ -62,9 +63,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleCreateNew = () => {
-    const defaultName = `Project ${projects.length + 1}`;
-    createProject(defaultName);
-    setView('editor');
+    setIsNewProjectOpen(true);
   };
 
   const handleStartRename = (id: string, name: string) => {
@@ -693,6 +692,12 @@ export const HomeScreen: React.FC = () => {
           <span>New Project</span>
         </button>
       </div>
+
+      <NewProjectSheet
+        open={isNewProjectOpen}
+        onClose={() => setIsNewProjectOpen(false)}
+        onCreated={() => setView('editor')}
+      />
 
       {isImportSheetOpen && (
         <div

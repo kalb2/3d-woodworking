@@ -11,11 +11,14 @@ import {
   PhoneCanvasHeader,
   PhoneMenuSheet,
 } from './components/layout/PhoneCanvasChrome';
+import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { ProjectModal } from './components/modals/ProjectModal';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
+import { TransformMenu } from './components/layout/TransformMenu';
+import { NewProjectSheet } from './components/modals/NewProjectSheet';
 
 export const App: React.FC = () => {
   const { loadProjects, selectedObjectId } = useProjectStore();
@@ -31,6 +34,7 @@ export const App: React.FC = () => {
   const isPhone = useIsPhone();
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isCutListOpen, setIsCutListOpen] = useState(false);
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -58,7 +62,8 @@ export const App: React.FC = () => {
     overlays.inspector ||
     overlays.materials ||
     overlays.tools ||
-    overlays.menu;
+    overlays.menu ||
+    overlays.settings;
   const showDesktopLaunchers = !isPhone;
 
   return (
@@ -84,6 +89,7 @@ export const App: React.FC = () => {
         <IPadHeader
           onOpenProjectModal={() => setIsProjectModalOpen(true)}
           onOpenCutList={() => setIsCutListOpen(true)}
+          onNewProject={() => setIsNewProjectOpen(true)}
         />
       )}
 
@@ -96,6 +102,7 @@ export const App: React.FC = () => {
           <PhoneMenuSheet
             onOpenProjectModal={() => setIsProjectModalOpen(true)}
             onOpenCutList={() => setIsCutListOpen(true)}
+            onNewProject={() => setIsNewProjectOpen(true)}
           />
         </>
       )}
@@ -122,8 +129,16 @@ export const App: React.FC = () => {
         <>
           <SidebarNav />
           <ObjectInspector />
+          <WorkshopSettings />
         </>
       )}
+
+      <TransformMenu />
+
+      <NewProjectSheet
+        open={isNewProjectOpen}
+        onClose={() => setIsNewProjectOpen(false)}
+      />
 
       {/* Modals */}
       <ProjectModal

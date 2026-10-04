@@ -11,8 +11,8 @@ import {
   GIZMO_OUTLINE_WIDTH,
   GIZMO_SCALE_MAX,
   GIZMO_SCALE_MIN,
+  ROTATE_SPHERE_RADIUS,
 } from '../../theme/gizmo';
-import { gripAnchor, type MeshExtents } from '../../theme/partSurface';
 
 const _world = new THREE.Vector3();
 
@@ -42,6 +42,7 @@ export const GripSize: React.FC<{ children: React.ReactNode }> = ({ children }) 
     if (!ref.current) return;
     ref.current.getWorldPosition(_world);
     const dist = camera.position.distanceTo(_world);
+    // Modest zoom compensation. The cap keeps grips on the part instead of filling the screen.
     const scale = THREE.MathUtils.clamp(dist / GIZMO_DISTANCE_REF, GIZMO_SCALE_MIN, GIZMO_SCALE_MAX);
     ref.current.scale.setScalar(scale);
   });
@@ -88,22 +89,24 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
 };
 
 /**
- * Rotate pills on the hoop equator — the side you'd grab, not the top.
- * X hoop (YZ): +Z. Y hoop (XZ): +Z. Z hoop (XY): +X.
+ * One grip on each hoop.
+ * X (red, depth/height): front of the hoop, above center, so the pill stays nearly vertical.
+ * Y (green, length/depth): front of the hoop — reads lower on the face when the camera is above.
+ * Z (blue, length/height): top of the hoop.
  */
 const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI,
+  x: Math.PI - 0.42,
   y: Math.PI / 2,
-  z: 0,
+  z: Math.PI / 2,
 };
 
-const SHAFT_START = 0.12;
-const SHAFT_LENGTH = 1.72;
-const SHAFT_RADIUS = 0.2;
-const CONE_LENGTH = 1.08;
-const CONE_RADIUS = 0.52;
-const ARROW_HIT_RADIUS = 2.15;
-const ARROW_HIT_EXTRA = 1.6;
+const SHAFT_START = 1.55;
+const SHAFT_LENGTH = 2.7;
+const SHAFT_RADIUS = 0.38;
+const CONE_LENGTH = 1.3;
+const CONE_RADIUS = 0.82;
+const ARROW_HIT_RADIUS = 1.15;
+const ARROW_HIT_EXTRA = 0.35;
 
 /** Local +Y maps onto the face normal — pull outward from the side. */
 const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
@@ -115,21 +118,34 @@ const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
   '-z': [-Math.PI / 2, 0, 0],
 };
 
-/** Moblo move: shaft + cone on the face you'd pull. Not a capsule. */
+/**
+ * Report a hit in front of any solid the handle passes through.
+ * The real intersection point is unchanged; only the sort distance moves up.
+ */
+function raycastInFrontOfSolid(this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+  const before = intersects.length;
+  THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+  for (let i = before; i < intersects.length; i += 1) {
+    intersects[i].distance -= 1e6;
+  }
+}
+
+/**
+ * Arrow grows from the object center along its axis.
+ * The shaft start is the offset, so the head is not glued to a face.
+ */
 export const AxisArrow: React.FC<{
   axis: FaceAxis;
-  extents: MeshExtents;
   color: string;
   active: boolean;
   onPointerDown: (event: any) => void;
-}> = ({ axis, extents, color, active, onPointerDown }) => {
-  const position = gripAnchor(axis, extents);
+}> = ({ axis, color, active, onPointerDown }) => {
   const shaftCenter = SHAFT_START + SHAFT_LENGTH / 2;
   const coneCenter = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH / 2;
   const hitLength = SHAFT_START + SHAFT_LENGTH + CONE_LENGTH + ARROW_HIT_EXTRA;
 
   return (
-    <group position={position} rotation={FACE_OUT[axis]}>
+    <group position={[0, 0, 0]} rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
           <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 20]} />
@@ -143,6 +159,7 @@ export const AxisArrow: React.FC<{
           position={[0, hitLength / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
@@ -156,46 +173,50 @@ export const AxisArrow: React.FC<{
   );
 };
 
-const HUB_RADIUS = 0.78;
-const HUB_THICKNESS = 0.2;
-const CHEVRON_RADIUS = 0.2;
-const CHEVRON_LENGTH = 0.42;
-const HUB_HIT_RADIUS = 2.2;
+const HUB_RADIUS = 0.62;
+const HUB_THICKNESS = 0.08;
+const CHEVRON_RADIUS = 0.16;
+const CHEVRON_LENGTH = 0.34;
+const HUB_HIT_RADIUS = 1.05;
 
-/** Light hub that sits on the part's top face (not a floating origin ball). */
+/** Circle and four triangles at the object center. Faces the camera; arrows stay on the axes. */
 export const MoveHub: React.FC<{
   active: boolean;
   onPointerDown: (event: any) => void;
 }> = ({ active, onPointerDown }) => {
+  const faceRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
   const chevrons = useMemo(() => {
-    return [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle) => {
-      const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const reach = HUB_RADIUS * 0.42;
-      return {
-        angle,
-        quaternion,
-        position: [dir.x * reach, HUB_THICKNESS * 0.2, dir.z * reach] as [number, number, number],
-      };
-    });
+    const reach = HUB_RADIUS + CHEVRON_LENGTH * 0.15;
+    return [
+      { key: 'up', position: [0, reach, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] },
+      { key: 'down', position: [0, -reach, 0] as [number, number, number], rotation: [0, 0, Math.PI] as [number, number, number] },
+      { key: 'right', position: [reach, 0, 0] as [number, number, number], rotation: [0, 0, -Math.PI / 2] as [number, number, number] },
+      { key: 'left', position: [-reach, 0, 0] as [number, number, number], rotation: [0, 0, Math.PI / 2] as [number, number, number] },
+    ];
   }, []);
 
+  useFrame(() => {
+    if (!faceRef.current) return;
+    faceRef.current.lookAt(camera.position);
+  });
+
   return (
-    <group position={[0, HUB_THICKNESS / 2, 0]}>
-      <GripSize>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
+    <GripSize>
+      <group ref={faceRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
           <cylinderGeometry args={[HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 32]} />
           <GizmoMaterial color={GIZMO_HUB_FILL} active={active} />
         </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={14} frustumCulled={false}>
           <torusGeometry args={[HUB_RADIUS, 0.045, 8, 32]} />
           <GizmoMaterial color={GIZMO_HUB_EDGE} active={active} />
         </mesh>
         {chevrons.map((chevron) => (
           <mesh
-            key={chevron.angle}
+            key={chevron.key}
             position={chevron.position}
-            quaternion={chevron.quaternion}
+            rotation={chevron.rotation}
             renderOrder={14}
             frustumCulled={false}
           >
@@ -204,116 +225,121 @@ export const MoveHub: React.FC<{
           </mesh>
         ))}
         <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
           renderOrder={21}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
           }}
         >
-          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.85, 20]} />
+          <cylinderGeometry args={[HUB_HIT_RADIUS, HUB_HIT_RADIUS, 0.7, 16]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
-      </GripSize>
-    </group>
+      </group>
+    </GripSize>
   );
 };
 
-const PILL_RADIUS = 0.36;
-const PILL_HEIGHT = 1.28;
-const PILL_FLAT = 0.4;
-const RING_HIT_TUBE = 2.2;
+const PILL_RADIUS = 0.62;
+const PILL_LENGTH = 1.7;
+/** Flatten along the outward axis so the pill lies on the ring. */
+const PILL_FLAT = 0.7;
+const RING_TUBE = 0.085;
+/** Invisible grab thickness so a thin ring is still easy to pinch. */
+const RING_HIT_TUBE = 0.62;
 
 function pillPose(radius: number, angle: number) {
-  const position: [number, number, number] = [
-    radius * Math.cos(angle),
-    radius * Math.sin(angle),
-    0,
-  ];
-  // Rz(angle) maps capsule +Y onto the circle tangent — always well-defined.
-  const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+  const position = new THREE.Vector3(radius * Math.cos(angle), radius * Math.sin(angle), 0);
+  const tangent = new THREE.Vector3(-Math.sin(angle), Math.cos(angle), 0);
+  const normal = new THREE.Vector3(0, 0, 1);
+  const outward = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(outward, tangent, normal)
+  );
   return { position, quaternion };
 }
 
-/** Full opaque RGB hoop + flattened pill on the side you'd grab. Not a cone or cube. */
+/** One true circle of the shared rotate sphere, plus the pill you drag. */
 export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
   color: string;
   active: boolean;
-  radius: number;
-  tube: number;
-  pillAngle?: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, radius, tube, pillAngle = SIDE_PILL_ANGLE[axis], onPointerDown }) => {
-  const pose = useMemo(() => pillPose(radius, pillAngle), [radius, pillAngle]);
+}> = ({ axis, color, active, onPointerDown }) => {
+  const radius = ROTATE_SPHERE_RADIUS;
+  const pose = useMemo(() => pillPose(radius, SIDE_PILL_ANGLE[axis]), [radius, axis]);
+
+  const grab = (event: any) => {
+    event.stopPropagation();
+    onPointerDown(event);
+  };
 
   return (
     <group rotation={RING_ROTATION[axis]}>
-      <mesh renderOrder={11} frustumCulled={false}>
-        <torusGeometry args={[radius, tube, 10, 80]} />
+      <mesh renderOrder={11} frustumCulled={false} raycast={() => null}>
+        <torusGeometry args={[radius, RING_TUBE, 12, 72]} />
         <GizmoMaterial color={color} active={active} />
       </mesh>
-      <group position={pose.position} quaternion={pose.quaternion}>
-        <GripSize>
-          <mesh scale={[1.12, 1, PILL_FLAT]} renderOrder={13} frustumCulled={false}>
-            <capsuleGeometry args={[PILL_RADIUS, PILL_HEIGHT, 6, 16]} />
-            <GizmoMaterial color={color} active={active} />
-          </mesh>
-        </GripSize>
-      </group>
-      <mesh
-        renderOrder={22}
-        frustumCulled={false}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onPointerDown(event);
-        }}
-      >
-        <torusGeometry args={[radius, RING_HIT_TUBE, 8, 56]} />
+      <mesh renderOrder={21} frustumCulled={false} raycast={raycastInFrontOfSolid} onPointerDown={grab}>
+        <torusGeometry args={[radius, RING_HIT_TUBE, 8, 48]} />
         <meshBasicMaterial visible={false} depthTest={false} />
       </mesh>
+      <group position={pose.position} quaternion={pose.quaternion}>
+        <mesh scale={[PILL_FLAT, 1, 1]} renderOrder={13} frustumCulled={false} raycast={() => null}>
+          <capsuleGeometry args={[PILL_RADIUS, PILL_LENGTH, 8, 16]} />
+          <GizmoMaterial color={color} active={active} />
+        </mesh>
+        <mesh
+          scale={[1.05, 1.15, 1.2]}
+          renderOrder={22}
+          frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
+          onPointerDown={grab}
+        >
+          <capsuleGeometry args={[PILL_RADIUS + 0.2, PILL_LENGTH + 0.15, 6, 10]} />
+          <meshBasicMaterial visible={false} depthTest={false} />
+        </mesh>
+      </group>
     </group>
   );
 };
 
-const PAD_MIN = 1.05;
-const PAD_MAX = 1.85;
-const PAD_FRAC = 0.12;
-const PAD_THICK_MIN = 0.32;
+const PAD_SIDE = 1.35;
+const PAD_THICK = 0.28;
+/** Faces pointing away from the camera stay visible, but much smaller. */
+const FAR_PAD_SCALE = 0.24;
 
-function facePadExtents(axis: FaceAxis, length: number, height: number, width: number) {
-  let across: number;
-  let along: number;
-  if (axis === '+x' || axis === '-x') {
-    across = height;
-    along = width;
-  } else if (axis === '+y' || axis === '-y') {
-    across = length;
-    along = width;
-  } else {
-    across = length;
-    along = height;
-  }
-  const side = THREE.MathUtils.clamp(Math.min(across, along) * PAD_FRAC, PAD_MIN, PAD_MAX);
-  const thick = Math.max(PAD_THICK_MIN, side * 0.2);
-  return { side, thick };
-}
+const _padNormal = new THREE.Vector3();
+const _padPos = new THREE.Vector3();
+const _padToCam = new THREE.Vector3();
 
-/** Moblo resize: square RGB pad on the face you'd pull. Not a capsule. */
+/** Square on the face center. Near faces are full size; far faces shrink as the camera orbits. */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
   active: boolean;
-  length: number;
-  height: number;
-  width: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, length, height, width, onPointerDown }) => {
-  const { side, thick } = facePadExtents(axis, length, height, width);
+}> = ({ axis, color, active, onPointerDown }) => {
+  const faceRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+  const side = PAD_SIDE;
+  const thick = PAD_THICK;
+
+  useFrame(() => {
+    const face = faceRef.current;
+    if (!face) return;
+    face.updateWorldMatrix(true, false);
+    _padNormal.set(0, 1, 0).transformDirection(face.matrixWorld);
+    face.getWorldPosition(_padPos);
+    _padToCam.copy(camera.position).sub(_padPos);
+    const near = _padNormal.dot(_padToCam) > 0;
+    face.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
+  });
 
   return (
-    <group rotation={FACE_OUT[axis]}>
+    <group ref={faceRef} rotation={FACE_OUT[axis]}>
       <GripSize>
         <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
           <boxGeometry args={[side, thick, side]} />
@@ -328,7 +354,7 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 1.4, thick + 1.8, side + 1.4]} />
+          <boxGeometry args={[side + 0.55, thick + 0.5, side + 0.55]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
       </GripSize>

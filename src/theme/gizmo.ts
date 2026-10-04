@@ -17,16 +17,14 @@ export const GIZMO_HUB_CHEVRON = '#8A96A3';
  * Positions stay on the part bounds — never scale the whole gizmo from the origin.
  * Cap is tight so handles stay tappable without swallowing the wood.
  */
-export const GIZMO_DISTANCE_REF = 76;
-export const GIZMO_SCALE_MIN = 0.82;
-export const GIZMO_SCALE_MAX = 1.5;
+export const GIZMO_DISTANCE_REF = 70;
+export const GIZMO_SCALE_MIN = 0.85;
+export const GIZMO_SCALE_MAX = 1.35;
 
 export const GIZMO_OUTLINE_WIDTH = 2.25;
 
-export function boundRingTube(radius: number) {
-  return THREE_CLAMP(radius * 0.01, 0.055, 0.14);
-}
-
-function THREE_CLAMP(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
+/**
+ * Rotate sphere radius in inches. Same circle on every axis, and it does not
+ * follow the part's size — a huge part keeps this sphere and the camera zooms in.
+ */
+export const ROTATE_SPHERE_RADIUS = 6;

@@ -12,7 +12,8 @@ import {
   EyeOff,
   Trash2,
   Copy,
-  Layers
+  Layers,
+  RectangleHorizontal
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -20,7 +21,7 @@ import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
-import type { ShapeType } from '../../types/furniture';
+import type { FurnitureObject, ShapeType } from '../../types/furniture';
 
 export const SidebarNav: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'shapes' | 'templates' | 'scene'>('shapes');
@@ -33,6 +34,7 @@ export const SidebarNav: React.FC = () => {
     projects,
     activeProjectId,
     selectedObjectId,
+    selectedObjectIds,
     selectObject,
     deleteObject,
     duplicateObject,
@@ -45,6 +47,7 @@ export const SidebarNav: React.FC = () => {
 
   const shapes: { type: ShapeType; label: string; icon: any }[] = [
     { type: 'bevel_top', label: 'Beveled Tabletop', icon: LayoutGrid },
+    { type: 'board', label: 'Board / Panel', icon: RectangleHorizontal },
     { type: 'cube', label: 'Box / Panel', icon: Box },
     { type: 'cylinder', label: 'Round Leg / Pole', icon: Cylinder },
     { type: 'sphere', label: 'Sphere Knob', icon: Circle },
@@ -130,6 +133,7 @@ export const SidebarNav: React.FC = () => {
               <button
                 key={type}
                 type="button"
+                data-testid={`shape-${type}`}
                 className={isPhone ? 'phone-shape-cell' : 'glass-button'}
                 onClick={isPhone ? undefined : () => addObject(type)}
                 onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addObject(type)) : undefined}
@@ -272,56 +276,109 @@ export const SidebarNav: React.FC = () => {
               Active Furniture Parts
             </div>
 
-            {currentProject?.objects.map((obj) => {
-              const isSelected = obj.id === selectedObjectId;
-
-              return (
-                <div
-                  key={obj.id}
-                  onClick={() => selectObject(obj.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    background: isSelected ? 'rgba(224, 159, 62, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isSelected ? '1px solid #e09f3e' : '1px solid transparent',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400 }}>
-                    {obj.name}
-                  </span>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <SceneIconButton
-                      label={obj.visible ? `Hide ${obj.name}` : `Show ${obj.name}`}
-                      onTap={() => updateObject(obj.id, { visible: !obj.visible })}
-                    >
-                      {obj.visible ? <Eye size={14} /> : <EyeOff size={14} color="#ef4444" />}
-                    </SceneIconButton>
-                    <SceneIconButton
-                      label={`Duplicate ${obj.name}`}
-                      onTap={() => duplicateObject(obj.id)}
-                    >
-                      <Copy size={14} />
-                    </SceneIconButton>
-                    <SceneIconButton
-                      danger
-                      label={`Delete ${obj.name}`}
-                      onTap={() => deleteObject(obj.id)}
-                    >
-                      <Trash2 size={14} />
-                    </SceneIconButton>
-                  </div>
-                </div>
-              );
-            })}
+            {currentProject?.objects.filter((obj) => !obj.parentId).map((obj) => (
+              <SceneRow
+                key={obj.id}
+                objectId={obj.id}
+                depth={0}
+                objects={currentProject.objects}
+                selectedObjectId={selectedObjectId}
+                selectedObjectIds={selectedObjectIds}
+                selectObject={selectObject}
+                updateObject={updateObject}
+                duplicateObject={duplicateObject}
+                deleteObject={deleteObject}
+              />
+            ))}
           </div>
         )}
       </div>
     </aside>
+  );
+};
+
+const SceneRow: React.FC<{
+  objectId: string;
+  depth: number;
+  objects: FurnitureObject[];
+  selectedObjectId: string | null;
+  selectedObjectIds: string[];
+  selectObject: (id: string | null, options?: { additive?: boolean }) => void;
+  updateObject: (id: string, updates: Partial<FurnitureObject>) => void;
+  duplicateObject: (id: string) => void;
+  deleteObject: (id: string) => void;
+}> = ({ objectId, depth, objects, selectedObjectId, selectedObjectIds, selectObject, updateObject, duplicateObject, deleteObject }) => {
+  const obj = objects.find((item) => item.id === objectId);
+  if (!obj) return null;
+  const isSelected = obj.id === selectedObjectId || selectedObjectIds.includes(obj.id);
+  const children = objects.filter((item) => item.parentId === obj.id);
+  return (
+    <>
+      <div
+        onClick={() => selectObject(obj.id)}
+        data-testid={`scene-row-${obj.id}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          paddingLeft: 12 + depth * 16,
+          borderRadius: 8,
+          background: isSelected ? 'rgba(224, 159, 62, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+          border: isSelected ? '1px solid #e09f3e' : '1px solid transparent',
+          cursor: 'pointer'
+        }}
+      >
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }} onClick={(event) => event.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`Add ${obj.name} to selection`}
+            data-testid={`scene-check-${obj.id}`}
+            checked={selectedObjectIds.includes(obj.id)}
+            onChange={() => selectObject(obj.id, { additive: true })}
+            style={{ width: 18, height: 18 }}
+          />
+          <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400 }}>
+            {obj.name}
+          </span>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <SceneIconButton
+            label={obj.visible ? `Hide ${obj.name}` : `Show ${obj.name}`}
+            onTap={() => updateObject(obj.id, { visible: !obj.visible })}
+          >
+            {obj.visible ? <Eye size={14} /> : <EyeOff size={14} color="#ef4444" />}
+          </SceneIconButton>
+          <SceneIconButton
+            label={`Duplicate ${obj.name}`}
+            onTap={() => duplicateObject(obj.id)}
+          >
+            <Copy size={14} />
+          </SceneIconButton>
+          <SceneIconButton
+            danger
+            label={`Delete ${obj.name}`}
+            onTap={() => deleteObject(obj.id)}
+          >
+            <Trash2 size={14} />
+          </SceneIconButton>
+        </div>
+      </div>
+      {children.map((child) => (
+        <SceneRow
+          key={child.id}
+          objectId={child.id}
+          depth={depth + 1}
+          objects={objects}
+          selectedObjectId={selectedObjectId}
+          selectedObjectIds={selectedObjectIds}
+          selectObject={selectObject}
+          updateObject={updateObject}
+          duplicateObject={duplicateObject}
+          deleteObject={deleteObject}
+        />
+      ))}
+    </>
   );
 };
 

@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { FolderOpen, Plus, Edit2, Copy, Trash2, Check, X, Upload, Download, Share2 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { exportProjectJSON, copyProjectToClipboard, importProjectFromJSON } from '../../utils/exportUtils';
+import { UNIT_CHOICES } from '../../utils/units';
+import type { LengthUnit } from '../../types/furniture';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) =
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectUnit, setNewProjectUnit] = useState<LengthUnit>('in');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +51,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) =
 
   const handleCreateNew = () => {
     if (newProjectName.trim()) {
-      createProject(newProjectName.trim());
+      createProject(newProjectName.trim(), newProjectUnit);
       setNewProjectName('');
     }
   };
@@ -138,6 +141,24 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) =
         </div>
 
         {/* Create New Project Input & Import */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-testid="project-modal-units">
+          {UNIT_CHOICES.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              className="glass-button"
+              data-testid={`project-modal-unit-${choice.id}`}
+              onClick={() => setNewProjectUnit(choice.id)}
+              style={{
+                minHeight: 40,
+                background: newProjectUnit === choice.id ? '#e09f3e' : undefined,
+                color: newProjectUnit === choice.id ? '#111' : undefined,
+              }}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             className="glass-input"
