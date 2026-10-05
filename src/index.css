@@ -267,7 +267,10 @@ html, body, #root {
 
 .editor-root.is-phone {
   --phone-sheet-inset: 12px;
-  --phone-sheet-float-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  /* Home-indicator inset is often 0 in the webview even when the card is clipped.
+     34px is that inset in portrait; 12px is padding above it. A reported inset still wins. */
+  --phone-sheet-float-bottom: calc(12px + 34px);
+  --phone-sheet-float-bottom: calc(12px + max(34px, env(safe-area-inset-bottom, 0px)));
   --phone-sheet-collapsed-height: 208px;
   --phone-dock-height: 208px;
   --phone-sheet-max-height: min(52dvh, 440px);
