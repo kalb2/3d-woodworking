@@ -16,6 +16,7 @@ import {
   Check,
   LayoutTemplate,
   Users,
+  User,
 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -170,6 +171,19 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       {/* Right section: Settings, Cut List & Export */}
       {!isPhone && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
+        <button
+          type="button"
+          className="glass-panel glass-button"
+          onClick={() => {
+            setShowExportMenu(false);
+            openHome('profile');
+          }}
+          title="Profile"
+          aria-label="Profile"
+          data-testid="editor-profile"
+        >
+          <User size={18} />
+        </button>
         <button
           type="button"
           className={`glass-panel glass-button ${overlays.settings ? 'active' : ''}`}

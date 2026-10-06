@@ -1,5 +1,9 @@
+import { Capacitor } from '@capacitor/core';
 import type { Account, AuthConfig, AuthResponse, SyncPushResponse, SyncRecord } from './types.ts';
 import { API_PREFIX } from './types.ts';
+
+export const SYNC_SERVER_UNCONFIGURED =
+  'Sync server is not configured. Projects stay on this device until the app is built with VITE_SYNC_API_URL.';
 
 const SESSION_KEY = 'workbench_session_v1';
 
@@ -12,6 +16,12 @@ export function syncBaseUrl(): string {
   const env = import.meta.env as Record<string, string | undefined>;
   const configured = env.VITE_SYNC_API_URL?.trim();
   return configured ? configured.replace(/\/$/, '') : '';
+}
+
+/** The Vite dev server serves /api/v1. A native build does not, unless a Worker URL is set. */
+export function syncServerConfigured(): boolean {
+  if (syncBaseUrl()) return true;
+  return !Capacitor.isNativePlatform();
 }
 
 export function readStoredSession(): StoredSession | null {
@@ -31,12 +41,26 @@ export function writeStoredSession(session: StoredSession | null) {
   else localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+function readBody<T>(text: string): T & { error?: string } {
+  if (!text) return {} as T & { error?: string };
+  try {
+    return JSON.parse(text) as T & { error?: string };
+  } catch {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.startsWith('<') || trimmed.startsWith('<!')) {
+      throw new Error(SYNC_SERVER_UNCONFIGURED);
+    }
+    throw new Error('The sync server returned a response this app could not read.');
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!syncServerConfigured()) throw new Error(SYNC_SERVER_UNCONFIGURED);
   const headers = new Headers(init.headers);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
   const response = await fetch(`${syncBaseUrl()}${API_PREFIX}${path}`, { ...init, headers });
   const text = await response.text();
-  const body = text ? JSON.parse(text) as T & { error?: string } : {} as T & { error?: string };
+  const body = readBody<T>(text);
   if (!response.ok) throw new Error(body.error || `Sync request failed (${response.status}).`);
   return body;
 }

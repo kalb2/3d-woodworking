@@ -58,7 +58,9 @@ Run those from a Wrangler install (`npx wrangler`); Wrangler is not a package de
 
 ## Sign in with Apple on device
 
-The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). The Profile button calls `SignInWithApple.authorize` on iOS. The browser still uses dev sign-in; Apple’s web JS flow is not configured.
+The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). Profile is the person icon at the top right of Home and the editor. On iOS it calls `SignInWithApple.authorize`. The browser still uses dev sign-in; Apple’s web JS flow is not configured.
+
+A native build with no `VITE_SYNC_API_URL` does not call `/api/v1` on `capacitor://localhost`. Profile stays signed out and says the sync server is not configured. A non-JSON response is shown as that message, not a JSON parse error.
 
 Apple sends the email only the first time someone authorizes the app. Later sign-ins use the same Apple subject. A brand-new account still needs that first email.
 

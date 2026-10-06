@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Cloud, LogOut, RefreshCw, User } from 'lucide-react';
+import { SYNC_SERVER_UNCONFIGURED } from '../../sync/client';
 import { appleSignInUnavailableReason } from '../../sync/appleSignIn';
 import { useAccountStore } from '../../state/useAccountStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -51,6 +52,7 @@ export const ProfilePanel: React.FC = () => {
     lastSyncedAt,
     lastError,
     notice,
+    serverConfigured,
     appleAvailable,
     migration,
     loadSession,
@@ -81,6 +83,12 @@ export const ProfilePanel: React.FC = () => {
         </div>
 
         {status === 'loading' && <p className="profile-note">Checking your account…</p>}
+
+        {!serverConfigured && (
+          <p className="profile-note" data-testid="sync-unconfigured">
+            {SYNC_SERVER_UNCONFIGURED}
+          </p>
+        )}
 
         {notice && <p className="profile-note" data-testid="profile-notice">{notice}</p>}
         {lastError && <p className="profile-error" data-testid="profile-error">{lastError}</p>}

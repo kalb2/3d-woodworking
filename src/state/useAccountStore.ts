@@ -7,6 +7,8 @@ import {
   readStoredSession,
   signInWithIdentity,
   signOutRequest,
+  SYNC_SERVER_UNCONFIGURED,
+  syncServerConfigured,
   writeStoredSession,
 } from '../sync/client.ts';
 import { appleSignInAvailable, authorizeWithApple } from '../sync/appleSignIn.ts';
@@ -40,6 +42,7 @@ interface AccountState {
   lastSyncedAt: number | null;
   lastError: string | null;
   notice: string | null;
+  serverConfigured: boolean;
   appleAvailable: boolean;
   migration: MigrationChoice;
   loadSession: () => Promise<void>;
@@ -161,7 +164,7 @@ function scheduleSync() {
 }
 
 export const useAccountStore = create<AccountState>((set, get) => ({
-  status: 'loading',
+  status: syncServerConfigured() ? 'loading' : 'signed-out',
   account: null,
   token: null,
   config: null,
@@ -169,22 +172,48 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   lastSyncedAt: null,
   lastError: null,
   notice: null,
+  serverConfigured: syncServerConfigured(),
   appleAvailable: appleSignInAvailable(),
   migration: 'needed',
 
   loadSession: async () => {
     const epoch = ++sessionEpoch;
     set({ appleAvailable: appleSignInAvailable() });
+    if (!syncServerConfigured()) {
+      set({
+        status: 'signed-out',
+        account: null,
+        token: null,
+        config: null,
+        syncStatus: 'idle',
+        lastError: null,
+        serverConfigured: false,
+      });
+      return;
+    }
     const stored = readStoredSession();
     try {
       const config = await fetchAuthConfig();
       if (epoch !== sessionEpoch) return;
-      set({ config });
+      set({ config, serverConfigured: true });
     } catch (error) {
       if (epoch !== sessionEpoch) return;
+      const message = errorMessage(error, 'Sync server is unreachable.');
+      if (message === SYNC_SERVER_UNCONFIGURED) {
+        set({
+          status: 'signed-out',
+          account: null,
+          token: null,
+          config: null,
+          syncStatus: 'idle',
+          lastError: null,
+          serverConfigured: false,
+        });
+        return;
+      }
       set({
         syncStatus: 'offline',
-        lastError: errorMessage(error, 'Sync server is unreachable.'),
+        lastError: message,
       });
     }
 
@@ -235,10 +264,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       await finishSignIn(set, get, credential.identityToken, credential.email, credential.displayName);
     } catch (error) {
       if (epoch !== sessionEpoch) return;
+      const message = errorMessage(error, 'Sign in with Apple failed.');
+      if (message === SYNC_SERVER_UNCONFIGURED) {
+        set({ status: 'signed-out', serverConfigured: false, syncStatus: 'idle', lastError: null });
+        return;
+      }
       set({
         status: get().account ? 'signed-in' : 'signed-out',
         syncStatus: 'error',
-        lastError: errorMessage(error, 'Sign in with Apple failed.'),
+        lastError: message,
       });
     }
   },
@@ -252,10 +286,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       await finishSignIn(set, get, token, email.trim(), displayName.trim());
     } catch (error) {
       if (epoch !== sessionEpoch) return;
+      const message = errorMessage(error, 'Dev sign-in failed.');
+      if (message === SYNC_SERVER_UNCONFIGURED) {
+        set({ status: 'signed-out', serverConfigured: false, syncStatus: 'idle', lastError: null });
+        return;
+      }
       set({
         status: get().account ? 'signed-in' : 'signed-out',
         syncStatus: isOffline(error) ? 'offline' : 'error',
-        lastError: errorMessage(error, 'Dev sign-in failed.'),
+        lastError: message,
       });
     }
   },

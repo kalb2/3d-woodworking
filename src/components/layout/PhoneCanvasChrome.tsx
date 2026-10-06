@@ -21,8 +21,8 @@ import {
   Ungroup,
   Settings,
   Share2,
-  User,
   SlidersHorizontal,
+  User,
   Users,
   Trash2,
 } from 'lucide-react';
@@ -45,7 +45,7 @@ const PhoneTapButton: React.FC<PhoneTapButtonProps> = ({ onTap, type = 'button',
 };
 
 export const PhoneCanvasHeader: React.FC = () => {
-  const { setView, openOverlay } = useAppStore();
+  const { setView, openOverlay, openHome } = useAppStore();
   const { projects, activeProjectId, setUnit } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const unit = currentProject?.unit ?? 'in';
@@ -86,15 +86,26 @@ export const PhoneCanvasHeader: React.FC = () => {
         </PhoneTapButton>
       </div>
 
-      <PhoneTapButton
-        className="phone-header-icon-btn"
-        onTap={() => openOverlay('menu', true)}
-        title="Project menu"
-        aria-label="Project menu"
-        data-testid="canvas-menu"
-      >
-        <Menu size={20} />
-      </PhoneTapButton>
+      <div className="phone-header-actions">
+        <PhoneTapButton
+          className="phone-header-icon-btn"
+          onTap={() => openHome('profile')}
+          title="Profile"
+          aria-label="Profile"
+          data-testid="editor-profile"
+        >
+          <User size={20} />
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-header-icon-btn"
+          onTap={() => openOverlay('menu', true)}
+          title="Project menu"
+          aria-label="Project menu"
+          data-testid="canvas-menu"
+        >
+          <Menu size={20} />
+        </PhoneTapButton>
+      </div>
     </header>
   );
 };
@@ -151,14 +162,6 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
         >
           <Settings size={18} />
           <span>Settings</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-profile"
-          onTap={() => { close(); openHome('profile'); }}
-        >
-          <User size={18} />
-          <span>Profile</span>
         </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"

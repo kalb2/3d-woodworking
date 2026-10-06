@@ -244,6 +244,18 @@ export const HomeScreen: React.FC = () => {
           </div>
         </div>
 
+        <div className="home-header-end">
+        <button
+          type="button"
+          className={`home-profile-btn${homeTab === 'profile' ? ' is-active' : ''}`}
+          data-testid="home-profile"
+          aria-label="Profile"
+          title="Profile"
+          onClick={() => setHomeTab('profile')}
+        >
+          <User size={18} />
+        </button>
+
         <div className="home-header-actions">
           <button
             className="glass-button"
@@ -261,6 +273,7 @@ export const HomeScreen: React.FC = () => {
             <Plus size={18} />
             <span>New Project</span>
           </button>
+        </div>
         </div>
       </header>
 
@@ -299,15 +312,6 @@ export const HomeScreen: React.FC = () => {
         >
           <Sliders size={18} />
           <span>{isPhone ? 'Presets' : 'Presets & Preferences'}</span>
-        </button>
-
-        <button
-          className={`home-tab ${homeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setHomeTab('profile')}
-          data-testid="home-tab-profile"
-        >
-          <User size={18} />
-          <span>Profile</span>
         </button>
 
         <button
