@@ -28,6 +28,7 @@ export const TransformMenu: React.FC = () => {
   const groupId = selected?.shape === 'group' ? selected.id : editingGroupId;
 
   const openOverlay = useAppStore((state) => state.openOverlay);
+  const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const isPhone = useIsPhone();
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
   const canEditSelection = Boolean(selected);
@@ -38,6 +39,7 @@ export const TransformMenu: React.FC = () => {
     if (selected) deleteObject(selected.id);
   });
   const addPart = useReliableTap(() => {
+    setSidebarPanel('shapes');
     openOverlay('sidebar');
   });
 

@@ -15,11 +15,9 @@ import {
 import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
-import { ProjectModal } from './components/modals/ProjectModal';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
-import { NewProjectSheet } from './components/modals/NewProjectSheet';
 import { ShareSheet } from './components/share/ShareSheet';
 
 export const App: React.FC = () => {
@@ -30,14 +28,13 @@ export const App: React.FC = () => {
     loadPreferences,
     overlays,
     openOverlay,
+    setSidebarPanel,
     resetOverlaysForLayout,
     setOverlayOpen,
     dismissOverlays,
   } = useAppStore();
   const isPhone = useIsPhone();
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isCutListOpen, setIsCutListOpen] = useState(false);
-  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   useEffect(() => {
@@ -92,9 +89,7 @@ export const App: React.FC = () => {
         <PhoneCanvasHeader />
       ) : (
         <IPadHeader
-          onOpenProjectModal={() => setIsProjectModalOpen(true)}
           onOpenCutList={() => setIsCutListOpen(true)}
-          onNewProject={() => setIsNewProjectOpen(true)}
           onShareProject={() => setIsShareOpen(true)}
         />
       )}
@@ -106,9 +101,7 @@ export const App: React.FC = () => {
             <ObjectInspector />
           </PhoneBottomSheet>
           <PhoneMenuSheet
-            onOpenProjectModal={() => setIsProjectModalOpen(true)}
             onOpenCutList={() => setIsCutListOpen(true)}
-            onNewProject={() => setIsNewProjectOpen(true)}
             onShareProject={() => setIsShareOpen(true)}
           />
         </>
@@ -119,7 +112,10 @@ export const App: React.FC = () => {
           label="Shapes"
           icon={<Box size={16} color="#e09f3e" />}
           placement="left"
-          onOpen={() => openOverlay('sidebar', isPhone)}
+          onOpen={() => {
+            setSidebarPanel('shapes');
+            openOverlay('sidebar', isPhone);
+          }}
         />
       )}
 
@@ -141,17 +137,6 @@ export const App: React.FC = () => {
       )}
 
       <TransformMenu />
-
-      <NewProjectSheet
-        open={isNewProjectOpen}
-        onClose={() => setIsNewProjectOpen(false)}
-      />
-
-      {/* Modals */}
-      <ProjectModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
-      />
 
       <CutListDrawer
         isOpen={isCutListOpen}

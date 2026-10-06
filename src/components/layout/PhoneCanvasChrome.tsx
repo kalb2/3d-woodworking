@@ -1,35 +1,22 @@
 import React from 'react';
 import {
-  Box,
-  Camera,
   Check,
   Copy,
-  FileCode,
-  FileSpreadsheet,
-  FolderOpen,
-  Home,
-  Layers,
-  LayoutTemplate,
-  Menu,
+  Ellipsis,
   Group,
+  Home,
   Move,
   Pencil,
   Plus,
   RotateCw,
-  Ruler,
   Scaling,
   Ungroup,
-  Settings,
-  Share2,
-  SlidersHorizontal,
-  User,
-  Users,
   Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
-import { exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
+import { EditorOverflowList } from './EditorOverflow';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
@@ -45,7 +32,7 @@ const PhoneTapButton: React.FC<PhoneTapButtonProps> = ({ onTap, type = 'button',
 };
 
 export const PhoneCanvasHeader: React.FC = () => {
-  const { setView, openOverlay, openHome } = useAppStore();
+  const { setView, openOverlay, overlays, setOverlayOpen } = useAppStore();
   const { projects, activeProjectId, setUnit } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const unit = currentProject?.unit ?? 'in';
@@ -89,21 +76,16 @@ export const PhoneCanvasHeader: React.FC = () => {
       <div className="phone-header-actions">
         <PhoneTapButton
           className="phone-header-icon-btn"
-          onTap={() => openHome('profile')}
-          title="Profile"
-          aria-label="Profile"
-          data-testid="editor-profile"
+          onTap={() => {
+            if (overlays.menu) setOverlayOpen('menu', false);
+            else openOverlay('menu', true);
+          }}
+          title="More"
+          aria-label="More"
+          aria-expanded={overlays.menu}
+          data-testid="editor-overflow"
         >
-          <User size={20} />
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-header-icon-btn"
-          onTap={() => openOverlay('menu', true)}
-          title="Project menu"
-          aria-label="Project menu"
-          data-testid="canvas-menu"
-        >
-          <Menu size={20} />
+          <Ellipsis size={20} />
         </PhoneTapButton>
       </div>
     </header>
@@ -111,37 +93,19 @@ export const PhoneCanvasHeader: React.FC = () => {
 };
 
 interface PhoneMenuSheetProps {
-  onOpenProjectModal: () => void;
   onOpenCutList: () => void;
-  onNewProject: () => void;
   onShareProject: () => void;
 }
 
 export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
-  onOpenProjectModal,
   onOpenCutList,
-  onNewProject,
   onShareProject,
 }) => {
-  const { overlays, openOverlay, setOverlayOpen, openHome } = useAppStore();
-  const { activeProjectId, projects, setGizmoMode } = useProjectStore();
-  const currentProject = projects.find((p) => p.id === activeProjectId);
+  const { overlays, setOverlayOpen } = useAppStore();
 
   if (!overlays.menu) return null;
 
   const close = () => setOverlayOpen('menu', false);
-
-  const handleCapturePNG = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'workbench'}_render.png`;
-      a.click();
-    }
-    close();
-  };
 
   return (
     <div
@@ -151,115 +115,15 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
     >
       <PhoneSheetGrab />
       <div className="phone-sheet-header">
-        <span className="phone-sheet-title">Project</span>
+        <span className="phone-sheet-title">More</span>
         <OverlayDismissButton onDismiss={close} />
       </div>
       <div className="phone-sheet-body">
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="tool-settings"
-          onTap={() => { close(); openOverlay('settings', true); }}
-        >
-          <Settings size={18} />
-          <span>Settings</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="overlay-launch-shapes"
-          onTap={() => { close(); openOverlay('sidebar', true); }}
-        >
-          <Box size={18} />
-          <span>Add shapes</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-templates"
-          onTap={() => { close(); openHome('templates'); }}
-        >
-          <LayoutTemplate size={18} />
-          <span>Templates</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-community"
-          onTap={() => { close(); openHome('community'); }}
-        >
-          <Users size={18} />
-          <span>Community</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="overlay-launch-properties"
-          onTap={() => { close(); openOverlay('inspector', true); }}
-        >
-          <SlidersHorizontal size={18} />
-          <span>Properties</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="tool-dims"
-          onTap={() => { close(); setGizmoMode('move'); }}
-        >
-          <Ruler size={18} />
-          <span>Measure</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => { close(); onOpenProjectModal(); }}
-        >
-          <FolderOpen size={18} />
-          <span>Switch project</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-new-project"
-          onTap={() => {
-            close();
-            onNewProject();
-          }}
-        >
-          <Plus size={18} />
-          <span>New project</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => { close(); onOpenCutList(); }}
-        >
-          <Layers size={18} />
-          <span>Cut list</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => {
-            if (currentProject) exportCutListCSV(currentProject);
-            close();
-          }}
-        >
-          <FileSpreadsheet size={18} />
-          <span>Export CSV cut list</span>
-        </PhoneTapButton>
-        <PhoneTapButton className="phone-sheet-row" onTap={handleCapturePNG}>
-          <Camera size={18} />
-          <span>Snapshot image (PNG)</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => {
-            if (currentProject) exportProjectJSON(currentProject);
-            close();
-          }}
-        >
-          <FileCode size={18} />
-          <span>Export project (.json)</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-share"
-          onTap={() => { close(); onShareProject(); }}
-        >
-          <Share2 size={18} />
-          <span>Share project</span>
-        </PhoneTapButton>
+        <EditorOverflowList
+          onOpenCutList={onOpenCutList}
+          onShareProject={onShareProject}
+          onClose={close}
+        />
       </div>
     </div>
   );
@@ -268,7 +132,7 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
 export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
   children,
 }) => {
-  const { overlays, openOverlay } = useAppStore();
+  const { overlays, openOverlay, setSidebarPanel } = useAppStore();
   const {
     projects,
     activeProjectId,
@@ -356,7 +220,10 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           icon={<Plus size={22} strokeWidth={1.8} />}
           active={false}
           showLabel
-          onTap={() => openOverlay('sidebar')}
+          onTap={() => {
+            setSidebarPanel('shapes');
+            openOverlay('sidebar');
+          }}
         />
         {selectedObjectIds.length >= 2 && (
           <DockItem

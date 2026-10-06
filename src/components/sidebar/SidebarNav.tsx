@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Cylinder,
@@ -16,7 +16,7 @@ import {
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
 import { PROJECT_TEMPLATES } from '../../catalog/templates';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
-import { useAppStore } from '../../state/useAppStore';
+import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
@@ -35,9 +35,18 @@ const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?
 };
 
 export const SidebarNav: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'shapes' | 'templates' | 'scene'>('shapes');
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen, openHome } = useAppStore();
+  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel } = useAppStore();
+  const [activeTab, setActiveTab] = useState<SidebarPanel>(sidebarPanel);
+
+  useEffect(() => {
+    setActiveTab(sidebarPanel);
+  }, [sidebarPanel]);
+
+  const selectTab = (panel: SidebarPanel) => {
+    setActiveTab(panel);
+    setSidebarPanel(panel);
+  };
   const {
     addObject,
     addWoodPreset,
@@ -105,7 +114,7 @@ export const SidebarNav: React.FC = () => {
       }}>
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'shapes' ? ' is-active' : ''}` : `glass-button ${activeTab === 'shapes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('shapes')}
+          onClick={() => selectTab('shapes')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Shapes</span>
@@ -113,7 +122,7 @@ export const SidebarNav: React.FC = () => {
 
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'templates' ? ' is-active' : ''}` : `glass-button ${activeTab === 'templates' ? 'active' : ''}`}
-          onClick={() => setActiveTab('templates')}
+          onClick={() => selectTab('templates')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Layouts</span>
@@ -121,7 +130,7 @@ export const SidebarNav: React.FC = () => {
 
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'scene' ? ' is-active' : ''}` : `glass-button ${activeTab === 'scene' ? 'active' : ''}`}
-          onClick={() => setActiveTab('scene')}
+          onClick={() => selectTab('scene')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Scene ({currentProject?.objects.length || 0})</span>

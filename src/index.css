@@ -261,6 +261,89 @@ html, body, #root {
   z-index: 55;
 }
 
+.editor-topbar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  z-index: 55;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.editor-topbar > * {
+  pointer-events: auto;
+}
+
+.editor-topbar-title {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 8px 0 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+}
+
+.editor-topbar-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.editor-topbar-more {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.editor-more-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+
+.editor-overflow {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 280px;
+  max-height: min(70dvh, 560px);
+  overflow: auto;
+  padding: 8px;
+  border-radius: 16px;
+  z-index: 80;
+  background: #ffffff;
+}
+
+.editor-overflow-rename {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+.editor-overflow-rename input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  padding: 0 10px;
+  font: inherit;
+  color: var(--text-main);
+  background: #ffffff;
+}
+
 /* ============================================
    PHONE CANVAS CHROME — Moblo-style frame
    ============================================ */
