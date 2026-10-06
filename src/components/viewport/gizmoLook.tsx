@@ -89,15 +89,15 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
 };
 
 /**
- * One grip on each hoop.
- * X (red, depth/height): front of the hoop, above center, so the pill stays nearly vertical.
- * Y (green, length/depth): front of the hoop — reads lower on the face when the camera is above.
- * Z (blue, length/height): top of the hoop.
+ * One grip on each hoop, at the middle of the camera-facing quarter.
+ * Those three points are 60° apart on the sphere. The old red and green
+ * angles both sat on the front crossing, about 24° apart, so the pills overlapped.
+ * X ring is YZ, Y ring is XZ, Z ring is XY. Radius stays ROTATE_SPHERE_RADIUS.
  */
 const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI - 0.42,
-  y: Math.PI / 2,
-  z: Math.PI / 2,
+  x: (3 * Math.PI) / 4,
+  y: Math.PI / 4,
+  z: Math.PI / 4,
 };
 
 const SHAFT_START = 1.55;
