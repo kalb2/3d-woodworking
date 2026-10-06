@@ -19,9 +19,10 @@ import { CutListDrawer } from './components/modals/CutListDrawer';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { NewProjectSheet } from './components/modals/NewProjectSheet';
+import { ShareSheet } from './components/share/ShareSheet';
 
 export const App: React.FC = () => {
-  const { loadProjects, selectedObjectId } = useProjectStore();
+  const { loadProjects, selectedObjectId, projects, activeProjectId } = useProjectStore();
   const {
     currentView,
     loadPreferences,
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isCutListOpen, setIsCutListOpen] = useState(false);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -90,6 +92,7 @@ export const App: React.FC = () => {
           onOpenProjectModal={() => setIsProjectModalOpen(true)}
           onOpenCutList={() => setIsCutListOpen(true)}
           onNewProject={() => setIsNewProjectOpen(true)}
+          onShareProject={() => setIsShareOpen(true)}
         />
       )}
 
@@ -103,6 +106,7 @@ export const App: React.FC = () => {
             onOpenProjectModal={() => setIsProjectModalOpen(true)}
             onOpenCutList={() => setIsCutListOpen(true)}
             onNewProject={() => setIsNewProjectOpen(true)}
+            onShareProject={() => setIsShareOpen(true)}
           />
         </>
       )}
@@ -149,6 +153,11 @@ export const App: React.FC = () => {
       <CutListDrawer
         isOpen={isCutListOpen}
         onClose={() => setIsCutListOpen(false)}
+      />
+
+      <ShareSheet
+        project={isShareOpen ? (projects.find((project) => project.id === activeProjectId) ?? null) : null}
+        onClose={() => setIsShareOpen(false)}
       />
     </div>
   );

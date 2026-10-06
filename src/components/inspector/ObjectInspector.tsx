@@ -10,6 +10,7 @@ import { useReliableTap } from '../../utils/reliableTap';
 import { unitScale } from '../../utils/units';
 import type { LengthUnit, RoutedEdge } from '../../types/furniture';
 import { defaultBoardOptions } from '../../utils/boardGeometry';
+import { shapeLabel } from '../../catalog/shapeCatalog';
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
@@ -134,6 +135,7 @@ export const ObjectInspector: React.FC = () => {
             style={{ fontWeight: 600, fontSize: 14 }}
           />
         </div>
+        <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>{shapeLabel(object.shape)}</span>
       </div>
 
       {/* DIMENSIONS SECTION */}

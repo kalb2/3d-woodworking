@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Home,
   Layers,
+  LayoutTemplate,
   Menu,
   Group,
   Move,
@@ -21,12 +22,13 @@ import {
   Settings,
   Share2,
   SlidersHorizontal,
+  Users,
   Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
-import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
+import { exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
@@ -100,17 +102,18 @@ interface PhoneMenuSheetProps {
   onOpenProjectModal: () => void;
   onOpenCutList: () => void;
   onNewProject: () => void;
+  onShareProject: () => void;
 }
 
 export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
   onOpenProjectModal,
   onOpenCutList,
   onNewProject,
+  onShareProject,
 }) => {
-  const { overlays, openOverlay, setOverlayOpen } = useAppStore();
+  const { overlays, openOverlay, setOverlayOpen, openHome } = useAppStore();
   const { activeProjectId, projects, setGizmoMode } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
-  const [copiedNotification, setCopiedNotification] = useState(false);
 
   if (!overlays.menu) return null;
 
@@ -122,22 +125,10 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'furniture'}_render.png`;
+      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'workbench'}_render.png`;
       a.click();
     }
     close();
-  };
-
-  const handleCopyJSON = async () => {
-    if (!currentProject) return;
-    const ok = await copyProjectToClipboard(currentProject);
-    if (ok) {
-      setCopiedNotification(true);
-      setTimeout(() => {
-        setCopiedNotification(false);
-        close();
-      }, 1200);
-    }
   };
 
   return (
@@ -166,7 +157,23 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
           onTap={() => { close(); openOverlay('sidebar', true); }}
         >
           <Box size={18} />
-          <span>Parts</span>
+          <span>Add shapes</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="menu-templates"
+          onTap={() => { close(); openHome('templates'); }}
+        >
+          <LayoutTemplate size={18} />
+          <span>Templates</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="menu-community"
+          onTap={() => { close(); openHome('community'); }}
+        >
+          <Users size={18} />
+          <span>Community</span>
         </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"
@@ -235,10 +242,11 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
         </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"
-          onTap={() => { void handleCopyJSON(); }}
+          data-testid="menu-share"
+          onTap={() => { close(); onShareProject(); }}
         >
-          {copiedNotification ? <Check size={18} /> : <Share2 size={18} />}
-          <span>{copiedNotification ? 'Copied to clipboard' : 'Copy JSON blueprint'}</span>
+          <Share2 size={18} />
+          <span>Share project</span>
         </PhoneTapButton>
       </div>
     </div>

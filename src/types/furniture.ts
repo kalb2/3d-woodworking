@@ -109,10 +109,15 @@ export interface FurnitureProject {
   backgroundColor?: string;
 }
 
+export type TemplateCategory = 'Blocks' | 'Boards' | 'Rounds' | 'Layouts';
+
 export interface PresetTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'Tables' | 'Chairs' | 'Storage' | 'Seating';
+  category: TemplateCategory;
+  /** Included in the on-device Community featured list. */
+  featured?: boolean;
+  author?: string;
   objects: Omit<FurnitureObject, 'id'>[];
 }

@@ -13,7 +13,9 @@ import {
   Home,
   FileCode,
   Share2,
-  Check
+  Check,
+  LayoutTemplate,
+  Users,
 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -25,12 +27,14 @@ interface IPadHeaderProps {
   onOpenProjectModal: () => void;
   onOpenCutList: () => void;
   onNewProject: () => void;
+  onShareProject: () => void;
 }
 
 export const IPadHeader: React.FC<IPadHeaderProps> = ({
   onOpenProjectModal,
   onOpenCutList,
-  onNewProject
+  onNewProject,
+  onShareProject,
 }) => {
   const {
     activeProjectId,
@@ -41,7 +45,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
     projects,
   } = useProjectStore();
 
-  const { setView, overlays, openOverlay, setOverlayOpen } = useAppStore();
+  const { setView, overlays, openOverlay, setOverlayOpen, openHome } = useAppStore();
   const isPhone = useIsPhone();
 
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -58,7 +62,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'furniture'}_render.png`;
+      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'workbench'}_render.png`;
       a.click();
     }
   };
@@ -215,14 +219,54 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
                 position: 'absolute',
                 top: 50,
                 right: 0,
-                width: 220,
+                width: 240,
                 padding: 8,
                 borderRadius: 12,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 4
+                gap: 4,
+                zIndex: 80,
               }}
             >
+              <button
+                className="glass-button"
+                style={{ justifyContent: 'flex-start', width: '100%', fontSize: 13 }}
+                data-testid="header-templates"
+                onClick={() => {
+                  setShowExportMenu(false);
+                  openHome('templates');
+                }}
+              >
+                <LayoutTemplate size={16} />
+                <span>Templates</span>
+              </button>
+
+              <button
+                className="glass-button"
+                style={{ justifyContent: 'flex-start', width: '100%', fontSize: 13 }}
+                data-testid="header-community"
+                onClick={() => {
+                  setShowExportMenu(false);
+                  openHome('community');
+                }}
+              >
+                <Users size={16} />
+                <span>Community</span>
+              </button>
+
+              <button
+                className="glass-button"
+                style={{ justifyContent: 'flex-start', width: '100%', fontSize: 13 }}
+                data-testid="header-share"
+                onClick={() => {
+                  setShowExportMenu(false);
+                  onShareProject();
+                }}
+              >
+                <Share2 size={16} />
+                <span>Share project…</span>
+              </button>
+
               <button
                 className="glass-button"
                 style={{ justifyContent: 'flex-start', width: '100%', fontSize: 13 }}

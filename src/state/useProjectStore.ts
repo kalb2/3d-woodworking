@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
+import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
@@ -48,7 +50,7 @@ export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
   {
     id: 'mdf_4x8_1_2',
     label: '4×8 MDF Sheet (1/2")',
-    description: '96" × 48" × 0.5" — Thinner MDF for panels',
+    description: '96" × 48" × 0.5" — Thinner MDF sheet stock',
     dimensions: { length: 96, width: 48, height: 0.5 },
     material: PRESET_WOOD_MATERIALS.custom_paint,
     shape: 'cube'
@@ -80,74 +82,40 @@ function withLightStartingWood(projects: FurnitureProject[]): FurnitureProject[]
   }));
 }
 
+function defaultSnapSettings(): SnapSettings {
+  return {
+    enabled: true,
+    faceSnap: true,
+    gridSnap: true,
+    gridSize: 0.5,
+    floorCollision: true,
+  };
+}
+
 const createInitialProject = (): FurnitureProject => ({
   id: 'proj_default',
-  name: 'Living Room Coffee Table',
+  name: 'Starter Layout',
   createdAt: Date.now(),
   updatedAt: Date.now(),
   unit: 'in',
   objects: [
     {
-      id: 'tabletop_1',
-      name: 'Table Top',
-      shape: 'bevel_top',
-      dimensions: { length: 48, width: 24, height: 1.5 },
-      position: { x: 0, y: 18, z: 0 },
+      id: 'starter_box',
+      name: 'Box',
+      shape: 'cube',
+      dimensions: { length: 12, width: 12, height: 12 },
+      position: { x: 0, y: 6, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
       material: LIGHT_STARTING_WOOD,
-      visible: true
+      visible: true,
     },
-    {
-      id: 'leg_1',
-      name: 'Front Left Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: -22, y: 8.625, z: -10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_2',
-      name: 'Front Right Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: 22, y: 8.625, z: -10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_3',
-      name: 'Back Left Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: -22, y: 8.625, z: 10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_4',
-      name: 'Back Right Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: 22, y: 8.625, z: 10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    }
   ],
-  snapSettings: {
-    enabled: true,
-    faceSnap: true,
-    gridSnap: true,
-    gridSize: 0.5,
-    floorCollision: true
-  },
+  snapSettings: defaultSnapSettings(),
   showFloor: true,
-  floorOpacity: 0.4
+  floorOpacity: 0.4,
 });
+
+const INITIAL_PROJECT = createInitialProject();
 
 interface ProjectState {
   projects: FurnitureProject[];
@@ -179,7 +147,8 @@ interface ProjectState {
   exitGroup: () => void;
   addObject: (shape: ShapeType, name?: string) => void;
   addWoodPreset: (presetId: string) => void;
-  addPresetTemplate: (templateType: 'table' | 'chair' | 'bookshelf' | 'desk' | 'sofa') => void;
+  createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
+  insertTemplate: (templateId: string) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -198,15 +167,15 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
-  projects: [createInitialProject()],
-  activeProjectId: 'proj_default',
-  selectedObjectId: 'tabletop_1',
-  selectedObjectIds: ['tabletop_1'],
+  projects: [INITIAL_PROJECT],
+  activeProjectId: INITIAL_PROJECT.id,
+  selectedObjectId: INITIAL_PROJECT.objects[0]?.id ?? null,
+  selectedObjectIds: INITIAL_PROJECT.objects[0] ? [INITIAL_PROJECT.objects[0].id] : [],
   multiSelect: false,
   editingGroupId: null,
   activeGizmoMode: 'move',
   showDimensions: true,
-  historyStack: [[...createInitialProject().objects]],
+  historyStack: [[...INITIAL_PROJECT.objects]],
   historyIndex: 0,
 
   loadProjects: () => {
@@ -215,7 +184,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const projects = withLightStartingWood(parsed);
+          const projects = migrateLegacyLabels(withLightStartingWood(parsed));
           const firstId = projects[0].objects[0]?.id ?? null;
           set({
             projects,
@@ -254,7 +223,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   createProject: (name: string, unit: LengthUnit = 'in') => {
     const defaultCube: FurnitureObject = {
       id: `obj_${Date.now()}_cube`,
-      name: 'Starting Cube',
+      name: 'Box',
       shape: 'cube',
       dimensions: { length: 12, width: 12, height: 12 },
       position: { x: 0, y: 6, z: 0 },
@@ -265,18 +234,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const newProj: FurnitureProject = {
       id: `proj_${Date.now()}`,
-      name: name || 'Untitled Furniture',
+      name: name || 'Untitled Project',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       unit,
       objects: [defaultCube],
-      snapSettings: {
-        enabled: true,
-        faceSnap: true,
-        gridSnap: true,
-        gridSize: 0.5,
-        floorCollision: true
-      },
+      snapSettings: defaultSnapSettings(),
       showFloor: true,
       floorOpacity: 0.4
     };
@@ -512,20 +475,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
 
-    const defaultMaterial: WoodMaterial = LIGHT_STARTING_WOOD;
-    const isBoard = shape === 'board';
+    const spec = shapeCatalogEntry(shape);
+    const dimensions = spec?.dimensions ?? { length: 12, width: 12, height: 12 };
+    const baseName = spec?.defaultName ?? 'Box';
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: customName || (isBoard ? 'Board' : `${shape.charAt(0).toUpperCase() + shape.slice(1)} Component`),
+      name: customName || nextStockName(proj.objects.map((object) => object.name), baseName),
       shape,
-      dimensions: isBoard
-        ? { length: 24, width: 16, height: 0.75 }
-        : { length: 12, width: 12, height: 12 },
-      position: { x: 0, y: isBoard ? 0.375 : 6, z: 0 },
+      dimensions: { ...dimensions },
+      position: { x: 0, y: dimensions.height / 2, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: defaultMaterial,
+      material: LIGHT_STARTING_WOOD,
       visible: true,
-      board: isBoard ? defaultBoardOptions() : undefined,
+      board: shape === 'board' ? defaultBoardOptions() : undefined,
     };
 
     const updatedObjects = [...proj.objects, newObj];
@@ -577,61 +539,55 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject();
   },
 
-  addPresetTemplate: (templateType) => {
+  createProjectFromTemplate: (templateId, unit = 'in') => {
+    const template = findTemplate(templateId);
+    const objects = instantiateTemplate(templateId);
+    if (!template || !objects || objects.length === 0) return false;
+
+    const newProj: FurnitureProject = {
+      id: `proj_${Date.now()}`,
+      name: template.name,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      unit,
+      objects,
+      snapSettings: defaultSnapSettings(),
+      showFloor: true,
+      floorOpacity: 0.4,
+    };
+
+    set((state) => ({
+      projects: [...state.projects, newProj],
+      activeProjectId: newProj.id,
+      selectedObjectId: objects[0].id,
+      selectedObjectIds: [objects[0].id],
+      editingGroupId: null,
+      multiSelect: false,
+      historyStack: [[...objects]],
+      historyIndex: 0,
+    }));
+    get().saveCurrentProject();
+    return true;
+  },
+
+  insertTemplate: (templateId) => {
+    const objects = instantiateTemplate(templateId);
+    if (!objects || objects.length === 0) return false;
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
-    const proj = projects.find(p => p.id === activeProjectId);
-    if (!proj) return;
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return false;
 
-    const oak = PRESET_WOOD_MATERIALS.oak;
-    const walnut = PRESET_WOOD_MATERIALS.walnut;
-    const metal = PRESET_WOOD_MATERIALS.metal_accent;
-    let newObjs: FurnitureObject[] = [];
-
-    if (templateType === 'table') {
-      newObjs = [
-        { id: `t_${Date.now()}_top`, name: 'Table Top', shape: 'bevel_top', dimensions: { length: 60, width: 36, height: 2 }, position: { x: 0, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `t_${Date.now()}_l1`, name: 'Leg FL', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: -27, y: 14.5, z: -15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l2`, name: 'Leg FR', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: 27, y: 14.5, z: -15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l3`, name: 'Leg BL', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: -27, y: 14.5, z: 15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l4`, name: 'Leg BR', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: 27, y: 14.5, z: 15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true }
-      ];
-    } else if (templateType === 'chair') {
-      newObjs = [
-        { id: `c_${Date.now()}_seat`, name: 'Chair Seat', shape: 'bevel_top', dimensions: { length: 18, width: 18, height: 1.5 }, position: { x: 0, y: 18, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_back`, name: 'Backrest', shape: 'cube', dimensions: { length: 18, width: 1.5, height: 16 }, position: { x: 0, y: 26, z: 8 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l1`, name: 'Leg FL', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: -7.5, y: 8.625, z: -7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l2`, name: 'Leg FR', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: 7.5, y: 8.625, z: -7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l3`, name: 'Leg BL', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: -7.5, y: 8.625, z: 7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l4`, name: 'Leg BR', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: 7.5, y: 8.625, z: 7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true }
-      ];
-    } else if (templateType === 'bookshelf') {
-      newObjs = [
-        { id: `b_${Date.now()}_side1`, name: 'Left Panel', shape: 'cube', dimensions: { length: 1, width: 14, height: 60 }, position: { x: -16, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_side2`, name: 'Right Panel', shape: 'cube', dimensions: { length: 1, width: 14, height: 60 }, position: { x: 16, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf1`, name: 'Bottom Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf2`, name: 'Middle Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 22, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf3`, name: 'Upper Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 42, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_top`, name: 'Top Panel', shape: 'bevel_top', dimensions: { length: 33, width: 15, height: 1.5 }, position: { x: 0, y: 59.25, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true }
-      ];
-    } else {
-      newObjs = [
-        { id: `m_${Date.now()}`, name: 'Base Component', shape: 'cube', dimensions: { length: 24, width: 24, height: 24 }, position: { x: 0, y: 12, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true }
-      ];
-    }
-
-    const updatedObjects = [...proj.objects, ...newObjs];
-
-    set(state => ({
-      projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects: [...p.objects, ...objects] } : p
       ),
-      selectedObjectId: newObjs[0].id,
-      selectedObjectIds: [newObjs[0].id],
+      selectedObjectId: objects[0].id,
+      selectedObjectIds: [objects[0].id],
       multiSelect: false,
     }));
-
     pushHistoryState();
     saveCurrentProject();
+    return true;
   },
 
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory = false) => {
