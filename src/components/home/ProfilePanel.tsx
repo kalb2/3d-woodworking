@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Cloud, LogOut, RefreshCw, User } from 'lucide-react';
 import { SYNC_SERVER_UNCONFIGURED } from '../../sync/client';
 import { appleSignInUnavailableReason } from '../../sync/appleSignIn';
@@ -84,6 +84,13 @@ export const ProfilePanel: React.FC = () => {
 
   const busy = syncStatus === 'syncing';
   const formLocked = busy || !serverConfigured;
+
+  useEffect(() => {
+    if (status === 'signed-in') {
+      setUsername('');
+      setPassword('');
+    }
+  }, [status]);
 
   function submitAccount(action: (username: string, password: string) => Promise<void>) {
     if (formRef.current && !formRef.current.reportValidity()) return;
