@@ -323,25 +323,28 @@ export const FacePad: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, onPointerDown }) => {
   const faceRef = useRef<THREE.Group>(null);
+  const visualRef = useRef<THREE.Mesh>(null);
   const { camera } = useThree();
   const side = PAD_SIDE;
   const thick = PAD_THICK;
 
   useFrame(() => {
     const face = faceRef.current;
-    if (!face) return;
+    const visual = visualRef.current;
+    if (!face || !visual) return;
     face.updateWorldMatrix(true, false);
     _padNormal.set(0, 1, 0).transformDirection(face.matrixWorld);
     face.getWorldPosition(_padPos);
     _padToCam.copy(camera.position).sub(_padPos);
     const near = _padNormal.dot(_padToCam) > 0;
-    face.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
+    // Shrink only the paint. The grab stays full size so the far side of a sphere still hits.
+    visual.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
   });
 
   return (
     <group ref={faceRef} rotation={FACE_OUT[axis]}>
       <GripSize>
-        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
+        <mesh ref={visualRef} position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
           <boxGeometry args={[side, thick, side]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
@@ -349,6 +352,7 @@ export const FacePad: React.FC<{
           position={[0, thick / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
