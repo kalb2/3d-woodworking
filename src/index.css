@@ -2424,6 +2424,7 @@ html, body, #root {
 .profile-heading p,
 .profile-note,
 .profile-dev p,
+.profile-form p,
 .profile-migration p,
 .profile-danger p {
   margin: 0;
@@ -2446,6 +2447,7 @@ html, body, #root {
 
 .profile-stack,
 .profile-dev,
+.profile-form,
 .profile-migration,
 .profile-danger,
 .profile-actions {
@@ -2455,6 +2457,7 @@ html, body, #root {
 }
 
 .profile-dev,
+.profile-form,
 .profile-migration,
 .profile-danger {
   padding: 14px;
@@ -2488,7 +2491,8 @@ html, body, #root {
   letter-spacing: 0.02em;
 }
 
-.profile-dev label {
+.profile-dev label,
+.profile-form label {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2497,7 +2501,8 @@ html, body, #root {
   color: var(--text-muted);
 }
 
-.profile-dev input {
+.profile-dev input,
+.profile-form input {
   min-height: 44px;
   border-radius: 10px;
   border: 1px solid var(--panel-border);

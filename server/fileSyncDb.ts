@@ -36,8 +36,8 @@ export class FileSyncDb extends MemorySyncDb {
     return this.chain;
   }
 
-  override async createAccount(account: Account) {
-    await super.createAccount(account);
+  override async createAccount(account: Account, passwordHash?: string | null) {
+    await super.createAccount(account, passwordHash);
     await this.persist();
   }
 

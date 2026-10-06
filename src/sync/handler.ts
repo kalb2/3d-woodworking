@@ -1,3 +1,4 @@
+import { hashPassword, normalizeUsername, passwordProblem, verifyPassword } from './password.ts';
 import type { Account, AuthConfig, IdentityResolver, SyncDatabase, SyncRecord } from './types.ts';
 import { API_PREFIX } from './types.ts';
 
@@ -54,6 +55,46 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
 
   if (request.method === 'GET' && path === '/auth/config') return json(config);
 
+  if (request.method === 'POST' && (path === '/auth/signup' || path === '/auth/login')) {
+    let body: { username?: string; password?: string };
+    try {
+      body = await request.json() as { username?: string; password?: string };
+    } catch {
+      return json({ error: 'Expected JSON.' }, 400);
+    }
+    const username = normalizeUsername(body.username || '');
+    if (typeof username !== 'string') return json({ error: username.error }, 400);
+    const password = body.password || '';
+    const passwordError = passwordProblem(password);
+    if (passwordError) return json({ error: passwordError }, 400);
+
+    if (path === '/auth/signup') {
+      const taken = await db.findAccountByUsername(username);
+      if (taken) return json({ error: 'That username is taken.' }, 409);
+      const account: Account = {
+        id: crypto.randomUUID(),
+        appleSub: `name:${username}`,
+        email: '',
+        username,
+        displayName: username,
+        provider: 'password',
+        createdAt: Date.now(),
+      };
+      await db.createAccount(account, await hashPassword(password));
+      const token = crypto.randomUUID();
+      await db.createSession(token, account.id, Date.now());
+      return json({ token, account });
+    }
+
+    const account = await db.findAccountByUsername(username);
+    const storedHash = account ? await db.passwordHashFor(account.id) : null;
+    const matches = storedHash ? await verifyPassword(password, storedHash) : false;
+    if (!account || !matches) return json({ error: 'Username or password is wrong.' }, 401);
+    const token = crypto.randomUUID();
+    await db.createSession(token, account.id, Date.now());
+    return json({ token, account });
+  }
+
   if (request.method === 'POST' && path === '/auth/apple') {
     let body: { identityToken?: string; email?: string; displayName?: string };
     try {
@@ -76,6 +117,7 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
         id: crypto.randomUUID(),
         appleSub: resolved.appleSub,
         email: resolved.email,
+        username: '',
         displayName: resolved.displayName,
         provider: resolved.provider,
         createdAt: Date.now(),
@@ -106,7 +148,9 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     await db.deleteAccount(account.id);
     return json({
       deleted: true,
-      message: 'Workbench projects and this session were deleted. Your Apple ID was not.',
+      message: account.provider === 'apple'
+        ? 'Workbench projects and this session were deleted. Your Apple ID stays in iOS Settings.'
+        : 'Workbench projects and this session were deleted.',
     });
   }
 

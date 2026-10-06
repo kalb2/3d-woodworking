@@ -6,7 +6,9 @@ import {
   pushRecords,
   readStoredSession,
   signInWithIdentity,
+  signInWithPassword,
   signOutRequest,
+  signUpWithPassword,
   SYNC_SERVER_UNCONFIGURED,
   syncServerConfigured,
   writeStoredSession,
@@ -47,6 +49,8 @@ interface AccountState {
   migration: MigrationChoice;
   loadSession: () => Promise<void>;
   signInApple: () => Promise<void>;
+  signUp: (username: string, password: string) => Promise<void>;
+  signInPassword: (username: string, password: string) => Promise<void>;
   signInDev: (displayName: string, email: string) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -198,7 +202,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       set({ config, serverConfigured: true });
     } catch (error) {
       if (epoch !== sessionEpoch) return;
-      const message = errorMessage(error, 'Sync server is unreachable.');
+      const message = errorMessage(error, 'Cloud sync is unreachable. Projects on this device are still here.');
       if (message === SYNC_SERVER_UNCONFIGURED) {
         set({
           status: 'signed-out',
@@ -274,6 +278,32 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         syncStatus: 'error',
         lastError: message,
       });
+    }
+  },
+
+  signUp: async (username, password) => {
+    const epoch = ++sessionEpoch;
+    set({ syncStatus: 'syncing', lastError: null, notice: null });
+    try {
+      const auth = await signUpWithPassword(username, password);
+      if (epoch !== sessionEpoch) return;
+      await applySession(set, get, auth);
+    } catch (error) {
+      if (epoch !== sessionEpoch) return;
+      refuseIfUnconfigured(set, error, 'Could not create the account.');
+    }
+  },
+
+  signInPassword: async (username, password) => {
+    const epoch = ++sessionEpoch;
+    set({ syncStatus: 'syncing', lastError: null, notice: null });
+    try {
+      const auth = await signInWithPassword(username, password);
+      if (epoch !== sessionEpoch) return;
+      await applySession(set, get, auth);
+    } catch (error) {
+      if (epoch !== sessionEpoch) return;
+      refuseIfUnconfigured(set, error, 'Could not sign in.');
     }
   },
 
@@ -382,6 +412,44 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 }));
 
+function refuseIfUnconfigured(
+  set: (partial: Partial<AccountState>) => void,
+  error: unknown,
+  fallback: string,
+) {
+  const message = errorMessage(error, fallback);
+  if (message === SYNC_SERVER_UNCONFIGURED) {
+    set({ status: 'signed-out', serverConfigured: false, syncStatus: 'idle', lastError: null });
+    return;
+  }
+  set({
+    status: 'signed-out',
+    syncStatus: 'error',
+    lastError: message,
+  });
+}
+
+async function applySession(
+  set: (partial: Partial<AccountState>) => void,
+  get: () => AccountState,
+  auth: { token: string; account: Account },
+) {
+  const account = auth.account;
+  writeStoredSession({ token: auth.token, account });
+  const migration = readMigration(account.id) ?? 'needed';
+  set({
+    status: 'signed-in',
+    account,
+    token: auth.token,
+    migration,
+    syncStatus: 'idle',
+    lastError: null,
+    notice: null,
+    serverConfigured: true,
+  });
+  if (migration === 'done') await get().syncNow();
+}
+
 async function finishSignIn(
   set: (partial: Partial<AccountState>) => void,
   get: () => AccountState,
@@ -390,18 +458,7 @@ async function finishSignIn(
   displayName?: string,
 ) {
   const auth = await signInWithIdentity(identityToken, email, displayName);
-  writeStoredSession({ token: auth.token, account: auth.account });
-  const migration = readMigration(auth.account.id) ?? 'needed';
-  set({
-    status: 'signed-in',
-    account: auth.account,
-    token: auth.token,
-    migration,
-    syncStatus: 'idle',
-    lastError: null,
-    notice: null,
-  });
-  if (migration === 'done') await get().syncNow();
+  await applySession(set, get, auth);
 }
 
 setProjectPersistListener((event) => {

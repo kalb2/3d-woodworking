@@ -47,7 +47,7 @@ export function createIdentityResolver(options: IdentityOptions): IdentityResolv
       if (!body.identityToken) return { error: 'Missing identity token.', status: 400 };
       if (body.identityToken.startsWith('dev.')) {
         if (!options.allowDev) {
-          return { error: 'Dev sign-in is disabled. Use Sign in with Apple.', status: 403 };
+          return { error: 'Dev sign-in is disabled.', status: 403 };
         }
         return devIdentity(body);
       }

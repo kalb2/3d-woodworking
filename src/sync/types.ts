@@ -1,11 +1,14 @@
 import type { FurnitureProject } from '../types/furniture.ts';
 
-export type AccountProvider = 'apple' | 'dev';
+export type AccountProvider = 'apple' | 'password' | 'dev';
 
 export interface Account {
   id: string;
+  /** Apple subject, `dev:<email>`, or `name:<username>` for a password account. */
   appleSub: string;
   email: string;
+  /** Set for username accounts. Empty for Apple-only accounts. */
+  username: string;
   displayName: string;
   provider: AccountProvider;
   createdAt: number;
@@ -57,7 +60,9 @@ export interface IdentityResolver {
 
 export interface SyncDatabase {
   findAccountBySub(appleSub: string): Promise<Account | null>;
-  createAccount(account: Account): Promise<void>;
+  findAccountByUsername(username: string): Promise<Account | null>;
+  passwordHashFor(accountId: string): Promise<string | null>;
+  createAccount(account: Account, passwordHash?: string | null): Promise<void>;
   deleteAccount(accountId: string): Promise<void>;
   createSession(token: string, accountId: string, createdAt: number): Promise<void>;
   accountForSession(token: string): Promise<Account | null>;

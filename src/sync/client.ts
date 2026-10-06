@@ -3,7 +3,7 @@ import type { Account, AuthConfig, AuthResponse, SyncPushResponse, SyncRecord } 
 import { API_PREFIX } from './types.ts';
 
 export const SYNC_SERVER_UNCONFIGURED =
-  'Sync server is not configured. Projects stay on this device until the app is built with VITE_SYNC_API_URL.';
+  'Projects stay on this device until cloud sync is turned on.';
 
 const SESSION_KEY = 'workbench_session_v1';
 
@@ -50,7 +50,7 @@ function readBody<T>(text: string): T & { error?: string } {
     if (!trimmed || trimmed.startsWith('<') || trimmed.startsWith('<!')) {
       throw new Error(SYNC_SERVER_UNCONFIGURED);
     }
-    throw new Error('The sync server returned a response this app could not read.');
+    throw new Error('Cloud sync could not read that response. Projects on this device are still here.');
   }
 }
 
@@ -71,6 +71,20 @@ function authHeaders(token: string): HeadersInit {
 
 export function fetchAuthConfig(): Promise<AuthConfig> {
   return request<AuthConfig>('/auth/config');
+}
+
+export function signUpWithPassword(username: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export function signInWithPassword(username: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
 }
 
 export function signInWithIdentity(identityToken: string, email?: string, displayName?: string): Promise<AuthResponse> {

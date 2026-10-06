@@ -4,6 +4,8 @@ import { mergeRecords } from './merge.ts';
 export class MemorySyncDb implements SyncDatabase {
   protected accounts = new Map<string, Account>();
   protected subs = new Map<string, string>();
+  protected usernames = new Map<string, string>();
+  protected passwordHashes = new Map<string, string>();
   protected sessions = new Map<string, string>();
   protected records = new Map<string, SyncRecord[]>();
 
@@ -12,15 +14,30 @@ export class MemorySyncDb implements SyncDatabase {
     return Promise.resolve(id ? this.accounts.get(id) ?? null : null);
   }
 
-  createAccount(account: Account): Promise<void> {
+  findAccountByUsername(username: string): Promise<Account | null> {
+    const id = this.usernames.get(username);
+    return Promise.resolve(id ? this.accounts.get(id) ?? null : null);
+  }
+
+  passwordHashFor(accountId: string): Promise<string | null> {
+    return Promise.resolve(this.passwordHashes.get(accountId) ?? null);
+  }
+
+  createAccount(account: Account, passwordHash?: string | null): Promise<void> {
     this.accounts.set(account.id, account);
-    this.subs.set(account.appleSub, account.id);
+    if (account.appleSub) this.subs.set(account.appleSub, account.id);
+    if (account.username) this.usernames.set(account.username, account.id);
+    if (passwordHash) this.passwordHashes.set(account.id, passwordHash);
     return Promise.resolve();
   }
 
   deleteAccount(accountId: string): Promise<void> {
     const account = this.accounts.get(accountId);
-    if (account) this.subs.delete(account.appleSub);
+    if (account) {
+      this.subs.delete(account.appleSub);
+      if (account.username) this.usernames.delete(account.username);
+    }
+    this.passwordHashes.delete(accountId);
     this.accounts.delete(accountId);
     this.records.delete(accountId);
     return Promise.resolve();
@@ -65,6 +82,7 @@ export class MemorySyncDb implements SyncDatabase {
       accounts: [...this.accounts.values()],
       sessions: [...this.sessions.entries()],
       records: [...this.records.entries()],
+      passwordHashes: [...this.passwordHashes.entries()],
     };
   }
 
@@ -72,16 +90,22 @@ export class MemorySyncDb implements SyncDatabase {
     accounts?: Account[];
     sessions?: [string, string][];
     records?: [string, SyncRecord[]][];
+    passwordHashes?: [string, string][];
   }) {
     this.accounts.clear();
     this.subs.clear();
+    this.usernames.clear();
+    this.passwordHashes.clear();
     this.sessions.clear();
     this.records.clear();
     for (const account of data.accounts ?? []) {
-      this.accounts.set(account.id, account);
-      this.subs.set(account.appleSub, account.id);
+      const stored = { ...account, username: account.username || '' };
+      this.accounts.set(stored.id, stored);
+      if (stored.appleSub) this.subs.set(stored.appleSub, stored.id);
+      if (stored.username) this.usernames.set(stored.username, stored.id);
     }
     for (const [token, accountId] of data.sessions ?? []) this.sessions.set(token, accountId);
     for (const [accountId, records] of data.records ?? []) this.records.set(accountId, records);
+    for (const [accountId, hash] of data.passwordHashes ?? []) this.passwordHashes.set(accountId, hash);
   }
 }

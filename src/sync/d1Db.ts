@@ -15,6 +15,7 @@ interface AccountRow {
   id: string;
   apple_sub: string;
   email: string;
+  username: string | null;
   display_name: string;
   provider: Account['provider'];
   created_at: number;
@@ -32,6 +33,7 @@ function accountFromRow(row: AccountRow): Account {
     id: row.id,
     appleSub: row.apple_sub,
     email: row.email,
+    username: row.username || '',
     displayName: row.display_name,
     provider: row.provider,
     createdAt: row.created_at,
@@ -47,15 +49,39 @@ export class D1SyncDb implements SyncDatabase {
 
   async findAccountBySub(appleSub: string): Promise<Account | null> {
     const row = await this.db.prepare(
-      'SELECT id, apple_sub, email, display_name, provider, created_at FROM accounts WHERE apple_sub = ?',
+      'SELECT id, apple_sub, email, username, display_name, provider, created_at FROM accounts WHERE apple_sub = ?',
     ).bind(appleSub).first<AccountRow>();
     return row ? accountFromRow(row) : null;
   }
 
-  async createAccount(account: Account): Promise<void> {
+  async findAccountByUsername(username: string): Promise<Account | null> {
+    const row = await this.db.prepare(
+      'SELECT id, apple_sub, email, username, display_name, provider, created_at FROM accounts WHERE username = ?',
+    ).bind(username).first<AccountRow>();
+    return row ? accountFromRow(row) : null;
+  }
+
+  async passwordHashFor(accountId: string): Promise<string | null> {
+    const row = await this.db.prepare(
+      'SELECT password_hash FROM accounts WHERE id = ?',
+    ).bind(accountId).first<{ password_hash: string | null }>();
+    return row?.password_hash ?? null;
+  }
+
+  async createAccount(account: Account, passwordHash?: string | null): Promise<void> {
     await this.db.prepare(
-      'INSERT INTO accounts (id, apple_sub, email, display_name, provider, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    ).bind(account.id, account.appleSub, account.email, account.displayName, account.provider, account.createdAt).run();
+      `INSERT INTO accounts (id, apple_sub, email, username, password_hash, display_name, provider, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      account.id,
+      account.appleSub,
+      account.email,
+      account.username,
+      passwordHash ?? null,
+      account.displayName,
+      account.provider,
+      account.createdAt,
+    ).run();
   }
 
   async deleteAccount(accountId: string): Promise<void> {
@@ -71,7 +97,7 @@ export class D1SyncDb implements SyncDatabase {
 
   async accountForSession(token: string): Promise<Account | null> {
     const row = await this.db.prepare(
-      `SELECT a.id, a.apple_sub, a.email, a.display_name, a.provider, a.created_at
+      `SELECT a.id, a.apple_sub, a.email, a.username, a.display_name, a.provider, a.created_at
        FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token = ?`,
     ).bind(token).first<AccountRow>();
     return row ? accountFromRow(row) : null;

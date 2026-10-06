@@ -8,7 +8,7 @@ export interface AppleCredential {
   displayName?: string;
 }
 
-/** Native sheet is iOS-only. The browser build keeps dev sign-in. */
+/** Native sheet is iOS-only. Other platforms use a username and password. */
 export function appleSignInAvailable(): boolean {
   return Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('SignInWithApple');
 }
@@ -16,9 +16,9 @@ export function appleSignInAvailable(): boolean {
 export function appleSignInUnavailableReason(): string | null {
   if (appleSignInAvailable()) return null;
   if (Capacitor.getPlatform() === 'ios') {
-    return 'This iOS build is missing the Sign in with Apple plugin. Sync Capacitor and rebuild in Xcode.';
+    return 'Sign in with Apple is unavailable in this build. Use a username and password.';
   }
-  return 'Sign in with Apple opens in the iOS app. On this browser, use dev sign-in.';
+  return 'Sign in with Apple opens in the iOS app. On this browser, use a username and password.';
 }
 
 export async function authorizeWithApple(): Promise<AppleCredential> {

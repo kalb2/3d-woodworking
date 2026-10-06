@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Cloud, LogOut, RefreshCw, User } from 'lucide-react';
 import { SYNC_SERVER_UNCONFIGURED } from '../../sync/client';
 import { appleSignInUnavailableReason } from '../../sync/appleSignIn';
 import { useAccountStore } from '../../state/useAccountStore';
 import { useAppStore } from '../../state/useAppStore';
+import type { Account } from '../../sync/types';
 
 function formatSynced(at: number | null) {
   if (!at) return 'Not synced yet';
   return `Last synced ${new Date(at).toLocaleString()}`;
+}
+
+function accountLabel(account: Account) {
+  return account.username || account.email || account.displayName;
+}
+
+function providerLabel(provider: Account['provider']) {
+  if (provider === 'apple') return 'Apple';
+  if (provider === 'password') return 'Username';
+  return 'Dev';
 }
 
 export const AccountSyncStrip: React.FC = () => {
@@ -18,16 +29,16 @@ export const AccountSyncStrip: React.FC = () => {
   const migration = useAccountStore((state) => state.migration);
   const setHomeTab = useAppStore((state) => state.setHomeTab);
   const openProfile = () => setHomeTab('profile');
-  const email = account?.email;
+  const label = account ? accountLabel(account) : '';
 
   let detail = 'On this device only';
   if (status === 'loading') detail = 'Checking account…';
   else if (status === 'signed-in') {
-    if (syncStatus === 'syncing') detail = `Syncing ${email ?? 'your account'}…`;
+    if (syncStatus === 'syncing') detail = `Syncing ${label || 'your account'}…`;
     else if (syncStatus === 'error' || syncStatus === 'offline') detail = lastError || 'Sync needs attention';
-    else if (migration === 'needed') detail = `Signed in as ${email}. Save this device to the account from Profile.`;
-    else if (migration === 'skipped') detail = `Signed in as ${email}. This device is not uploading yet.`;
-    else detail = `Synced to ${email}`;
+    else if (migration === 'needed') detail = `Signed in as ${label}. Save this device to the account from Profile.`;
+    else if (migration === 'skipped') detail = `Signed in as ${label}. This device is not uploading yet.`;
+    else detail = `Synced to ${label}`;
   }
 
   return (
@@ -57,19 +68,27 @@ export const ProfilePanel: React.FC = () => {
     migration,
     loadSession,
     signInApple,
-    signInDev,
+    signUp,
+    signInPassword,
     signOut,
     deleteAccount,
     saveAndSync,
     skipMigration,
     syncNow,
   } = useAccountStore();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const appleHint = appleSignInUnavailableReason();
 
   const busy = syncStatus === 'syncing';
+  const formLocked = busy || !serverConfigured;
+
+  function submitAccount(action: (username: string, password: string) => Promise<void>) {
+    if (formRef.current && !formRef.current.reportValidity()) return;
+    void action(username, password);
+  }
 
   return (
     <div className="profile-panel" data-testid="profile-panel">
@@ -78,7 +97,7 @@ export const ProfilePanel: React.FC = () => {
           <span className="profile-avatar"><User size={22} /></span>
           <div>
             <h3>Profile</h3>
-            <p>Sign in with Apple to keep projects on this account across iPhone and iPad.</p>
+            <p>A username keeps projects on this account across iPhone and iPad.</p>
           </div>
         </div>
 
@@ -95,59 +114,81 @@ export const ProfilePanel: React.FC = () => {
 
         {status === 'signed-out' && (
           <div className="profile-stack">
+            <form
+              ref={formRef}
+              className="profile-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitAccount(signUp);
+              }}
+            >
+              <label>
+                Username
+                <input
+                  data-testid="account-username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  pattern="[A-Za-z][A-Za-z0-9_]{2,31}"
+                  title="Use 3–32 characters: a letter, then letters, numbers, or underscores."
+                  required
+                  disabled={formLocked}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  data-testid="account-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  minLength={8}
+                  required
+                  disabled={formLocked}
+                />
+              </label>
+              <div className="profile-actions">
+                <button
+                  type="submit"
+                  className="glass-button active"
+                  data-testid="account-create"
+                  disabled={formLocked}
+                >
+                  <span>Create account</span>
+                </button>
+                <button
+                  type="button"
+                  className="glass-button"
+                  data-testid="account-sign-in"
+                  disabled={formLocked}
+                  onClick={() => submitAccount(signInPassword)}
+                >
+                  <span>Sign in</span>
+                </button>
+              </div>
+            </form>
+            <p className="profile-note">Or</p>
             <button
               type="button"
-              className="glass-button active"
+              className="glass-button"
               data-testid="sign-in-apple"
-              disabled={busy}
+              disabled={formLocked}
               onClick={() => { void signInApple(); }}
             >
               <span>Sign in with Apple</span>
             </button>
             {!appleAvailable && appleHint && (
-              <p className="profile-note">{appleHint}</p>
+              <p className="profile-note" data-testid="apple-hint">{appleHint}</p>
             )}
-            {!config && (
+            {serverConfigured && !config && (
               <button type="button" className="glass-button" onClick={() => { void loadSession(); }}>
                 <RefreshCw size={16} />
-                <span>Retry sync server</span>
+                <span>Try again</span>
               </button>
-            )}
-            {config?.devSignIn && (
-              <form
-                className="profile-dev"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void signInDev(name, email);
-                }}
-              >
-                <strong>Dev sign-in</strong>
-                <p>Same email on two devices joins one account. This path is only on the local sync server.</p>
-                <label>
-                  Display name
-                  <input
-                    data-testid="dev-sign-in-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    autoComplete="name"
-                    required
-                  />
-                </label>
-                <label>
-                  Email
-                  <input
-                    data-testid="dev-sign-in-email"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="email"
-                    required
-                  />
-                </label>
-                <button type="submit" className="glass-button" data-testid="dev-sign-in-submit" disabled={busy}>
-                  <span>Continue</span>
-                </button>
-              </form>
             )}
           </div>
         )}
@@ -156,11 +197,11 @@ export const ProfilePanel: React.FC = () => {
           <div className="profile-stack">
             <div className="profile-identity">
               <strong data-testid="profile-name">{account.displayName}</strong>
-              <span data-testid="profile-email">{account.email}</span>
-              <span className="profile-badge">{account.provider === 'apple' ? 'Apple' : 'Dev'}</span>
+              <span data-testid="profile-email">{accountLabel(account)}</span>
+              <span className="profile-badge" data-testid="profile-provider">{providerLabel(account.provider)}</span>
             </div>
             <p className="profile-note">
-              {config?.mode === 'cloud' ? 'Cloud sync' : 'Dev sync on this computer'}
+              {config?.mode === 'cloud' ? 'Cloud sync' : 'Saved to your account'}
               {' · '}
               {syncStatus === 'syncing' ? 'Syncing…' : formatSynced(lastSyncedAt)}
             </p>
@@ -222,7 +263,9 @@ export const ProfilePanel: React.FC = () => {
             <div className="profile-danger">
               <strong>Delete Workbench account</strong>
               <p>
-                This deletes cloud projects and sessions for this Workbench account. Your Apple ID is not deleted — that stays in iOS Settings. Projects already saved on this device stay until you delete them in the app.
+                {account.provider === 'apple'
+                  ? 'This deletes cloud projects and sessions for this Workbench account. Your Apple ID stays in iOS Settings. Projects already saved on this device stay until you delete them in the app.'
+                  : 'This deletes cloud projects and sessions for this username. Projects already saved on this device stay until you delete them in the app.'}
               </p>
               {confirmDelete ? (
                 <div className="profile-actions">
