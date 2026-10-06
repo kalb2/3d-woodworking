@@ -64,7 +64,7 @@ The D1 database already exists and the remote schema is applied (`accounts`, `se
 | Worker name | `workbench-sync` |
 | Config | `worker/wrangler.toml` |
 
-This cloud VM can see the database, and Wrangler on this VM is not logged in (`npx wrangler whoami` says to run `wrangler login`). The Worker script is not uploaded, so there is no workers.dev URL yet. Do not set `VITE_SYNC_API_URL` until deploy prints one.
+The sync origin for device builds is `https://workbench-sync.k24corp.workers.dev` (no trailing slash). Wrangler on this cloud VM is not logged in, so deploys still run from Kalb-Mini.
 
 From the repo root on Kalb-Mini, with Wrangler 4:
 
@@ -73,7 +73,7 @@ npx wrangler login
 npx wrangler deploy --config worker/wrangler.toml
 ```
 
-Deploy prints an origin like `https://workbench-sync.<account-subdomain>.workers.dev`. That origin, with no trailing slash, is the iOS sync address.
+Deploy should stay on the Worker name `workbench-sync`. The iOS sync address is `https://workbench-sync.k24corp.workers.dev`.
 
 Re-applying the schema is safe (`IF NOT EXISTS`). Use it if the remote tables are missing:
 
@@ -88,15 +88,15 @@ Leave `ALLOW_DEV_AUTH` unset on this Worker. Username accounts and Sign in with 
 After deploy, from the repo root:
 
 ```sh
-printf '%s\n' 'VITE_SYNC_API_URL=https://workbench-sync.<account-subdomain>.workers.dev' > .env.production
+printf '%s\n' 'VITE_SYNC_API_URL=https://workbench-sync.k24corp.workers.dev' > .env.production
 npm run build:ios
 ```
 
-`npm run build:ios` runs `vite build`, which inlines `.env.production`. Replace the host with the origin deploy printed. No trailing slash. Then install that build on the device.
+`npm run build:ios` runs `vite build`, which inlines `.env.production`. No trailing slash. Then install that build on the device.
 
 ## Sign in with Apple on device
 
-The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). Profile is the person icon at the top right of Home and the editor. The primary controls are **Create account** and **Sign in** with a username and password. **Sign in with Apple** sits under those. On iOS it calls `SignInWithApple.authorize`. The browser does not run Apple’s web JS flow; it uses the username form.
+The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). Profile is the person icon at the top right of Home. The primary controls are **Create account** and **Sign in** with a username and password. **Sign in with Apple** sits under those. On iOS it calls `SignInWithApple.authorize`. The browser does not run Apple’s web JS flow; it uses the username form.
 
 A native build with no `VITE_SYNC_API_URL` does not call `/api/v1` on `capacitor://localhost`. Profile stays signed out and shows “Projects stay on this device until cloud sync is turned on.”
 
@@ -108,7 +108,7 @@ On Kalb-Mini, after pulling this branch:
 2. `npm run build:ios`, then `npx cap open ios`. Confirm the App target’s bundle id is `com.antigravity.furniture3d`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
 3. Run on a device. Create a username on the phone. Sign in with Apple is the second button and needs an Apple ID on the device. A build made before `.env.production` exists keeps projects on the device and shows “Projects stay on this device until cloud sync is turned on.”
 
-`capacitor.config.json` `appId` is still `com.antigravity.woodworking3d`. Do not let a Capacitor regenerate replace the Xcode bundle id. The identity-token audience is `com.antigravity.furniture3d`.
+`capacitor.config.json` `appId` is `com.antigravity.furniture3d`, the same id as the Xcode target. Do not delete `ios/` or run `npx cap add ios`. `npx cap sync ios` refreshes the gitignored native config copy and leaves `PRODUCT_BUNDLE_IDENTIFIER` alone. The identity-token audience is `com.antigravity.furniture3d`.
 
 ## Not in this cut
 
