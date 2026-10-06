@@ -10,11 +10,11 @@ enabled = true
 [observability.traces]
 enabled = true
 
-# Replace database_id after `npx wrangler d1 create workbench`.
+# Live D1 database in Kaleb's Cloudflare account. Schema is already applied remotely.
 [[d1_databases]]
 binding = "DB"
 database_name = "workbench"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "e87ee84f-66b3-4e33-9aad-ca20e995534c"
 
 # Secrets (do not commit values):
 #   npx wrangler secret put ALLOW_DEV_AUTH   # "1" only on a private dev worker

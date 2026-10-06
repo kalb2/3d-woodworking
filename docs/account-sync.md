@@ -39,7 +39,7 @@ Apple identity tokens are verified with Apple’s JWKS (RS256, issuer `https://a
 | `VITE_SYNC_API_URL` | app build | Worker origin, no trailing slash. Empty uses the same origin, which is correct for `npm run dev`. A Capacitor build (`capacitor://localhost`) must set this to the deployed Worker or Profile stays on-device with the sentence above. People using the app never see this name. |
 | `ALLOW_DEV_AUTH` | Worker secret | Set to `1` only on a private dev Worker. Production should omit it so dev email tokens are rejected. Username accounts and Apple tokens still work. |
 | `APPLE_AUDIENCE` | Worker secret, optional | Defaults to `com.antigravity.furniture3d`. |
-| D1 binding `DB` | `worker/wrangler.toml` | Database name `workbench`. Replace the placeholder `database_id`. |
+| D1 binding `DB` | `worker/wrangler.toml` | Database name `workbench`, id `e87ee84f-66b3-4e33-9aad-ca20e995534c`. |
 
 Dev data file `.data/sync-dev.json` is gitignored.
 
@@ -51,18 +51,48 @@ Dev data file `.data/sync-dev.json` is gitignored.
 4. On each device, tap **Save and sync**
 5. Rename a project on one device, wait a moment (or tap **Sync now**), then reopen the app or tap **Sync now** on the other
 
-The shared file is `.data/sync-dev.json`. Password hashes live in that file under `passwordHashes`, separate from the account object. Two browser profiles against `http://127.0.0.1:5173` exercise the same path. This cut does not require a Cloudflare deploy.
+The shared file is `.data/sync-dev.json`. Password hashes live in that file under `passwordHashes`, separate from the account object. Two browser profiles against `http://127.0.0.1:5173` exercise the same path. `npm run dev` does not read `.env.production`, so local sync stays on that file.
 
-## Worker deploy (when credentials exist)
+## Worker deploy from Kalb-Mini
+
+The D1 database already exists and the remote schema is applied (`accounts`, `sessions`, `project_records`, and `accounts_username_unique`).
+
+| | |
+| --- | --- |
+| Name | `workbench` |
+| database_id | `e87ee84f-66b3-4e33-9aad-ca20e995534c` |
+| Worker name | `workbench-sync` |
+| Config | `worker/wrangler.toml` |
+
+This cloud VM can see the database, and Wrangler on this VM is not logged in (`npx wrangler whoami` says to run `wrangler login`). The Worker script is not uploaded, so there is no workers.dev URL yet. Do not set `VITE_SYNC_API_URL` until deploy prints one.
+
+From the repo root on Kalb-Mini, with Wrangler 4:
 
 ```sh
-npx wrangler d1 create workbench
-# paste the database_id into worker/wrangler.toml
-npx wrangler d1 execute workbench --file=worker/schema.sql
-npx wrangler deploy
+npx wrangler login
+npx wrangler deploy --config worker/wrangler.toml
 ```
 
-Run those from a Wrangler install (`npx wrangler`); Wrangler is not a package dependency yet. Not required for this cut. A database created before username accounts needs the `ALTER TABLE` lines commented in `worker/schema.sql` (`username`, `password_hash`, then the partial unique index). Set `VITE_SYNC_API_URL` to the Worker origin for iOS builds when you do deploy.
+Deploy prints an origin like `https://workbench-sync.<account-subdomain>.workers.dev`. That origin, with no trailing slash, is the iOS sync address.
+
+Re-applying the schema is safe (`IF NOT EXISTS`). Use it if the remote tables are missing:
+
+```sh
+npx wrangler d1 execute workbench --remote --yes --file=worker/schema.sql --config worker/wrangler.toml
+```
+
+Leave `ALLOW_DEV_AUTH` unset on this Worker. Username accounts and Sign in with Apple work without it.
+
+### iOS build address
+
+After deploy, from the repo root:
+
+```sh
+printf '%s\n' 'VITE_SYNC_API_URL=https://workbench-sync.<account-subdomain>.workers.dev' > .env.production
+npm run build:ios
+```
+
+`npm run build:ios` runs `vite build`, which inlines `.env.production`. Replace the host with the origin deploy printed. No trailing slash. Then install that build on the device.
 
 ## Sign in with Apple on device
 
@@ -74,9 +104,9 @@ Apple sends the email only the first time someone authorizes the app. Later sign
 
 On Kalb-Mini, after pulling this branch:
 
-1. `npm install` then `npm run build:ios` (or `npx cap sync ios` if `dist/` is already built).
-2. `npx cap open ios`. Confirm the App target’s bundle id is `com.antigravity.furniture3d`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
-3. Run on a device. Username sign-in works once the app can reach the API. The Apple sheet is the native plugin and needs an Apple ID on the device. Until `VITE_SYNC_API_URL` points at a deployed Worker, a Capacitor build keeps projects on the device and shows the sentence above.
+1. `npm install`, then the deploy commands above. Put the printed origin in `.env.production`.
+2. `npm run build:ios`, then `npx cap open ios`. Confirm the App target’s bundle id is `com.antigravity.furniture3d`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
+3. Run on a device. Create a username on the phone. Sign in with Apple is the second button and needs an Apple ID on the device. A build made before `.env.production` exists keeps projects on the device and shows “Projects stay on this device until cloud sync is turned on.”
 
 `capacitor.config.json` `appId` is still `com.antigravity.woodworking3d`. Do not let a Capacitor regenerate replace the Xcode bundle id. The identity-token audience is `com.antigravity.furniture3d`.
 
@@ -85,5 +115,4 @@ On Kalb-Mini, after pulling this branch:
 - StoreKit / IAP products (Pro is decided as Apple IAP; see `docs/monetization.md`)
 - Stripe or a web checkout
 - Apple account revocation (deleting the Workbench account does not revoke the Apple ID)
-- A deployed Worker (no Cloudflare credentials in this environment)
 - Remote community (shares stay on the device)
