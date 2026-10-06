@@ -60,6 +60,22 @@ export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
 const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
 const LIGHT_STARTING_WOOD = PRESET_WOOD_MATERIALS.birch;
 
+export type ProjectPersistEvent =
+  | { type: 'save' }
+  | { type: 'delete'; id: string; updatedAt: number };
+
+let persistListener: ((event: ProjectPersistEvent) => void) | null = null;
+let persistSuppressed = false;
+
+export function setProjectPersistListener(listener: ((event: ProjectPersistEvent) => void) | null) {
+  persistListener = listener;
+}
+
+function notifyProjectPersist(event: ProjectPersistEvent) {
+  if (persistSuppressed) return;
+  persistListener?.(event);
+}
+
 function isStartingBoard(object: FurnitureObject): boolean {
   return (
     object.id === 'tabletop_1' ||
@@ -131,6 +147,7 @@ interface ProjectState {
   historyIndex: number;
 
   loadProjects: () => void;
+  replaceAllProjects: (projects: FurnitureProject[]) => void;
   saveCurrentProject: () => void;
   createProject: (name: string, unit?: LengthUnit) => void;
   renameProject: (id: string, newName: string) => void;
@@ -215,8 +232,34 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedProjects));
       set({ projects: updatedProjects });
+      notifyProjectPersist({ type: 'save' });
     } catch (err) {
       console.warn('Failed to auto-save project:', err);
+    }
+  },
+
+  replaceAllProjects: (projects) => {
+    const previousId = get().activeProjectId;
+    const active = projects.find((project) => project.id === previousId) ?? projects[0] ?? null;
+    const selected = active?.objects.find((object) => object.id === get().selectedObjectId)?.id
+      ?? active?.objects[0]?.id
+      ?? null;
+    persistSuppressed = true;
+    try {
+      set({
+        projects,
+        activeProjectId: active?.id ?? '',
+        selectedObjectId: selected,
+        selectedObjectIds: selected ? [selected] : [],
+        editingGroupId: null,
+        historyStack: active ? [[...active.objects]] : [[]],
+        historyIndex: 0,
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+    } catch (err) {
+      console.warn('Failed to apply synced projects:', err);
+    } finally {
+      persistSuppressed = false;
     }
   },
 
@@ -312,6 +355,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     } catch (e) {}
+    notifyProjectPersist({ type: 'delete', id, updatedAt: Date.now() });
   },
 
   switchProject: (id: string) => {

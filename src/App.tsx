@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
+import { useAccountStore } from './state/useAccountStore';
 import { useAppStore } from './state/useAppStore';
 import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
@@ -23,6 +24,7 @@ import { ShareSheet } from './components/share/ShareSheet';
 
 export const App: React.FC = () => {
   const { loadProjects, selectedObjectId, projects, activeProjectId } = useProjectStore();
+  const loadSession = useAccountStore((state) => state.loadSession);
   const {
     currentView,
     loadPreferences,
@@ -41,7 +43,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadProjects();
     loadPreferences();
-  }, [loadProjects, loadPreferences]);
+    void loadSession();
+  }, [loadProjects, loadPreferences, loadSession]);
 
   useEffect(() => {
     if (currentView !== 'editor') return;

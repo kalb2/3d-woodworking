@@ -21,6 +21,7 @@ import {
   Ungroup,
   Settings,
   Share2,
+  User,
   SlidersHorizontal,
   Users,
   Trash2,
@@ -150,6 +151,14 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
         >
           <Settings size={18} />
           <span>Settings</span>
+        </PhoneTapButton>
+        <PhoneTapButton
+          className="phone-sheet-row"
+          data-testid="menu-profile"
+          onTap={() => { close(); openHome('profile'); }}
+        >
+          <User size={18} />
+          <span>Profile</span>
         </PhoneTapButton>
         <PhoneTapButton
           className="phone-sheet-row"

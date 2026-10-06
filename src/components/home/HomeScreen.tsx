@@ -31,6 +31,7 @@ import type { FurnitureObject, PresetTemplate } from '../../types/furniture';
 import { NewProjectSheet } from '../modals/NewProjectSheet';
 import { ShareSheet } from '../share/ShareSheet';
 import { CommunityPanel, TemplatePreviewSheet, TemplatesPanel } from './LibraryPanels';
+import { AccountSyncStrip, ProfilePanel } from './ProfilePanel';
 
 const WELCOME_KEY = 'workbench_welcome_dismissed_v1';
 
@@ -303,6 +304,7 @@ export const HomeScreen: React.FC = () => {
         <button
           className={`home-tab ${homeTab === 'profile' ? 'active' : ''}`}
           onClick={() => setHomeTab('profile')}
+          data-testid="home-tab-profile"
         >
           <User size={18} />
           <span>Profile</span>
@@ -322,6 +324,7 @@ export const HomeScreen: React.FC = () => {
         {/* PROJECTS TAB */}
         {homeTab === 'projects' && (
           <div>
+            <AccountSyncStrip />
             {showWelcome && (
               <div className="home-welcome" data-testid="home-welcome">
                 <div>
@@ -695,22 +698,7 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* PROFILE TAB */}
-        {homeTab === 'profile' && (
-          <div className="placeholder-section">
-            <div className="icon-large">
-              <User size={36} color="var(--accent-primary)" />
-            </div>
-            <span className="coming-badge">Cloud Sync Coming Soon</span>
-            <h3>Woodworker Profile & Cloud Workspace</h3>
-            <p>
-              Sign in with your Google or Apple account to synchronize projects, cut lists, and material presets across your devices. Accounts are not connected in this build.
-            </p>
-            <div className="glass-panel" style={{ padding: 16, borderRadius: 12, display: 'inline-flex', flexDirection: 'column', gap: 8, alignItems: 'center', marginTop: 12 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Local Device Storage Active</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>{projects.length} Saved Projects Stored Locally</span>
-            </div>
-          </div>
-        )}
+        {homeTab === 'profile' && <ProfilePanel />}
 
         {homeTab === 'community' && (
           <CommunityPanel

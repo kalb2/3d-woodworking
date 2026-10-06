@@ -1,0 +1,23 @@
+name = "workbench-sync"
+main = "../src/sync/worker.ts"
+compatibility_date = "2026-10-06"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers Logs and traces. Tokens stay out of log lines in the handler.
+[observability]
+enabled = true
+
+[observability.traces]
+enabled = true
+
+# Replace database_id after `npx wrangler d1 create workbench`.
+[[d1_databases]]
+binding = "DB"
+database_name = "workbench"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Secrets (do not commit values):
+#   npx wrangler secret put ALLOW_DEV_AUTH   # "1" only on a private dev worker
+# APPLE_AUDIENCE defaults to com.antigravity.furniture3d inside the worker.
+# Optional override:
+#   npx wrangler secret put APPLE_AUDIENCE

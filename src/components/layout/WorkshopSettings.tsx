@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Magnet } from 'lucide-react';
+import { Grid, Magnet, User } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -49,9 +49,10 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
 /** Floor and Magnet live here so the dock stays focused on building tools. */
 export const WorkshopSettings: React.FC = () => {
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen } = useAppStore();
+  const { overlays, setOverlayOpen, openHome } = useAppStore();
   const { projects, activeProjectId, toggleFloor, updateSnapSettings } = useProjectStore();
   const currentProject = projects.find((project) => project.id === activeProjectId);
+  const openProfile = useReliableTap(() => openHome('profile'));
 
   if (!overlays.settings || !currentProject) return null;
 
@@ -77,6 +78,19 @@ export const WorkshopSettings: React.FC = () => {
         on={magnetOn}
         onToggle={() => updateSnapSettings({ enabled: !magnetOn })}
       />
+      <button
+        type="button"
+        className="settings-row"
+        data-testid="settings-profile"
+        onClick={openProfile}
+        onPointerUp={openProfile}
+      >
+        <span className="settings-row-icon"><User size={18} strokeWidth={1.8} /></span>
+        <span className="settings-row-copy">
+          <strong>Profile</strong>
+          <span>Sign in and sync projects</span>
+        </span>
+      </button>
     </div>
   );
 
