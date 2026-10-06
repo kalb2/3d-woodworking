@@ -9,29 +9,25 @@ export interface MeshExtents {
   kind: MeshKind;
 }
 
+/** Finite size used for meshes and grips. Zero or NaN collapses the matrix and can kill the GPU. */
+export function positiveSize(value: number, floor = 0.01): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return floor;
+  return Math.max(n, floor);
+}
+
 /**
- * Half-extents of the *drawn* mesh, not the authored AABB.
- * Cylinders / poles use min(length, width) / 2. Spheres use min(l, w, h) / 2.
+ * Half-extents of the drawn mesh. Each axis follows its own dimension, including
+ * spheres and round parts, so a face pull changes that axis the way a box does.
  */
 export function meshExtents(shape: ShapeType, dimensions: Dimensions3D): MeshExtents {
-  const hy = Math.max(dimensions.height, 0.01) / 2;
+  const hx = positiveSize(dimensions.length) / 2;
+  const hy = positiveSize(dimensions.height) / 2;
+  const hz = positiveSize(dimensions.width) / 2;
 
-  if (shape === 'cylinder' || shape === 'pole') {
-    const radius = Math.max(Math.min(dimensions.length, dimensions.width), 0.01) / 2;
-    return { hx: radius, hy, hz: radius, kind: 'cylinder' };
-  }
-
-  if (shape === 'sphere') {
-    const radius = Math.max(Math.min(dimensions.length, dimensions.width, dimensions.height), 0.01) / 2;
-    return { hx: radius, hy: radius, hz: radius, kind: 'sphere' };
-  }
-
-  return {
-    hx: Math.max(dimensions.length, 0.01) / 2,
-    hy,
-    hz: Math.max(dimensions.width, 0.01) / 2,
-    kind: 'box',
-  };
+  if (shape === 'cylinder' || shape === 'pole') return { hx, hy, hz, kind: 'cylinder' };
+  if (shape === 'sphere') return { hx, hy, hz, kind: 'sphere' };
+  return { hx, hy, hz, kind: 'box' };
 }
 
 export type FaceAxis = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';

@@ -95,7 +95,7 @@ export const App: React.FC = () => {
 
       {isPhone && (
         <>
-          <PhoneBottomSheet hasSelection={hasSelection}>
+          <PhoneBottomSheet>
             <SidebarNav />
             <ObjectInspector />
           </PhoneBottomSheet>

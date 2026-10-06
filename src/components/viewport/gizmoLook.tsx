@@ -89,15 +89,15 @@ const RING_ROTATION: Record<'x' | 'y' | 'z', [number, number, number]> = {
 };
 
 /**
- * One grip on each hoop.
- * X (red, depth/height): front of the hoop, above center, so the pill stays nearly vertical.
- * Y (green, length/depth): front of the hoop — reads lower on the face when the camera is above.
- * Z (blue, length/height): top of the hoop.
+ * One grip on each hoop, at the middle of the camera-facing quarter.
+ * Those three points are 60° apart on the sphere. The old red and green
+ * angles both sat on the front crossing, about 24° apart, so the pills overlapped.
+ * X ring is YZ, Y ring is XZ, Z ring is XY. Radius stays ROTATE_SPHERE_RADIUS.
  */
 const SIDE_PILL_ANGLE: Record<'x' | 'y' | 'z', number> = {
-  x: Math.PI - 0.42,
-  y: Math.PI / 2,
-  z: Math.PI / 2,
+  x: (3 * Math.PI) / 4,
+  y: Math.PI / 4,
+  z: Math.PI / 4,
 };
 
 const SHAFT_START = 1.55;
@@ -323,25 +323,28 @@ export const FacePad: React.FC<{
   onPointerDown: (event: any) => void;
 }> = ({ axis, color, active, onPointerDown }) => {
   const faceRef = useRef<THREE.Group>(null);
+  const visualRef = useRef<THREE.Mesh>(null);
   const { camera } = useThree();
   const side = PAD_SIDE;
   const thick = PAD_THICK;
 
   useFrame(() => {
     const face = faceRef.current;
-    if (!face) return;
+    const visual = visualRef.current;
+    if (!face || !visual) return;
     face.updateWorldMatrix(true, false);
     _padNormal.set(0, 1, 0).transformDirection(face.matrixWorld);
     face.getWorldPosition(_padPos);
     _padToCam.copy(camera.position).sub(_padPos);
     const near = _padNormal.dot(_padToCam) > 0;
-    face.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
+    // Shrink only the paint. The grab stays full size so the far side of a sphere still hits.
+    visual.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
   });
 
   return (
     <group ref={faceRef} rotation={FACE_OUT[axis]}>
       <GripSize>
-        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
+        <mesh ref={visualRef} position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
           <boxGeometry args={[side, thick, side]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
@@ -349,6 +352,7 @@ export const FacePad: React.FC<{
           position={[0, thick / 2, 0]}
           renderOrder={22}
           frustumCulled={false}
+          raycast={raycastInFrontOfSolid}
           onPointerDown={(event) => {
             event.stopPropagation();
             onPointerDown(event);
