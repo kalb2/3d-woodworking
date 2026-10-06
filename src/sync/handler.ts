@@ -69,6 +69,9 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     if ('error' in resolved) return json({ error: resolved.error }, resolved.status);
     let account = await db.findAccountBySub(resolved.appleSub);
     if (!account) {
+      if (!resolved.email) {
+        return json({ error: 'Apple did not share an email. Sign in again and allow email.', status: 400 });
+      }
       account = {
         id: crypto.randomUUID(),
         appleSub: resolved.appleSub,

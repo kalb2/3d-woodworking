@@ -1,25 +1,6 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { SignInWithApple } from '@capacitor-community/apple-sign-in';
+import { Capacitor } from '@capacitor/core';
 import { APPLE_AUDIENCE } from './types.ts';
-
-interface AppleAuthorization {
-  response: {
-    user?: string;
-    email?: string | null;
-    givenName?: string | null;
-    familyName?: string | null;
-    identityToken?: string | null;
-  };
-}
-
-interface AppleSignInPlugin {
-  authorize(options: {
-    clientId: string;
-    redirectURI: string;
-    scopes: string;
-  }): Promise<AppleAuthorization>;
-}
-
-const SignInWithApple = registerPlugin<AppleSignInPlugin>('SignInWithApple');
 
 export interface AppleCredential {
   identityToken: string;
@@ -27,13 +8,22 @@ export interface AppleCredential {
   displayName?: string;
 }
 
+/** Native sheet is iOS-only. The browser build keeps dev sign-in. */
 export function appleSignInAvailable(): boolean {
-  return Capacitor.isPluginAvailable('SignInWithApple');
+  return Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('SignInWithApple');
+}
+
+export function appleSignInUnavailableReason(): string | null {
+  if (appleSignInAvailable()) return null;
+  if (Capacitor.getPlatform() === 'ios') {
+    return 'This iOS build is missing the Sign in with Apple plugin. Sync Capacitor and rebuild in Xcode.';
+  }
+  return 'Sign in with Apple opens in the iOS app. On this browser, use dev sign-in.';
 }
 
 export async function authorizeWithApple(): Promise<AppleCredential> {
   if (!appleSignInAvailable()) {
-    throw new Error('Sign in with Apple is not in this build. Add the iOS capability and @capacitor-community/apple-sign-in, then sync.');
+    throw new Error(appleSignInUnavailableReason() ?? 'Sign in with Apple is unavailable.');
   }
   const result = await SignInWithApple.authorize({
     clientId: APPLE_AUDIENCE,

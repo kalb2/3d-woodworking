@@ -58,14 +58,17 @@ Run those from a Wrangler install (`npx wrangler`); Wrangler is not a package de
 
 ## Sign in with Apple on device
 
-The Xcode bundle id is `com.antigravity.furniture3d`. Add the Sign in with Apple capability for that id, then:
+The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). The Profile button calls `SignInWithApple.authorize` on iOS. The browser still uses dev sign-in; Apple’s web JS flow is not configured.
 
-```sh
-npm i @capacitor-community/apple-sign-in
-npx cap sync ios
-```
+Apple sends the email only the first time someone authorizes the app. Later sign-ins use the same Apple subject. A brand-new account still needs that first email.
 
-Until that plugin is in the iOS build, the Apple button explains what is missing. Dev sign-in is the working path on the Vite server.
+On Kalb-Mini, after pulling this branch:
+
+1. `npm install` then `npm run build:ios` (or `npx cap sync ios` if `dist/` is already built).
+2. `npx cap open ios`. Confirm the App target’s bundle id is `com.antigravity.furniture3d`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
+3. Run on a device or simulator signed into an Apple ID. The Apple sheet is the native plugin. The sync API is not inside the app: set `VITE_SYNC_API_URL` to a deployed Worker before `npm run build`, or the token is collected and the account request fails because `capacitor://localhost` has no `/api/v1`.
+
+`capacitor.config.json` `appId` is still `com.antigravity.woodworking3d`. Do not let a Capacitor regenerate replace the Xcode bundle id. The identity-token audience is `com.antigravity.furniture3d`.
 
 ## Not in this cut
 

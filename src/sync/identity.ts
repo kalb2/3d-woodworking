@@ -54,10 +54,7 @@ export function createIdentityResolver(options: IdentityOptions): IdentityResolv
       try {
         const verified = await verifyAppleIdentityToken(body.identityToken, options.appleAudience);
         const email = (verified.email || body.email || '').trim().toLowerCase();
-        if (!email) {
-          return { error: 'Apple did not share an email. Sign in again and allow email.', status: 400 };
-        }
-        const displayName = (body.displayName || email.split('@')[0]).trim();
+        const displayName = (body.displayName || (email ? email.split('@')[0] : 'Apple user')).trim();
         return { appleSub: verified.sub, email, displayName, provider: 'apple' };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Apple identity token was rejected.';

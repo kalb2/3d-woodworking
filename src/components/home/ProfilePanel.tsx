@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Cloud, LogOut, RefreshCw, User } from 'lucide-react';
+import { appleSignInUnavailableReason } from '../../sync/appleSignIn';
 import { useAccountStore } from '../../state/useAccountStore';
 import { useAppStore } from '../../state/useAppStore';
 
@@ -64,6 +65,7 @@ export const ProfilePanel: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const appleHint = appleSignInUnavailableReason();
 
   const busy = syncStatus === 'syncing';
 
@@ -94,11 +96,8 @@ export const ProfilePanel: React.FC = () => {
             >
               <span>Sign in with Apple</span>
             </button>
-            {!appleAvailable && (
-              <p className="profile-note">
-                This build does not include the Sign in with Apple plugin yet. Add the iOS capability and
-                {' '}<code>@capacitor-community/apple-sign-in</code>, then run cap sync. Dev sign-in works on the Vite server until then.
-              </p>
+            {!appleAvailable && appleHint && (
+              <p className="profile-note">{appleHint}</p>
             )}
             {!config && (
               <button type="button" className="glass-button" onClick={() => { void loadSession(); }}>
