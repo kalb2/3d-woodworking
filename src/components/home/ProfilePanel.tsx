@@ -188,16 +188,18 @@ export const ProfilePanel: React.FC = () => {
             )}
 
             <div className="profile-actions">
-              <button
-                type="button"
-                className="glass-button"
-                data-testid="profile-sync-now"
-                disabled={busy}
-                onClick={() => { void syncNow(); }}
-              >
-                <RefreshCw size={16} />
-                <span>Sync now</span>
-              </button>
+              {migration !== 'needed' && (
+                <button
+                  type="button"
+                  className="glass-button"
+                  data-testid="profile-sync-now"
+                  disabled={busy}
+                  onClick={() => { void syncNow(); }}
+                >
+                  <RefreshCw size={16} />
+                  <span>Sync now</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="glass-button"

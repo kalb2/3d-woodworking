@@ -147,6 +147,7 @@ async function pushLocal(token: string, accountId: string) {
 }
 
 let syncTimer: number | null = null;
+let sessionEpoch = 0;
 
 function scheduleSync() {
   if (syncTimer !== null) window.clearTimeout(syncTimer);
@@ -172,18 +173,22 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   migration: 'needed',
 
   loadSession: async () => {
+    const epoch = ++sessionEpoch;
     set({ appleAvailable: appleSignInAvailable() });
     const stored = readStoredSession();
     try {
       const config = await fetchAuthConfig();
+      if (epoch !== sessionEpoch) return;
       set({ config });
     } catch (error) {
+      if (epoch !== sessionEpoch) return;
       set({
         syncStatus: 'offline',
         lastError: errorMessage(error, 'Sync server is unreachable.'),
       });
     }
 
+    if (epoch !== sessionEpoch) return;
     if (!stored) {
       set({ status: 'signed-out', account: null, token: null });
       return;
@@ -191,6 +196,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
     try {
       const { account } = await fetchMe(stored.token);
+      if (epoch !== sessionEpoch) return;
       writeStoredSession({ token: stored.token, account });
       const migration = readMigration(account.id) ?? 'needed';
       set({
@@ -202,6 +208,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       });
       if (migration === 'done') void get().syncNow();
     } catch (error) {
+      if (epoch !== sessionEpoch) return;
       if (isUnauthorized(error)) {
         writeStoredSession(null);
         set({ status: 'signed-out', account: null, token: null, lastError: null });
@@ -220,11 +227,14 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   signInApple: async () => {
+    const epoch = ++sessionEpoch;
     set({ syncStatus: 'syncing', lastError: null, notice: null });
     try {
       const credential = await authorizeWithApple();
+      if (epoch !== sessionEpoch) return;
       await finishSignIn(set, get, credential.identityToken, credential.email, credential.displayName);
     } catch (error) {
+      if (epoch !== sessionEpoch) return;
       set({
         status: get().account ? 'signed-in' : 'signed-out',
         syncStatus: 'error',
@@ -234,11 +244,14 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   signInDev: async (displayName, email) => {
+    const epoch = ++sessionEpoch;
     set({ syncStatus: 'syncing', lastError: null, notice: null });
     try {
       const token = createDevIdentityToken(email.trim(), displayName.trim());
+      if (epoch !== sessionEpoch) return;
       await finishSignIn(set, get, token, email.trim(), displayName.trim());
     } catch (error) {
+      if (epoch !== sessionEpoch) return;
       set({
         status: get().account ? 'signed-in' : 'signed-out',
         syncStatus: isOffline(error) ? 'offline' : 'error',
