@@ -19,22 +19,43 @@ import {
   Share2,
   Box,
   Compass,
-  X
+  X,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
-import { exportProjectJSON, importProjectFromJSON, copyProjectToClipboard } from '../../utils/exportUtils';
+import { exportProjectJSON, importProjectFromJSON } from '../../utils/exportUtils';
+import { listDeviceShares, removeDeviceShare, type DeviceShare } from '../../utils/share';
+import type { FurnitureObject, PresetTemplate } from '../../types/furniture';
 import { NewProjectSheet } from '../modals/NewProjectSheet';
+import { ShareSheet } from '../share/ShareSheet';
+import { CommunityPanel, TemplatePreviewSheet, TemplatesPanel } from './LibraryPanels';
+import { AccountSyncStrip, ProfilePanel } from './ProfilePanel';
+
+const WELCOME_KEY = 'workbench_welcome_dismissed_v1';
+
+type PreviewState =
+  | { kind: 'template'; template: PresetTemplate }
+  | { kind: 'share'; share: DeviceShare };
 
 export const HomeScreen: React.FC = () => {
   const isPhone = useIsPhone();
-  const [activeTab, setActiveTab] = useState<'projects' | 'presets' | 'profile' | 'community' | 'tutorials'>('projects');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [deviceShares, setDeviceShares] = useState<DeviceShare[]>(() => listDeviceShares());
+  const [shareProject, setShareProject] = useState<Parameters<typeof exportProjectJSON>[0] | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return localStorage.getItem(WELCOME_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,10 +66,17 @@ export const HomeScreen: React.FC = () => {
     renameProject,
     duplicateProject,
     deleteProject,
-    importProject
+    importProject,
+    createProjectFromTemplate,
   } = useProjectStore();
 
-  const { setView, preferences, updatePreferences } = useAppStore();
+  const { setView, preferences, updatePreferences, homeTab, setHomeTab } = useAppStore();
+
+  const refreshShares = () => setDeviceShares(listDeviceShares());
+
+  useEffect(() => {
+    if (homeTab === 'community') refreshShares();
+  }, [homeTab]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -97,15 +125,59 @@ export const HomeScreen: React.FC = () => {
     showToast(`Exported "${proj.name}.json"`);
   };
 
-  const handleCopyShare = async (e: React.MouseEvent, proj: any) => {
-    e.stopPropagation();
-    const ok = await copyProjectToClipboard(proj);
-    if (ok) {
-      showToast('Project JSON copied to clipboard!');
-    } else {
-      showToast('Failed to copy to clipboard');
+  const handleShare = (event: React.MouseEvent, project: typeof projects[number]) => {
+    event.stopPropagation();
+    setShareProject(project);
+  };
+
+  const startTemplate = (templateId: string) => {
+    const ok = createProjectFromTemplate(templateId, preferences.defaultUnit);
+    if (!ok) {
+      showToast('Could not start that template.');
+      return;
+    }
+    setPreview(null);
+    setView('editor');
+  };
+
+  const openDeviceShare = (share: DeviceShare) => {
+    const imported = importProjectFromJSON(JSON.stringify({ project: share.project }));
+    if (!imported) {
+      showToast('Could not open that share.');
+      return;
+    }
+    imported.name = share.title;
+    importProject(imported);
+    setPreview(null);
+    setView('editor');
+  };
+
+  const importPastedPayload = (text: string): string | null => {
+    const imported = importProjectFromJSON(text);
+    if (!imported) return 'That text is not a Workbench share payload.';
+    importProject(imported);
+    setPreview(null);
+    showToast(`Imported “${imported.name}”.`);
+    setView('editor');
+    return null;
+  };
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    try {
+      localStorage.setItem(WELCOME_KEY, '1');
+    } catch {
+      // the banner can return next launch
     }
   };
+
+  const previewRows = (objects: FurnitureObject[]) =>
+    objects.map((object) => ({
+      id: object.id ?? object.name,
+      name: object.name,
+      shape: object.shape,
+      size: `${object.dimensions.length} × ${object.dimensions.width} × ${object.dimensions.height} in`,
+    }));
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -172,6 +244,18 @@ export const HomeScreen: React.FC = () => {
           </div>
         </div>
 
+        <div className="home-header-end">
+        <button
+          type="button"
+          className={`home-profile-btn${homeTab === 'profile' ? ' is-active' : ''}`}
+          data-testid="home-profile"
+          aria-label="Profile"
+          title="Profile"
+          onClick={() => setHomeTab('profile')}
+        >
+          <User size={18} />
+        </button>
+
         <div className="home-header-actions">
           <button
             className="glass-button"
@@ -190,45 +274,49 @@ export const HomeScreen: React.FC = () => {
             <span>New Project</span>
           </button>
         </div>
+        </div>
       </header>
 
       {/* Navigation Tabs */}
       <nav className="home-tabs">
         <button
-          className={`home-tab ${activeTab === 'projects' ? 'active' : ''}`}
-          onClick={() => setActiveTab('projects')}
+          className={`home-tab ${homeTab === 'projects' ? 'active' : ''}`}
+          onClick={() => setHomeTab('projects')}
+          data-testid="home-tab-projects"
         >
           <FolderOpen size={18} />
           <span>Projects ({projects.length})</span>
         </button>
 
         <button
-          className={`home-tab ${activeTab === 'presets' ? 'active' : ''}`}
-          onClick={() => setActiveTab('presets')}
+          className={`home-tab ${homeTab === 'templates' ? 'active' : ''}`}
+          onClick={() => setHomeTab('templates')}
+          data-testid="home-tab-templates"
         >
-          <Sliders size={18} />
-          <span>{isPhone ? 'Presets' : 'Presets & Preferences'}</span>
+          <LayoutTemplate size={18} />
+          <span>Templates</span>
         </button>
 
         <button
-          className={`home-tab ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <User size={18} />
-          <span>Profile</span>
-        </button>
-
-        <button
-          className={`home-tab ${activeTab === 'community' ? 'active' : ''}`}
-          onClick={() => setActiveTab('community')}
+          className={`home-tab ${homeTab === 'community' ? 'active' : ''}`}
+          onClick={() => setHomeTab('community')}
+          data-testid="home-tab-community"
         >
           <Users size={18} />
           <span>Community</span>
         </button>
 
         <button
-          className={`home-tab ${activeTab === 'tutorials' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tutorials')}
+          className={`home-tab ${homeTab === 'presets' ? 'active' : ''}`}
+          onClick={() => setHomeTab('presets')}
+        >
+          <Sliders size={18} />
+          <span>{isPhone ? 'Presets' : 'Presets & Preferences'}</span>
+        </button>
+
+        <button
+          className={`home-tab ${homeTab === 'tutorials' ? 'active' : ''}`}
+          onClick={() => setHomeTab('tutorials')}
         >
           <GraduationCap size={18} />
           <span>Tutorials</span>
@@ -238,7 +326,39 @@ export const HomeScreen: React.FC = () => {
       {/* Content Area */}
       <main className="home-content">
         {/* PROJECTS TAB */}
-        {activeTab === 'projects' && (
+        {homeTab === 'projects' && (
+          <div>
+            <AccountSyncStrip />
+            {showWelcome && (
+              <div className="home-welcome" data-testid="home-welcome">
+                <div>
+                  <strong>Build with shapes and stock</strong>
+                  <p>Add boxes, planks, and round stock in the editor. Or start from a template and share it on this device.</p>
+                </div>
+                <div className="home-welcome-actions">
+                  <button type="button" className="glass-button active" onClick={() => setHomeTab('templates')}>
+                    <LayoutTemplate size={16} />
+                    <span>Templates</span>
+                  </button>
+                  <button type="button" className="glass-button" onClick={() => setHomeTab('community')}>
+                    <Users size={16} />
+                    <span>Community</span>
+                  </button>
+                  <button type="button" className="home-welcome-dismiss" onClick={dismissWelcome} aria-label="Dismiss welcome">
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+            {projects.length === 0 && (
+              <div className="library-empty" data-testid="projects-empty">
+                <Box size={28} />
+                <div>
+                  <strong>No projects yet</strong>
+                  <p>Create a blank project or start from a template.</p>
+                </div>
+              </div>
+            )}
           <div className="projects-grid">
             {/* Desktop / iPad create card — phone uses the FAB instead */}
             <div className="new-project-card" onClick={handleCreateNew}>
@@ -247,7 +367,7 @@ export const HomeScreen: React.FC = () => {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-main)' }}>Create New Project</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Start from an editable starting cube</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Blank project with a starter box</div>
               </div>
             </div>
 
@@ -335,8 +455,9 @@ export const HomeScreen: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={(e) => handleCopyShare(e, proj)}
-                      title="Copy JSON to Clipboard"
+                      onClick={(e) => handleShare(e, proj)}
+                      title="Share project"
+                      data-testid={`project-share-${proj.id}`}
                     >
                       <Share2 size={13} />
                     </button>
@@ -362,10 +483,18 @@ export const HomeScreen: React.FC = () => {
               );
             })}
           </div>
+          </div>
+        )}
+
+        {homeTab === 'templates' && (
+          <TemplatesPanel
+            onStart={startTemplate}
+            onPreview={(template) => setPreview({ kind: 'template', template })}
+          />
         )}
 
         {/* PRESETS & PREFERENCES TAB */}
-        {activeTab === 'presets' && (
+        {homeTab === 'presets' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-main)' }}>
@@ -573,39 +702,26 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* PROFILE TAB */}
-        {activeTab === 'profile' && (
-          <div className="placeholder-section">
-            <div className="icon-large">
-              <User size={36} color="var(--accent-primary)" />
-            </div>
-            <span className="coming-badge">Cloud Sync Coming Soon</span>
-            <h3>Woodworker Profile & Cloud Workspace</h3>
-            <p>
-              Sign in with your Google or Apple account to seamlessly synchronize your custom furniture designs, cut lists, and material presets across all your iPad, desktop, and workshop devices.
-            </p>
-            <div className="glass-panel" style={{ padding: 16, borderRadius: 12, display: 'inline-flex', flexDirection: 'column', gap: 8, alignItems: 'center', marginTop: 12 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Local Device Storage Active</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>{projects.length} Saved Projects Stored Locally</span>
-            </div>
-          </div>
-        )}
+        {homeTab === 'profile' && <ProfilePanel />}
 
-        {/* COMMUNITY TAB */}
-        {activeTab === 'community' && (
-          <div className="placeholder-section">
-            <div className="icon-large">
-              <Users size={36} color="var(--accent-primary)" />
-            </div>
-            <span className="coming-badge">Community Hub Coming Soon</span>
-            <h3>Maker Showcase & Shared Blueprints</h3>
-            <p>
-              Discover and remix community-created dining tables, credenzas, floating shelves, and fine woodworking blueprints with full cut lists and assembly instructions.
-            </p>
-          </div>
+        {homeTab === 'community' && (
+          <CommunityPanel
+            shares={deviceShares}
+            onStartTemplate={startTemplate}
+            onPreviewTemplate={(template) => setPreview({ kind: 'template', template })}
+            onOpenShare={openDeviceShare}
+            onPreviewShare={(share) => setPreview({ kind: 'share', share })}
+            onRemoveShare={(id) => {
+              removeDeviceShare(id);
+              refreshShares();
+              showToast('Removed from this device');
+            }}
+            onImportPayload={importPastedPayload}
+          />
         )}
 
         {/* TUTORIALS TAB */}
-        {activeTab === 'tutorials' && (
+        {homeTab === 'tutorials' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-main)' }}>
@@ -621,7 +737,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">1</div>
                 <div>
                   <h4>Start with Shapes & Standard Cuts</h4>
-                  <p>Open the Shapes tab in the left sidebar to add standard 4×8 plywood, 2×4 dimensional lumber, or basic boxes, cylinders, and bevel tops.</p>
+                  <p>Open Add in the editor for boxes, planks, dowels, and standard sheet stock. Or start a project from Templates.</p>
                 </div>
               </div>
 
@@ -637,7 +753,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">3</div>
                 <div>
                   <h4>Transparent Floor Barrier</h4>
-                  <p>The ground plane prevents wood parts from falling below the shop floor (Y ≥ 0) and anchors your legs and base components accurately.</p>
+                  <p>The ground plane keeps stock from falling below the shop floor (Y ≥ 0).</p>
                 </div>
               </div>
 
@@ -645,7 +761,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">4</div>
                 <div>
                   <h4>Magnetic Surface Snapping</h4>
-                  <p>Turn on Magnet mode to automatically snap table legs to tabletops and align panels edge-to-edge with 1.2" smart proximity.</p>
+                  <p>Turn on Magnet mode to snap faces together and align edges when shapes get close.</p>
                 </div>
               </div>
 
@@ -661,7 +777,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">6</div>
                 <div>
                   <h4>Generate Cut Lists & Share</h4>
-                  <p>Click "Cut List" in the header to view exact board dimensions and export your bill of materials to CSV spreadsheet or JSON project backup.</p>
+                  <p>Open Cut List for exact stock sizes, then Share to copy a payload, download JSON, or publish the project on this device.</p>
                 </div>
               </div>
             </div>
@@ -698,6 +814,39 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setIsNewProjectOpen(false)}
         onCreated={() => setView('editor')}
       />
+
+      <ShareSheet
+        project={shareProject}
+        onClose={() => setShareProject(null)}
+        onPublished={() => {
+          refreshShares();
+          showToast('Published to Community on this device');
+        }}
+      />
+
+      {preview?.kind === 'template' && (
+        <TemplatePreviewSheet
+          title={preview.template.name}
+          description={preview.template.description}
+          badge={preview.template.category}
+          rows={previewRows(preview.template.objects.map((object, index) => ({ ...object, id: `${preview.template.id}-${index}` })))}
+          startLabel="Start project"
+          onClose={() => setPreview(null)}
+          onStart={() => startTemplate(preview.template.id)}
+        />
+      )}
+
+      {preview?.kind === 'share' && (
+        <TemplatePreviewSheet
+          title={preview.share.title}
+          description="Saved on this device. Opening it makes a new editable copy."
+          badge="On this device"
+          rows={previewRows(preview.share.project.objects)}
+          startLabel="Open copy"
+          onClose={() => setPreview(null)}
+          onStart={() => openDeviceShare(preview.share)}
+        />
+      )}
 
       {isImportSheetOpen && (
         <div

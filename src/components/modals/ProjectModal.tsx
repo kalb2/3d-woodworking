@@ -162,7 +162,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) =
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             className="glass-input"
-            placeholder="New Project Title (e.g. Dining Chair Set)..."
+            placeholder="New project title (e.g. Box study)..."
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {

@@ -92,12 +92,21 @@ function initialOverlayVisibility(): OverlayVisibility {
   return { ...ALL_OVERLAYS_CLOSED };
 }
 
+export type HomeTab = 'projects' | 'templates' | 'community' | 'presets' | 'profile' | 'tutorials';
+
+export type SidebarPanel = 'shapes' | 'templates' | 'scene';
+
 interface AppState {
   currentView: 'home' | 'editor';
+  homeTab: HomeTab;
   preferences: AppPreferences;
   overlays: OverlayVisibility;
+  sidebarPanel: SidebarPanel;
 
   setView: (view: 'home' | 'editor') => void;
+  setHomeTab: (tab: HomeTab) => void;
+  openHome: (tab?: HomeTab) => void;
+  setSidebarPanel: (panel: SidebarPanel) => void;
   updatePreferences: (updates: Partial<AppPreferences>) => void;
   loadPreferences: () => void;
   setOverlayOpen: (id: OverlayId, open: boolean) => void;
@@ -108,10 +117,23 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentView: 'home',
+  homeTab: 'projects',
   preferences: { ...DEFAULT_PREFS },
   overlays: initialOverlayVisibility(),
+  sidebarPanel: 'shapes',
 
   setView: (view) => set({ currentView: view }),
+
+  setHomeTab: (tab) => set({ homeTab: tab }),
+
+  setSidebarPanel: (panel) => set({ sidebarPanel: panel }),
+
+  openHome: (tab) =>
+    set({
+      currentView: 'home',
+      homeTab: tab ?? get().homeTab,
+      overlays: { ...ALL_OVERLAYS_CLOSED },
+    }),
 
   updatePreferences: (updates) => {
     const newPrefs = { ...get().preferences, ...updates };

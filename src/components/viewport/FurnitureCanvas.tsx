@@ -130,14 +130,15 @@ export const FurnitureCanvas: React.FC = () => {
 
         {/* Orbit Camera controls for iPad.
             Default touch gestures: 1-finger = orbit, 2-finger = dolly+pan.
-            Gizmo handles disable controls.enabled during drag to prevent conflicts. */}
+            Gizmo handles disable controls.enabled during drag to prevent conflicts.
+            Distances are inches. 250 stopped a phone on a 4×8 sheet; 4000 frames a bunk or a small shop. */}
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault
           enableDamping
           dampingFactor={0.08}
           minDistance={10}
-          maxDistance={250}
+          maxDistance={4000}
           maxPolarAngle={Math.PI / 2 + 0.05}
         />
 

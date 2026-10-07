@@ -44,6 +44,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
   ];
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
+    if (!e.point || !Number.isFinite(e.point.x) || !Number.isFinite(e.point.y) || !Number.isFinite(e.point.z)) return;
     e.stopPropagation();
     (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
 
@@ -83,6 +84,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
       if (!session) return;
 
       const rect = gl.domElement.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return;
       const mouse = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
         -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -94,23 +96,20 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
       if (raycaster.ray.intersectPlane(session.dragPlane, currentIntersection)) {
         const worldDelta = currentIntersection.clone().sub(session.startPoint);
         const localDelta = worldDelta.clone().applyMatrix4(session.inverseRotationMatrix);
+        if (!Number.isFinite(localDelta.x) || !Number.isFinite(localDelta.y) || !Number.isFinite(localDelta.z)) return;
 
         const newDim = { ...session.startDimensions };
-        const minSize = 0.5;
+        const resized = (start: number, delta: number) => {
+          const next = start + delta;
+          return Number.isFinite(next) ? Math.max(0.5, next) : Math.max(0.5, start);
+        };
 
-        if (session.axis === '+x') {
-          newDim.length = Math.max(minSize, session.startDimensions.length + localDelta.x * 2);
-        } else if (session.axis === '-x') {
-          newDim.length = Math.max(minSize, session.startDimensions.length - localDelta.x * 2);
-        } else if (session.axis === '+y') {
-          newDim.height = Math.max(minSize, session.startDimensions.height + localDelta.y * 2);
-        } else if (session.axis === '-y') {
-          newDim.height = Math.max(minSize, session.startDimensions.height - localDelta.y * 2);
-        } else if (session.axis === '+z') {
-          newDim.width = Math.max(minSize, session.startDimensions.width + localDelta.z * 2);
-        } else if (session.axis === '-z') {
-          newDim.width = Math.max(minSize, session.startDimensions.width - localDelta.z * 2);
-        }
+        if (session.axis === '+x') newDim.length = resized(session.startDimensions.length, localDelta.x * 2);
+        else if (session.axis === '-x') newDim.length = resized(session.startDimensions.length, -localDelta.x * 2);
+        else if (session.axis === '+y') newDim.height = resized(session.startDimensions.height, localDelta.y * 2);
+        else if (session.axis === '-y') newDim.height = resized(session.startDimensions.height, -localDelta.y * 2);
+        else if (session.axis === '+z') newDim.width = resized(session.startDimensions.width, localDelta.z * 2);
+        else if (session.axis === '-z') newDim.width = resized(session.startDimensions.width, -localDelta.z * 2);
 
         updateObject(object.id, { dimensions: newDim }, true);
       }

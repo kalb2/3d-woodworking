@@ -1,36 +1,56 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Cylinder,
   Circle,
   Triangle,
   LayoutGrid,
-  Armchair,
-  Table,
-  BookOpen,
   Eye,
   EyeOff,
   Trash2,
   Copy,
   Layers,
-  RectangleHorizontal
+  RectangleHorizontal,
+  Blend,
 } from 'lucide-react';
+import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
+import { PROJECT_TEMPLATES } from '../../catalog/templates';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
-import { useAppStore } from '../../state/useAppStore';
+import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
-import type { FurnitureObject, ShapeType } from '../../types/furniture';
+import type { FurnitureObject } from '../../types/furniture';
+
+const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
+  cube: Box,
+  wedge: Triangle,
+  cushion: Blend,
+  board: RectangleHorizontal,
+  bevel_top: LayoutGrid,
+  cylinder: Cylinder,
+  pole: Cylinder,
+  sphere: Circle,
+};
 
 export const SidebarNav: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'shapes' | 'templates' | 'scene'>('shapes');
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen } = useAppStore();
+  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel } = useAppStore();
+  const [activeTab, setActiveTab] = useState<SidebarPanel>(sidebarPanel);
+
+  useEffect(() => {
+    setActiveTab(sidebarPanel);
+  }, [sidebarPanel]);
+
+  const selectTab = (panel: SidebarPanel) => {
+    setActiveTab(panel);
+    setSidebarPanel(panel);
+  };
   const {
     addObject,
     addWoodPreset,
-    addPresetTemplate,
+    insertTemplate,
     projects,
     activeProjectId,
     selectedObjectId,
@@ -42,18 +62,18 @@ export const SidebarNav: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
+  const lastAddAt = useRef(0);
+  const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
+    fireReliableTap(event, () => {
+      const now = performance.now();
+      if (now - lastAddAt.current < 400) return;
+      lastAddAt.current = now;
+      action();
+      setOverlayOpen('sidebar', false);
+    });
+  };
 
   if (!overlays.sidebar) return null;
-
-  const shapes: { type: ShapeType; label: string; icon: any }[] = [
-    { type: 'bevel_top', label: 'Beveled Tabletop', icon: LayoutGrid },
-    { type: 'board', label: 'Board / Panel', icon: RectangleHorizontal },
-    { type: 'cube', label: 'Box / Panel', icon: Box },
-    { type: 'cylinder', label: 'Round Leg / Pole', icon: Cylinder },
-    { type: 'sphere', label: 'Sphere Knob', icon: Circle },
-    { type: 'wedge', label: 'Triangular Wedge', icon: Triangle },
-    { type: 'cushion', label: 'Soft Cushion', icon: Armchair }
-  ];
 
   return (
     <aside
@@ -81,7 +101,7 @@ export const SidebarNav: React.FC = () => {
         gap: 8,
         padding: '8px 10px 4px',
       }}>
-        <span className={isPhone ? 'phone-sheet-title' : undefined} style={isPhone ? undefined : { fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Parts</span>
+        <span className={isPhone ? 'phone-sheet-title' : undefined} style={isPhone ? undefined : { fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Add</span>
         <OverlayDismissButton onDismiss={() => setOverlayOpen('sidebar', false)} />
       </div>
 
@@ -94,7 +114,7 @@ export const SidebarNav: React.FC = () => {
       }}>
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'shapes' ? ' is-active' : ''}` : `glass-button ${activeTab === 'shapes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('shapes')}
+          onClick={() => selectTab('shapes')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Shapes</span>
@@ -102,15 +122,15 @@ export const SidebarNav: React.FC = () => {
 
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'templates' ? ' is-active' : ''}` : `glass-button ${activeTab === 'templates' ? 'active' : ''}`}
-          onClick={() => setActiveTab('templates')}
+          onClick={() => selectTab('templates')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
-          <span>Starters</span>
+          <span>Layouts</span>
         </button>
 
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'scene' ? ' is-active' : ''}` : `glass-button ${activeTab === 'scene' ? 'active' : ''}`}
-          onClick={() => setActiveTab('scene')}
+          onClick={() => selectTab('scene')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
           <span>Scene ({currentProject?.objects.length || 0})</span>
@@ -118,55 +138,70 @@ export const SidebarNav: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+      <div style={{ flex: isPhone ? 'none' : 1, overflowY: isPhone ? 'visible' : 'auto', padding: 12 }}>
         {/* SHAPES TAB */}
         {activeTab === 'shapes' && (
           <div style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {!isPhone && (
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Basic Shapes
-            </div>
-            )}
-
-            <div className={isPhone ? 'phone-shape-grid' : undefined} style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {shapes.map(({ type, label, icon: Icon }) => (
-              <button
-                key={type}
-                type="button"
-                data-testid={`shape-${type}`}
-                className={isPhone ? 'phone-shape-cell' : 'glass-button'}
-                onClick={isPhone ? undefined : () => addObject(type)}
-                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addObject(type)) : undefined}
-                style={isPhone ? undefined : {
-                  justifyContent: 'flex-start',
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: 'rgba(255, 255, 255, 0.05)'
-                }}
-              >
-                <div className={isPhone ? 'phone-shape-cell-icon' : undefined} style={isPhone ? undefined : {
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  background: 'rgba(224, 159, 62, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10
-                }}>
-                  <Icon size={isPhone ? 22 : 16} color={isPhone ? '#64748b' : '#e09f3e'} strokeWidth={isPhone ? 1.5 : 2} />
+            {SHAPE_GROUPS.map((group) => {
+              const entries = SHAPE_CATALOG.filter((entry) => entry.group === group);
+              return (
+                <div key={group}>
+                  <div style={{
+                    fontSize: 12,
+                    fontWeight: isPhone ? 500 : 600,
+                    color: isPhone ? '#94a3b8' : '#9ca3af',
+                    textTransform: isPhone ? 'none' : 'uppercase',
+                    letterSpacing: isPhone ? 0 : 0.5,
+                    margin: isPhone ? '4px 4px 0' : '0 0 8px',
+                  }}>
+                    {group}
+                  </div>
+                  <div className={isPhone ? 'phone-shape-grid' : undefined} style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {entries.map((entry) => {
+                      const Icon = SHAPE_ICONS[entry.type];
+                      return (
+                        <button
+                          key={entry.type}
+                          type="button"
+                          data-testid={`shape-${entry.type}`}
+                          aria-label={entry.label}
+                          className={isPhone ? 'phone-shape-cell' : 'glass-button'}
+                          onClick={addPart(() => addObject(entry.type))}
+                          onPointerUp={addPart(() => addObject(entry.type))}
+                          style={isPhone ? undefined : {
+                            justifyContent: 'flex-start',
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'rgba(255, 255, 255, 0.05)'
+                          }}
+                        >
+                          <div className={isPhone ? 'phone-shape-cell-icon' : undefined} style={isPhone ? undefined : {
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            background: 'rgba(224, 159, 62, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 10
+                          }}>
+                            <Icon size={isPhone ? 22 : 16} color={isPhone ? '#64748b' : '#e09f3e'} strokeWidth={isPhone ? 1.5 : 2} />
+                          </div>
+                          {isPhone ? (
+                            <span>{entry.shortLabel}</span>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.label}</span>
+                              <span style={{ fontSize: 10, color: '#9ca3af' }}>{entry.hint}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                {isPhone ? (
-                  <span>{label.replace('Beveled ', '').replace(' / Panel', '').replace(' / Pole', '')}</span>
-                ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
-                  <span style={{ fontSize: 10, color: '#9ca3af' }}>Click to spawn on canvas</span>
-                </div>
-                )}
-              </button>
-            ))}
-            </div>
+              );
+            })}
 
             {/* Standard Lumber & Sheet Stock Presets */}
             <div style={{
@@ -186,9 +221,11 @@ export const SidebarNav: React.FC = () => {
               <button
                 key={preset.id}
                 type="button"
+                data-testid={`preset-${preset.id}`}
+                aria-label={preset.label}
                 className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-                onClick={isPhone ? undefined : () => addWoodPreset(preset.id)}
-                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addWoodPreset(preset.id)) : undefined}
+                onClick={addPart(() => addWoodPreset(preset.id))}
+                onPointerUp={addPart(() => addWoodPreset(preset.id))}
                 style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
@@ -228,44 +265,39 @@ export const SidebarNav: React.FC = () => {
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Pre-built Furniture Assemblies
+              Shape layouts
             </div>
-
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.45 }}>
+              Drop a starter into this project, or open the Templates tab to begin a new one.
+            </p>
             <button
-              className="glass-button"
-              onClick={() => addPresetTemplate('table')}
-              style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
+              type="button"
+              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+              data-testid="browse-templates"
+              onClick={addPart(() => openHome('templates'))}
+              onPointerUp={addPart(() => openHome('templates'))}
+              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '10px 12px' }}
             >
-              <Table size={20} color="#e09f3e" style={{ marginRight: 10 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Dining Table</span>
-                <span style={{ fontSize: 11, color: '#9ca3af' }}>Top & 4 Round Metal Legs</span>
-              </div>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Browse templates</span>
             </button>
-
-            <button
-              className="glass-button"
-              onClick={() => addPresetTemplate('chair')}
-              style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
-            >
-              <Armchair size={20} color="#e09f3e" style={{ marginRight: 10 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Modern Chair</span>
-                <span style={{ fontSize: 11, color: '#9ca3af' }}>Beveled Seat & Backrest</span>
-              </div>
-            </button>
-
-            <button
-              className="glass-button"
-              onClick={() => addPresetTemplate('bookshelf')}
-              style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
-            >
-              <BookOpen size={20} color="#e09f3e" style={{ marginRight: 10 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Standing Bookshelf</span>
-                <span style={{ fontSize: 11, color: '#9ca3af' }}>Vertical Side Panels & Shelves</span>
-              </div>
-            </button>
+            {PROJECT_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+                data-testid={`insert-template-${template.id}`}
+                aria-label={template.name}
+                onClick={addPart(() => { insertTemplate(template.id); })}
+                onPointerUp={addPart(() => { insertTemplate(template.id); })}
+                style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
+              >
+                <Layers size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{template.name}</span>
+                  <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>{template.description}</span>
+                </div>
+              </button>
+            ))}
           </div>
         )}
 
@@ -273,7 +305,7 @@ export const SidebarNav: React.FC = () => {
         {activeTab === 'scene' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-              Active Furniture Parts
+              Shapes in this project
             </div>
 
             {currentProject?.objects.filter((obj) => !obj.parentId).map((obj) => (
@@ -338,8 +370,9 @@ const SceneRow: React.FC<{
             onChange={() => selectObject(obj.id, { additive: true })}
             style={{ width: 18, height: 18 }}
           />
-          <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400 }}>
-            {obj.name}
+          <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.name}</span>
+            <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>{shapeLabel(obj.shape)}</span>
           </span>
         </label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

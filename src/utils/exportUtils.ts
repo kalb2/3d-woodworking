@@ -1,4 +1,6 @@
+import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
+import { buildSharePayload } from './share';
 
 export interface CutListItem {
   id: string;
@@ -27,7 +29,7 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
       map.set(key, {
         id: obj.id,
         name: obj.name,
-        shape: obj.shape.replace('_', ' ').toUpperCase(),
+        shape: shapeLabel(obj.shape),
         length: `${obj.dimensions.length.toFixed(1)} ${unit}`,
         width: `${obj.dimensions.width.toFixed(1)} ${unit}`,
         height: `${obj.dimensions.height.toFixed(1)} ${unit}`,
@@ -64,12 +66,7 @@ export function exportCutListCSV(project: FurnitureProject) {
 }
 
 export function exportProjectJSON(project: FurnitureProject) {
-  const projectData = {
-    formatVersion: 1,
-    exportedAt: new Date().toISOString(),
-    project
-  };
-  const json = JSON.stringify(projectData, null, 2);
+  const json = JSON.stringify(buildSharePayload(project), null, 2);
   downloadFile(
     `${project.name.toLowerCase().replace(/\s+/g, '_')}.json`,
     json,
@@ -78,12 +75,7 @@ export function exportProjectJSON(project: FurnitureProject) {
 }
 
 export async function copyProjectToClipboard(project: FurnitureProject): Promise<boolean> {
-  const projectData = {
-    formatVersion: 1,
-    exportedAt: new Date().toISOString(),
-    project
-  };
-  const json = JSON.stringify(projectData, null, 2);
+  const json = JSON.stringify(buildSharePayload(project), null, 2);
 
   try {
     await navigator.clipboard.writeText(json);

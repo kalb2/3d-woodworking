@@ -1,33 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  Box,
-  Camera,
   Check,
   Copy,
-  FileCode,
-  FileSpreadsheet,
-  FolderOpen,
-  Home,
-  Layers,
-  Menu,
   Ellipsis,
   Group,
+  Home,
   Move,
   Pencil,
   Plus,
   RotateCw,
-  Ruler,
   Scaling,
   Ungroup,
-  Settings,
-  Share2,
-  SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
-import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
+import { EditorOverflowList } from './EditorOverflow';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
 import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
@@ -43,7 +32,7 @@ const PhoneTapButton: React.FC<PhoneTapButtonProps> = ({ onTap, type = 'button',
 };
 
 export const PhoneCanvasHeader: React.FC = () => {
-  const { setView, openOverlay } = useAppStore();
+  const { setView, openOverlay, overlays, setOverlayOpen } = useAppStore();
   const { projects, activeProjectId, setUnit } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const unit = currentProject?.unit ?? 'in';
@@ -84,62 +73,39 @@ export const PhoneCanvasHeader: React.FC = () => {
         </PhoneTapButton>
       </div>
 
-      <PhoneTapButton
-        className="phone-header-icon-btn"
-        onTap={() => openOverlay('menu', true)}
-        title="Project menu"
-        aria-label="Project menu"
-        data-testid="canvas-menu"
-      >
-        <Menu size={20} />
-      </PhoneTapButton>
+      <div className="phone-header-actions">
+        <PhoneTapButton
+          className="phone-header-icon-btn"
+          onTap={() => {
+            if (overlays.menu) setOverlayOpen('menu', false);
+            else openOverlay('menu', true);
+          }}
+          title="More"
+          aria-label="More"
+          aria-expanded={overlays.menu}
+          data-testid="editor-overflow"
+        >
+          <Ellipsis size={20} />
+        </PhoneTapButton>
+      </div>
     </header>
   );
 };
 
 interface PhoneMenuSheetProps {
-  onOpenProjectModal: () => void;
   onOpenCutList: () => void;
-  onNewProject: () => void;
+  onShareProject: () => void;
 }
 
 export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
-  onOpenProjectModal,
   onOpenCutList,
-  onNewProject,
+  onShareProject,
 }) => {
-  const { overlays, openOverlay, setOverlayOpen } = useAppStore();
-  const { activeProjectId, projects, setGizmoMode } = useProjectStore();
-  const currentProject = projects.find((p) => p.id === activeProjectId);
-  const [copiedNotification, setCopiedNotification] = useState(false);
+  const { overlays, setOverlayOpen } = useAppStore();
 
   if (!overlays.menu) return null;
 
   const close = () => setOverlayOpen('menu', false);
-
-  const handleCapturePNG = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'furniture'}_render.png`;
-      a.click();
-    }
-    close();
-  };
-
-  const handleCopyJSON = async () => {
-    if (!currentProject) return;
-    const ok = await copyProjectToClipboard(currentProject);
-    if (ok) {
-      setCopiedNotification(true);
-      setTimeout(() => {
-        setCopiedNotification(false);
-        close();
-      }, 1200);
-    }
-  };
 
   return (
     <div
@@ -149,112 +115,24 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
     >
       <PhoneSheetGrab />
       <div className="phone-sheet-header">
-        <span className="phone-sheet-title">Project</span>
+        <span className="phone-sheet-title">More</span>
         <OverlayDismissButton onDismiss={close} />
       </div>
       <div className="phone-sheet-body">
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="tool-settings"
-          onTap={() => { close(); openOverlay('settings', true); }}
-        >
-          <Settings size={18} />
-          <span>Settings</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="overlay-launch-shapes"
-          onTap={() => { close(); openOverlay('sidebar', true); }}
-        >
-          <Box size={18} />
-          <span>Parts</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="overlay-launch-properties"
-          onTap={() => { close(); openOverlay('inspector', true); }}
-        >
-          <SlidersHorizontal size={18} />
-          <span>Properties</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="tool-dims"
-          onTap={() => { close(); setGizmoMode('move'); }}
-        >
-          <Ruler size={18} />
-          <span>Measure</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => { close(); onOpenProjectModal(); }}
-        >
-          <FolderOpen size={18} />
-          <span>Switch project</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          data-testid="menu-new-project"
-          onTap={() => {
-            close();
-            onNewProject();
-          }}
-        >
-          <Plus size={18} />
-          <span>New project</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => { close(); onOpenCutList(); }}
-        >
-          <Layers size={18} />
-          <span>Cut list</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => {
-            if (currentProject) exportCutListCSV(currentProject);
-            close();
-          }}
-        >
-          <FileSpreadsheet size={18} />
-          <span>Export CSV cut list</span>
-        </PhoneTapButton>
-        <PhoneTapButton className="phone-sheet-row" onTap={handleCapturePNG}>
-          <Camera size={18} />
-          <span>Snapshot image (PNG)</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => {
-            if (currentProject) exportProjectJSON(currentProject);
-            close();
-          }}
-        >
-          <FileCode size={18} />
-          <span>Export project (.json)</span>
-        </PhoneTapButton>
-        <PhoneTapButton
-          className="phone-sheet-row"
-          onTap={() => { void handleCopyJSON(); }}
-        >
-          {copiedNotification ? <Check size={18} /> : <Share2 size={18} />}
-          <span>{copiedNotification ? 'Copied to clipboard' : 'Copy JSON blueprint'}</span>
-        </PhoneTapButton>
+        <EditorOverflowList
+          onOpenCutList={onOpenCutList}
+          onShareProject={onShareProject}
+          onClose={close}
+        />
       </div>
     </div>
   );
 };
 
-interface PhoneCanvasDockProps {
-  hasSelection: boolean;
-}
-
-export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: React.ReactNode }> = ({
-  hasSelection,
+export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
   children,
 }) => {
-  const { overlays, openOverlay } = useAppStore();
+  const { overlays, openOverlay, setSidebarPanel } = useAppStore();
   const {
     projects,
     activeProjectId,
@@ -270,16 +148,10 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     duplicateObject,
     deleteObject,
   } = useProjectStore();
-  const [partMenuOpen, setPartMenuOpen] = useState(false);
-
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
   const groupId = selectedObject?.shape === 'group' ? selectedObject.id : editingGroupId;
-
-  useEffect(() => {
-    setPartMenuOpen(false);
-  }, [selectedObjectId]);
 
   return (
     <div
@@ -293,58 +165,15 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           <WorkshopSettings />
         </div>
       )}
-      {hasSelection && selectedObject && (
-        <div className="phone-selected-part" data-testid="selected-part-chip">
-          <span className="phone-selected-part-name" title={selectedObject.name}>
-            {selectedObject.name}
-          </span>
-          <PhoneTapButton
-            className="phone-selected-part-delete"
-            onTap={() => deleteObject(selectedObject.id)}
-            aria-label={`Delete ${selectedObject.name}`}
-            title="Delete part"
-            data-testid="selected-part-delete"
-          >
-            <Trash2 size={15} strokeWidth={1.8} />
-            <span>Delete</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className={`phone-selected-part-more${partMenuOpen ? ' is-open' : ''}`}
-            onTap={() => setPartMenuOpen((open) => !open)}
-            aria-label="Part actions"
-            aria-expanded={partMenuOpen}
-            title="Part actions"
-            data-testid="selected-part-menu"
-          >
-            <Ellipsis size={18} strokeWidth={1.8} />
-          </PhoneTapButton>
-          {partMenuOpen && (
-            <div className="phone-selected-part-menu" role="menu" data-testid="selected-part-menu-list">
-              <PhoneTapButton
-                className="phone-sheet-row"
-                onTap={() => {
-                  duplicateObject(selectedObject.id);
-                  setPartMenuOpen(false);
-                }}
-                data-testid="selected-part-menu-duplicate"
-              >
-                <Copy size={16} />
-                <span>Duplicate</span>
-              </PhoneTapButton>
-              <PhoneTapButton
-                className="phone-sheet-row is-danger"
-                onTap={() => {
-                  deleteObject(selectedObject.id);
-                  setPartMenuOpen(false);
-                }}
-                data-testid="selected-part-menu-delete"
-              >
-                <Trash2 size={16} />
-                <span>Delete</span>
-              </PhoneTapButton>
-            </div>
-          )}
-        </div>
+      {selectedObject && !overlays.inspector && (
+        <PhoneTapButton
+          className="phone-properties-entry"
+          data-testid="phone-properties"
+          aria-label="Properties"
+          onTap={() => openOverlay('inspector')}
+        >
+          Properties
+        </PhoneTapButton>
       )}
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem
@@ -401,7 +230,10 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
           icon={<Plus size={22} strokeWidth={1.8} />}
           active={false}
           showLabel
-          onTap={() => openOverlay('sidebar')}
+          onTap={() => {
+            setSidebarPanel('shapes');
+            openOverlay('sidebar');
+          }}
         />
         {selectedObjectIds.length >= 2 && (
           <DockItem
