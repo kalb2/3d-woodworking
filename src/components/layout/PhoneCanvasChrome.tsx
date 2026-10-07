@@ -165,6 +165,16 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           <WorkshopSettings />
         </div>
       )}
+      {selectedObject && !overlays.inspector && (
+        <PhoneTapButton
+          className="phone-properties-entry"
+          data-testid="phone-properties"
+          aria-label="Properties"
+          onTap={() => openOverlay('inspector')}
+        >
+          Properties
+        </PhoneTapButton>
+      )}
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem
           label="Move"

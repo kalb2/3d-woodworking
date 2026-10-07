@@ -29,6 +29,7 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
   onClose,
 }) => {
   const { openOverlay, setSidebarPanel } = useAppStore();
+  const selectedObjectId = useProjectStore((state) => state.selectedObjectId);
   const {
     activeProjectId,
     projects,
@@ -54,7 +55,10 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onOpenCutList();
   });
   const settings = useReliableTap(() => openOverlay('settings', true));
-  const properties = useReliableTap(() => openOverlay('inspector', true));
+  const properties = useReliableTap(() => {
+    if (!useProjectStore.getState().selectedObjectId) return;
+    openOverlay('inspector', true);
+  });
   const share = useReliableTap(() => {
     onClose();
     onShareProject();
@@ -118,7 +122,7 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Settings size={18} />
         <span>Settings</span>
       </button>
-      <button type="button" className="phone-sheet-row" data-testid="overlay-launch-properties" onClick={properties} onPointerUp={properties}>
+      <button type="button" className="phone-sheet-row" data-testid="overlay-launch-properties" disabled={!selectedObjectId} onClick={properties} onPointerUp={properties}>
         <SlidersHorizontal size={18} />
         <span>Properties</span>
       </button>

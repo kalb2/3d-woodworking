@@ -506,11 +506,84 @@ html, body, #root {
   color: #dc2626;
 }
 
-.editor-root.is-phone .inspector-quick-actions {
-  position: sticky;
-  bottom: 0;
+.phone-properties-entry {
+  align-self: flex-end;
+  margin: 2px 10px 4px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
   background: #ffffff;
-  padding-bottom: 4px;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.part-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.part-properties-head,
+.part-properties-name,
+.part-properties-board label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.part-properties-head span,
+.part-properties-kicker {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.part-properties-name,
+.part-properties-board label {
+  flex-direction: column;
+  align-items: stretch;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.part-properties-shape,
+.part-properties-note,
+.part-properties-size-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.part-properties-size {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.part-properties-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.part-properties-edges {
+  display: flex;
+  gap: 6px;
+}
+
+.part-properties-edges .glass-button {
+  flex: 1;
+  min-height: 40px;
 }
 
 .phone-dock-grid {
