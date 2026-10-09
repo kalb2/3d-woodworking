@@ -19,6 +19,7 @@ import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectSt
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
+import { MediaWallSheet } from './MediaWallSheet';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
@@ -280,6 +281,7 @@ export const SidebarNav: React.FC = () => {
             >
               <span style={{ fontSize: 13, fontWeight: 700 }}>Browse templates</span>
             </button>
+            <MediaWallSheet isPhone={isPhone} onDone={() => setOverlayOpen('sidebar', false)} />
             {PROJECT_TEMPLATES.map((template) => (
               <button
                 key={template.id}
