@@ -43,3 +43,27 @@ describe('roomFromScan', () => {
     expect(generateCutList(project)).toHaveLength(0);
   });
 });
+
+describe('roomFromScan (L-shaped room)', () => {
+  // Outline (x, z): (0,0) (200,0) (200,100) (100,100) (100,200) (0,200). Inner corner walls sit on the bbox center.
+  const seg = (id: string, a: number[], b: number[]) => {
+    const dx = b[0] - a[0], dz = b[1] - a[1];
+    const len = Math.hypot(dx, dz);
+    const ax = [dx / len, dz / len];
+    // Deliberately pick the normal that points OUT of the room for every wall.
+    return { id, width: len, height: 96, transform: tf(ax, [ax[1], -ax[0]], [(a[0] + b[0]) / 2, 48, (a[1] + b[1]) / 2]) };
+  };
+  const pts = [[0, 0], [200, 0], [200, 100], [100, 100], [100, 200], [0, 200]];
+  // Counter-clockwise in (x, z) seen from above with normal (az, -ax) = outward for this winding.
+  const walls = pts.map((p, i) => seg(`w${i}`, p, pts[(i + 1) % pts.length]));
+  const room = roomFromScan({ walls, windows: [], doors: [], openings: [] });
+  it('faces every wall into the room, including the inner corner', () => {
+    for (const w of room.walls) {
+      const n = { x: Math.sin((w.yaw * Math.PI) / 180), z: Math.cos((w.yaw * Math.PI) / 180) };
+      // A point 10" in front of the wall must be inside the L (in centered coords, offset 100,100).
+      const px = w.x + n.x * 10 + 100, pz = w.z + n.z * 10 + 100;
+      const inside = px > 0 && px < 200 && pz > 0 && pz < 200 && !(px > 100 && pz > 100);
+      expect(inside, w.label).toBe(true);
+    }
+  });
+});

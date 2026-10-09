@@ -90,6 +90,25 @@ export interface FurnitureObject {
   generator?: string;
   /** Reference geometry (scanned room, reference wall): not stock, skipped by the cut list. */
   reference?: boolean;
+  /** On a built-in's group: what made it and where it sits, so it can be edited/regenerated. */
+  builtIn?: BuiltInInfo;
+  /** On a built-in's parts: the instance they belong to. */
+  builtInId?: string;
+  /** On room-scan wall parts: the scanned wall id. */
+  wallId?: string;
+}
+
+export type BuiltInTemplateId = 'media-wall';
+
+export interface BuiltInInfo {
+  id: string;
+  template: BuiltInTemplateId;
+  /** Scanned wall it is fitted to; absent for free-standing/manual built-ins. */
+  wallId?: string;
+  /** Wall-local x of the built-in's center (inches from wall center). */
+  center?: number;
+  /** Template form values (template-specific). */
+  input: Record<string, number | string>;
 }
 
 export interface SnapSettings {

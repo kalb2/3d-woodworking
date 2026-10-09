@@ -16,6 +16,7 @@ import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
+import { BuiltInSheet } from './builtins/BuiltInSheet';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { ShareSheet } from './components/share/ShareSheet';
@@ -137,6 +138,8 @@ export const App: React.FC = () => {
       )}
 
       <TransformMenu />
+
+      <BuiltInSheet />
 
       <CutListDrawer
         isOpen={isCutListOpen}

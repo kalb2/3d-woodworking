@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Tv,
   Box,
   Cylinder,
   Circle,
@@ -19,7 +20,7 @@ import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectSt
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
-import { MediaWallSheet } from './MediaWallSheet';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
@@ -64,6 +65,11 @@ export const SidebarNav: React.FC = () => {
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const lastAddAt = useRef(0);
+  const startBuiltIn = () => {
+    const { projects, activeProjectId } = useProjectStore.getState();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    useBuiltInFlow.getState().startAdd(Boolean(proj?.scannedRoom?.walls.length));
+  };
   const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
     fireReliableTap(event, () => {
       const now = performance.now();
@@ -281,7 +287,20 @@ export const SidebarNav: React.FC = () => {
             >
               <span style={{ fontSize: 13, fontWeight: 700 }}>Browse templates</span>
             </button>
-            <MediaWallSheet isPhone={isPhone} onDone={() => setOverlayOpen('sidebar', false)} />
+            <button
+              type="button"
+              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+              data-testid="add-builtin"
+              onClick={addPart(startBuiltIn)}
+              onPointerUp={addPart(startBuiltIn)}
+              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
+            >
+              <Tv size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Add template</span>
+                <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>Built-ins like a media wall, fitted to a scanned wall.</span>
+              </div>
+            </button>
             {PROJECT_TEMPLATES.map((template) => (
               <button
                 key={template.id}

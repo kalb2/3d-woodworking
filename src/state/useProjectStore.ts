@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
-import { generateMediaWall, MEDIA_WALL_TAG, type MediaWallInput } from '../generators/mediaWall';
-import { roomScanParts, wallToWorld } from '../generators/roomScan';
+import { roomScanParts } from '../generators/roomScan';
+import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
@@ -168,9 +168,10 @@ interface ProjectState {
   addWoodPreset: (presetId: string) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
-  /** Adds a generated media wall as one group, replacing any earlier one in this project. */
-  /** With `wallId`, fits the media wall flush to that scanned room wall (no reference wall). */
-  insertMediaWall: (input: MediaWallInput, wallId?: string) => boolean;
+  /** Adds a built-in (or regenerates `editId`); returns its group id. */
+  insertBuiltIn: (req: BuiltInRequest) => string | null;
+  /** Removes a built-in's group and all its parts. */
+  deleteBuiltIn: (groupId: string) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -621,77 +622,39 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true;
   },
 
-  insertMediaWall: (input, wallId) => {
+  insertBuiltIn: (req) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
-    if (!proj) return false;
-    const stamp = Date.now();
-    const groupId = `grp_${stamp}_mediawall`;
-    const fit = wallId ? proj.scannedRoom?.walls.find((w) => w.id === wallId) : undefined;
-    const generated = generateMediaWall(input);
-    const placed = fit
-      ? generated.filter((o) => !o.reference).map((o) => ({
-          ...o,
-          position: wallToWorld(fit, o.position),
-          rotation: { ...o.rotation, y: o.rotation.y + fit.yaw },
-        }))
-      : generated;
-    const parts: FurnitureObject[] = placed.map((object, index) => ({
-      ...object,
-      id: `obj_${stamp}_${index}_${Math.random().toString(36).slice(2, 6)}`,
-      parentId: groupId,
-    }));
-    if (parts.length === 0) return false;
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (const o of parts) {
-      minX = Math.min(minX, o.position.x - o.dimensions.length / 2);
-      maxX = Math.max(maxX, o.position.x + o.dimensions.length / 2);
-      minY = Math.min(minY, o.position.y - o.dimensions.height / 2);
-      maxY = Math.max(maxY, o.position.y + o.dimensions.height / 2);
-      minZ = Math.min(minZ, o.position.z - o.dimensions.width / 2);
-      maxZ = Math.max(maxZ, o.position.z + o.dimensions.width / 2);
-    }
-    if (fit) {
-      minX = Infinity; minY = Infinity; minZ = Infinity; maxX = -Infinity; maxY = -Infinity; maxZ = -Infinity;
-      for (const o of generated.filter((g) => !g.reference)) {
-        minX = Math.min(minX, o.position.x - o.dimensions.length / 2); maxX = Math.max(maxX, o.position.x + o.dimensions.length / 2);
-        minY = Math.min(minY, o.position.y - o.dimensions.height / 2); maxY = Math.max(maxY, o.position.y + o.dimensions.height / 2);
-        minZ = Math.min(minZ, o.position.z - o.dimensions.width / 2); maxZ = Math.max(maxZ, o.position.z + o.dimensions.width / 2);
-      }
-    }
-    const groupCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 };
-    const group: FurnitureObject = {
-      id: groupId,
-      name: 'Media wall',
-      shape: 'group',
-      dimensions: { length: maxX - minX, height: maxY - minY, width: maxZ - minZ },
-      position: fit ? wallToWorld(fit, groupCenter) : groupCenter,
-      rotation: { x: 0, y: fit ? fit.yaw : 0, z: 0 },
-      material: LIGHT_STARTING_WOOD,
-      visible: true,
-      generator: MEDIA_WALL_TAG,
-    };
-    // Replace an earlier generated wall: its group and every part still inside it.
-    const oldGroupIds = new Set(
-      proj.objects.filter((o) => o.shape === 'group' && o.generator === MEDIA_WALL_TAG).map((o) => o.id)
-    );
-    const kept = proj.objects.filter(
-      (o) => !(o.generator === MEDIA_WALL_TAG && (o.shape === 'group' || !o.parentId || oldGroupIds.has(o.parentId)))
-    ).map((o) => (o.parentId && oldGroupIds.has(o.parentId) ? { ...o, parentId: undefined } : o));
-
+    if (!proj) return null;
+    const result = placeBuiltIn(proj.objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD);
+    if (!result) return null;
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === activeProjectId ? { ...p, objects: [...kept, ...parts, group] } : p
-      ),
-      selectedObjectId: group.id,
-      selectedObjectIds: [group.id],
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectId: result.groupId,
+      selectedObjectIds: [result.groupId],
       multiSelect: false,
       editingGroupId: null,
     }));
     pushHistoryState();
     saveCurrentProject();
-    return true;
+    return result.groupId;
+  },
+
+  deleteBuiltIn: (groupId) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const group = proj?.objects.find((o) => o.id === groupId);
+    if (!proj || !group?.builtIn) return;
+    const id = group.builtIn.id;
+    const objects = proj.objects.filter((o) => o.id !== groupId && o.builtInId !== id && o.parentId !== groupId);
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: state.editingGroupId === groupId ? null : state.editingGroupId,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
   },
 
   createProjectFromScan: (name, room, unit = 'in') => {
@@ -758,6 +721,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const minY = objHeight / 2;
       if (updates.position.y < minY) {
         updates = { ...updates, position: { ...updates.position, y: minY } };
+      }
+    }
+
+    // Wall-fitted built-ins slide along their wall, flush and on the floor; no free rotation.
+    const fittedWall = existingObj.builtIn?.wallId
+      ? proj.scannedRoom?.walls.find((w) => w.id === existingObj.builtIn!.wallId)
+      : undefined;
+    if (fittedWall && existingObj.builtIn && (updates.position || updates.rotation)) {
+      const { rotation: _ignored, ...rest } = updates;
+      void _ignored;
+      updates = rest;
+      if (updates.position) {
+        const slid = slideAlongWall(existingObj, fittedWall, updates.position);
+        updates = { ...updates, position: slid.position, builtIn: { ...existingObj.builtIn, center: slid.center } };
       }
     }
 

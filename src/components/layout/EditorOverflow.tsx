@@ -4,6 +4,7 @@ import {
   FileCode,
   FileSpreadsheet,
   Layers,
+  Tv,
   List,
   Pencil,
   Redo,
@@ -16,6 +17,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -55,6 +57,11 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onOpenCutList();
   });
   const settings = useReliableTap(() => openOverlay('settings', true));
+  const hasBuiltIns = Boolean(currentProject?.objects.some((o) => o.shape === 'group' && o.builtIn));
+  const builtIns = useReliableTap(() => {
+    onClose();
+    useBuiltInFlow.getState().openList();
+  });
   const properties = useReliableTap(() => {
     if (!useProjectStore.getState().selectedObjectId) return;
     openOverlay('inspector', true);
@@ -118,6 +125,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Layers size={18} />
         <span>Cut list</span>
       </button>
+      {hasBuiltIns && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
+          <Tv size={18} />
+          <span>Built-ins</span>
+        </button>
+      )}
       <button type="button" className="phone-sheet-row" data-testid="tool-settings" onClick={settings} onPointerUp={settings}>
         <Settings size={18} />
         <span>Settings</span>

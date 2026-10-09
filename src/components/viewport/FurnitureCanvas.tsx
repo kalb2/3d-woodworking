@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -32,6 +33,28 @@ const GroundContactShadow: React.FC = () => {
   );
 };
 
+/** Room-scan wall part (not a window/door panel). Older scans lack `wallId`. */
+const isRoomWall = (obj: { wallId?: string; name: string }) =>
+  obj.wallId !== undefined || /^Wall \d+ \(scan\)$/.test(obj.name);
+
+/** Frames the camera on a requested target (Built-ins list). */
+const CameraFocus: React.FC = () => {
+  const focus = useBuiltInFlow((s) => s.focus);
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  React.useEffect(() => {
+    if (!focus || !controls) return;
+    const target = new THREE.Vector3(focus.x, focus.y, focus.z);
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-6) dir.set(0.6, 0.5, 0.8);
+    dir.normalize().multiplyScalar(Math.max(40, focus.radius * 1.6));
+    controls.target.copy(target);
+    camera.position.copy(target.clone().add(dir));
+    controls.update();
+  }, [focus, camera, controls]);
+  return null;
+};
+
 export const FurnitureCanvas: React.FC = () => {
   const {
     projects,
@@ -45,6 +68,7 @@ export const FurnitureCanvas: React.FC = () => {
     activeGizmoMode,
   } = useProjectStore();
   const lastTap = useRef<{ id: string; time: number } | null>(null);
+  const picking = useBuiltInFlow((s) => s.picking);
 
   const { preferences } = useAppStore();
 
@@ -65,8 +89,16 @@ export const FurnitureCanvas: React.FC = () => {
     if (e.target === e.currentTarget) clearSelection();
   };
 
+  const handleRoomWallPick = (event: any, obj: { wallId?: string; name: string }) => {
+    event.stopPropagation();
+    const walls = currentProject.scannedRoom?.walls ?? [];
+    const wall = walls.find((w) => w.id === obj.wallId) ?? walls.find((w) => `${w.label} (scan)` === obj.name);
+    if (wall) useBuiltInFlow.getState().chooseWall(wall.id);
+  };
+
   const handlePartPointerDown = (event: any, objId: string) => {
     event.stopPropagation();
+    if (picking) return;
     const obj = currentProject.objects.find((item) => item.id === objId);
     if (!obj) return;
     const additive = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
@@ -149,6 +181,8 @@ export const FurnitureCanvas: React.FC = () => {
         />
         {currentProject.showFloor && <GroundContactShadow />}
 
+        <CameraFocus />
+
         {/* Render all furniture objects in active project */}
         {currentProject.objects.map((obj) => (
           <FurnitureMesh
@@ -156,7 +190,9 @@ export const FurnitureCanvas: React.FC = () => {
             object={obj}
             isSelected={selectedObjectIds.includes(obj.id)}
             pickGroup={editingGroupId !== obj.id}
-            onPointerDown={obj.generator === 'room-scan' ? undefined : (e) => handlePartPointerDown(e, obj.id)}
+            onPointerDown={obj.generator === 'room-scan'
+              ? (picking && isRoomWall(obj) ? (e) => handleRoomWallPick(e, obj) : undefined)
+              : (e) => handlePartPointerDown(e, obj.id)}
           />
         ))}
 

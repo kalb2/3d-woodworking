@@ -39,6 +39,15 @@ export function roomFromScan(result: WallScanResult): ScannedRoom {
   const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
   const all = [...(result.windows ?? []), ...(result.doors ?? []), ...(result.openings ?? [])];
 
+  // 2D wall segments (x, z) for inside/outside ray tests.
+  const segs: Seg[] = raw.map((w) => {
+    const t = w.transform;
+    const len = Math.hypot(t[0], t[2]) || 1;
+    const ax = t[0] / len, az = t[2] / len;
+    const h = w.width / 2;
+    return { ax: t[12] - cx - ax * h, az: t[14] - cz - az * h, bx: t[12] - cx + ax * h, bz: t[14] - cz + az * h };
+  });
+
   const walls: RoomWall[] = raw.map((w, i) => {
     const t = w.transform;
     const x = t[12] - cx;
@@ -48,7 +57,7 @@ export function roomFromScan(result: WallScanResult): ScannedRoom {
     let nx = t[8], nz = t[10];
     const len = Math.hypot(ax, az) || 1; ax /= len; az /= len;
     const nlen = Math.hypot(nx, nz) || 1; nx /= nlen; nz /= nlen;
-    if (nx * -x + nz * -z < 0) { nx = -nx; nz = -nz; } // face the room center
+    if (!normalPointsInside(i, segs, { x, z }, { x: ax, z: az }, { x: nx, z: nz })) { nx = -nx; nz = -nz; }
     let yaw = (Math.atan2(nx, nz) * 180) / Math.PI;
     if (yaw <= -179.95) yaw += 360;
     const frame = wallFrame(yaw);
@@ -61,6 +70,41 @@ export function roomFromScan(result: WallScanResult): ScannedRoom {
     return { id: w.id, label: `Wall ${i + 1}`, width: r1(w.width), height: r1(w.height), x: r1(x), z: r1(z), yaw: r1(yaw), openings };
   });
   return { walls };
+}
+
+interface Seg { ax: number; az: number; bx: number; bz: number }
+type V2 = { x: number; z: number };
+
+/** Number of wall segments (other than `skip`) hit by a ray from `o` along `d`. */
+function rayHits(skip: number, segs: Seg[], o: V2, d: V2): number {
+  let hits = 0;
+  segs.forEach((s, i) => {
+    if (i === skip) return;
+    const ex = s.bx - s.ax, ez = s.bz - s.az;
+    const den = d.x * ez - d.z * ex;
+    if (Math.abs(den) < 1e-9) return;
+    const wx = s.ax - o.x, wz = s.az - o.z;
+    const t = (wx * ez - wz * ex) / den; // along ray
+    const u = (wx * d.z - wz * d.x) / den; // along segment
+    if (t > 1e-6 && u >= 0 && u <= 1) hits++;
+  });
+  return hits;
+}
+
+/**
+ * True when the normal points into the room: a ray from just in front of the
+ * wall crosses an odd number of the other walls (point-in-polygon). Works for
+ * L-shaped and other concave rooms. Falls back to "faces the room center" when
+ * the room outline is open and the test is inconclusive.
+ */
+export function normalPointsInside(index: number, segs: Seg[], mid: V2, along: V2, n: V2): boolean {
+  // Nudge off the exact midpoint so the ray rarely grazes a corner.
+  const o = { x: mid.x + along.x * 0.137 + n.x * 0.5, z: mid.z + along.z * 0.137 + n.z * 0.5 };
+  const back = { x: mid.x + along.x * 0.137 - n.x * 0.5, z: mid.z + along.z * 0.137 - n.z * 0.5 };
+  const front = rayHits(index, segs, o, n) % 2 === 1;
+  const behind = rayHits(index, segs, back, { x: -n.x, z: -n.z }) % 2 === 1;
+  if (front !== behind) return front;
+  return n.x * -mid.x + n.z * -mid.z >= 0;
 }
 
 /** Map a point in a wall's local frame (x from wall center, y up, z into room) to world. */
@@ -77,6 +121,7 @@ export function roomScanParts(room: ScannedRoom): Part[] {
     parts.push({
       ...base,
       name: `${wall.label} (scan)`,
+      wallId: wall.id,
       shape: 'cube',
       dimensions: { length: wall.width, height: wall.height, width: WALL_T },
       position: wallToWorld(wall, { x: 0, y: wall.height / 2, z: -WALL_T / 2 }),
