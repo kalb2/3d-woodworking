@@ -175,7 +175,8 @@ interface ProjectState {
   /** Put a scanned room into the current project, replacing only an earlier room scan. */
   addScannedRoom: (room: ScannedRoom) => boolean;
   /** Lock/unlock the scanned room's walls for editing (per project). */
-  setRoomLocked: (locked: boolean) => void;
+  /** When unlocking with `selectWallId`, that wall's part becomes the selection (ready for Move/Delete). */
+  setRoomLocked: (locked: boolean, selectWallId?: string | null) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -687,13 +688,21 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     return true;
   },
 
-  setRoomLocked: (locked) => {
-    const { activeProjectId, saveCurrentProject } = get();
+  setRoomLocked: (locked, selectWallId) => {
+    const { activeProjectId, saveCurrentProject, projects, selectedObjectIds } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const wall = selectWallId ? proj?.scannedRoom?.walls.find((w) => w.id === selectWallId) : undefined;
+    const wallPart = wall ? proj?.objects.find((o) => o.generator === 'room-scan' && !o.openingId
+      && !/\b(Window|Door|Opening)\b/.test(o.name) && (o.wallId === wall.id || o.name === `${wall.label} (scan)`)) : undefined;
+    const roomIds = new Set(proj?.objects.filter((o) => o.generator === 'room-scan').map((o) => o.id));
+    const keep = selectedObjectIds.filter((id) => !roomIds.has(id));
     set((state) => ({
       projects: state.projects.map((p) => (p.id === activeProjectId
         ? { ...p, roomLocked: locked, objects: p.objects.map((o) => (o.generator === 'room-scan' ? { ...o, locked } : o)) }
         : p)),
-      ...(locked ? { selectedObjectId: null, selectedObjectIds: [] } : {}),
+      ...(locked
+        ? { selectedObjectIds: keep, selectedObjectId: keep[keep.length - 1] ?? null }
+        : wallPart ? { selectedObjectId: wallPart.id, selectedObjectIds: [wallPart.id], editingGroupId: null, multiSelect: false } : {}),
     }));
     saveCurrentProject();
   },
@@ -877,7 +886,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const remaining = get().selectedObjectIds.filter(
       (item) => item !== id && updatedObjects.some((object) => object.id === item)
     );
-    const nextSelected = remaining[remaining.length - 1] ?? updatedObjects[0]?.id ?? null;
+    // Never fall back onto a locked scanned wall (it couldn't be acted on).
+    const nextSelected = remaining[remaining.length - 1]
+      ?? updatedObjects.find((o) => !(o.generator === 'room-scan' && proj.roomLocked !== false))?.id
+      ?? null;
 
     set(state => ({
       projects: state.projects.map(p =>

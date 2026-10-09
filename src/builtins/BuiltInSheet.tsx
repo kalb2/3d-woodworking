@@ -129,7 +129,15 @@ export const BuiltInSheet: React.FC = () => {
   const dismissWall = useReliableTap(() => flow.focusWall(null));
   const setRoomLocked = useProjectStore((s) => s.setRoomLocked);
   const roomLocked = project?.roomLocked !== false;
-  const lockTap = useReliableTap(() => setRoomLocked(!roomLocked));
+  const lockTap = useReliableTap(() => {
+    if (roomLocked) {
+      // Unlock and hand the tapped wall to the normal tools (bottom bar: Move/Resize/Delete).
+      setRoomLocked(false, flow.focusWallId);
+      flow.focusWall(null);
+    } else {
+      setRoomLocked(true);
+    }
+  });
   const addForWall = useReliableTap(() => { if (flow.focusWallId) flow.startAddForWall(flow.focusWallId); });
   const closeTap = useReliableTap(flow.close);
   const backTap = useReliableTap(flow.back);

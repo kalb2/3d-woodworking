@@ -90,3 +90,26 @@ describe('addScannedRoom', () => {
     expect(s().projects.find((p) => p.id === projectId)!.scannedRoom!.walls.map((w) => w.id)).toEqual(['b', 'c']);
   });
 });
+
+describe('unlock then delete a scanned wall', () => {
+  it('unlocking with a wall selects it, delete removes it and updates scannedRoom', async () => {
+    const { roomScanParts } = await import('../generators/roomScan');
+    void roomScanParts;
+    s().createProject('Unlock', 'in');
+    const walls = [
+      { id: 'a', label: 'Wall 1', width: 120, height: 96, x: 0, z: -60, yaw: 0, openings: [] },
+      { id: 'b', label: 'Wall 2', width: 100, height: 96, x: -60, z: 0, yaw: 90, openings: [] },
+    ];
+    s().addScannedRoom({ walls });
+    s().setRoomLocked(false, 'b');
+    const sel = objs().find((o) => o.id === s().selectedObjectId)!;
+    expect(sel.generator).toBe('room-scan');
+    expect(sel.wallId).toBe('b');
+    s().deleteObject(sel.id);
+    const proj = s().projects.find((p) => p.id === s().activeProjectId)!;
+    expect(proj.objects.some((o) => o.wallId === 'b')).toBe(false);
+    expect(proj.scannedRoom!.walls.map((w) => w.id)).toEqual(['a']);
+    s().setRoomLocked(true);
+    expect(objs().find((o) => o.id === s().selectedObjectId)?.generator).not.toBe('room-scan');
+  });
+});

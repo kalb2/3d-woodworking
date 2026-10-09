@@ -84,7 +84,11 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
   });
   const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
   const roomLocked = currentProject?.roomLocked !== false;
-  const toggleRoomLock = useReliableTap(() => useProjectStore.getState().setRoomLocked(!roomLocked));
+  const toggleRoomLock = useReliableTap(() => {
+    const flow = useBuiltInFlow.getState();
+    useProjectStore.getState().setRoomLocked(!roomLocked, roomLocked ? flow.focusWallId : null);
+    if (roomLocked && flow.focusWallId) { flow.focusWall(null); onClose(); }
+  });
   const hasBuiltIns = Boolean(currentProject?.objects.some((o) => o.shape === 'group' && o.builtIn));
   const builtIns = useReliableTap(() => {
     onClose();
