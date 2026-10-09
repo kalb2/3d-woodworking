@@ -29,24 +29,6 @@ export function scanWalls(): Promise<WallScanResult> {
   return WallScan.scan();
 }
 
-const r1 = (n: number) => Math.round(n * 10) / 10;
-
-/** Flatten a scan into per-wall summaries (small, syncable; no transforms). */
-export function wallsFromScan(result: WallScanResult): ScannedWall[] {
-  const all = [...(result.windows ?? []), ...(result.doors ?? []), ...(result.openings ?? [])];
-  return (result.walls ?? [])
-    .filter((w) => w.width > 0 && w.height > 0)
-    .map((w, i) => ({
-      id: w.id,
-      label: `Wall ${i + 1}`,
-      width: r1(w.width),
-      height: r1(w.height),
-      openings: all.filter((o) => o.wallId === w.id).map((o) => ({
-        id: o.id, kind: o.kind, width: r1(o.width), height: r1(o.height), offsetX: r1(o.offsetX), bottom: r1(o.bottom),
-      })),
-    }));
-}
-
 export function describeWall(w: ScannedWall): string {
   const count = (k: ScannedOpening['kind'], word: string) => {
     const n = w.openings.filter((o) => o.kind === k).length;

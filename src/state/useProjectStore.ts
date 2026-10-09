@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
-import { generateMediaWall, MEDIA_WALL_TAG, openingReferenceParts, type MediaWallInput } from '../generators/mediaWall';
-import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedWall, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import { generateMediaWall, MEDIA_WALL_TAG, type MediaWallInput } from '../generators/mediaWall';
+import { roomScanParts, wallToWorld } from '../generators/roomScan';
+import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
@@ -168,8 +169,10 @@ interface ProjectState {
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
   /** Adds a generated media wall as one group, replacing any earlier one in this project. */
-  insertMediaWall: (input: MediaWallInput) => boolean;
-  setScannedWall: (wall: ScannedWall | undefined) => void;
+  /** With `wallId`, fits the media wall flush to that scanned room wall (no reference wall). */
+  insertMediaWall: (input: MediaWallInput, wallId?: string) => boolean;
+  /** New project whose scene is the scanned room (locked reference parts). */
+  createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -618,14 +621,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true;
   },
 
-  insertMediaWall: (input) => {
+  insertMediaWall: (input, wallId) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return false;
     const stamp = Date.now();
     const groupId = `grp_${stamp}_mediawall`;
-    const openings = proj.scannedWall?.openings ?? [];
-    const parts: FurnitureObject[] = [...generateMediaWall(input), ...openingReferenceParts(input, openings)].map((object, index) => ({
+    const fit = wallId ? proj.scannedRoom?.walls.find((w) => w.id === wallId) : undefined;
+    const generated = generateMediaWall(input);
+    const placed = fit
+      ? generated.filter((o) => !o.reference).map((o) => ({
+          ...o,
+          position: wallToWorld(fit, o.position),
+          rotation: { ...o.rotation, y: o.rotation.y + fit.yaw },
+        }))
+      : generated;
+    const parts: FurnitureObject[] = placed.map((object, index) => ({
       ...object,
       id: `obj_${stamp}_${index}_${Math.random().toString(36).slice(2, 6)}`,
       parentId: groupId,
@@ -641,13 +652,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       minZ = Math.min(minZ, o.position.z - o.dimensions.width / 2);
       maxZ = Math.max(maxZ, o.position.z + o.dimensions.width / 2);
     }
+    if (fit) {
+      minX = Infinity; minY = Infinity; minZ = Infinity; maxX = -Infinity; maxY = -Infinity; maxZ = -Infinity;
+      for (const o of generated.filter((g) => !g.reference)) {
+        minX = Math.min(minX, o.position.x - o.dimensions.length / 2); maxX = Math.max(maxX, o.position.x + o.dimensions.length / 2);
+        minY = Math.min(minY, o.position.y - o.dimensions.height / 2); maxY = Math.max(maxY, o.position.y + o.dimensions.height / 2);
+        minZ = Math.min(minZ, o.position.z - o.dimensions.width / 2); maxZ = Math.max(maxZ, o.position.z + o.dimensions.width / 2);
+      }
+    }
+    const groupCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 };
     const group: FurnitureObject = {
       id: groupId,
       name: 'Media wall',
       shape: 'group',
       dimensions: { length: maxX - minX, height: maxY - minY, width: maxZ - minZ },
-      position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 },
-      rotation: { x: 0, y: 0, z: 0 },
+      position: fit ? wallToWorld(fit, groupCenter) : groupCenter,
+      rotation: { x: 0, y: fit ? fit.yaw : 0, z: 0 },
       material: LIGHT_STARTING_WOOD,
       visible: true,
       generator: MEDIA_WALL_TAG,
@@ -674,12 +694,34 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true;
   },
 
-  setScannedWall: (wall) => {
-    const { activeProjectId, saveCurrentProject } = get();
+  createProjectFromScan: (name, room, unit = 'in') => {
+    if (room.walls.length === 0) return false;
+    const stamp = Date.now();
+    const objects: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}` }));
+    const newProj: FurnitureProject = {
+      id: `proj_${stamp}`,
+      name,
+      createdAt: stamp,
+      updatedAt: stamp,
+      unit,
+      objects,
+      snapSettings: defaultSnapSettings(),
+      showFloor: true,
+      floorOpacity: 0.4,
+      scannedRoom: room,
+    };
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, scannedWall: wall } : p)),
+      projects: [...state.projects, newProj],
+      activeProjectId: newProj.id,
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: null,
+      multiSelect: false,
+      historyStack: [[...objects]],
+      historyIndex: 0,
     }));
-    saveCurrentProject();
+    get().saveCurrentProject();
+    return true;
   },
 
   insertTemplate: (templateId) => {

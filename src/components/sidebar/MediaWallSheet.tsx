@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { ScanLine, Tv } from 'lucide-react';
-import { describeWall, isWallScanSupported, scanWalls, wallsFromScan } from '../../native/wallScan';
-import type { ScannedWall } from '../../types/furniture';
+import React, { useState } from 'react';
+import { Tv } from 'lucide-react';
+import { describeWall } from '../../native/wallScan';
+import type { RoomWall, ScannedWall } from '../../types/furniture';
 import { autoBaseCount, MEDIA_WALL_DEFAULTS, MEDIA_WALL_TAG, type UpperStyle } from '../../generators/mediaWall';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useReliableTap } from '../../utils/reliableTap';
@@ -34,42 +34,16 @@ export const MediaWallSheet: React.FC<Props> = ({ isPhone, onDone }) => {
   const [baseCount, setBaseCount] = useState<number | null>(null);
   const [upperStyle, setUpperStyle] = useState<UpperStyle>('shelves');
   const [baseDepth, setBaseDepth] = useState(MEDIA_WALL_DEFAULTS.baseDepth);
-  const setScannedWall = useProjectStore((s) => s.setScannedWall);
-  const scannedWall = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.scannedWall);
-  const [canScan, setCanScan] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<ScannedWall[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void isWallScanSupported().then((ok) => { if (alive) setCanScan(ok); });
-    return () => { alive = false; };
-  }, []);
+  const roomWalls = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.scannedRoom?.walls);
+  const [fitWallId, setFitWallId] = useState<string | null>(null);
+  const fitWall = roomWalls?.find((w) => w.id === fitWallId);
+  const pickingWall = !!roomWalls?.length && !fitWall;
 
   const applyWall = (wall: ScannedWall) => {
     setWallWidth(Math.round(wall.width));
     setWallHeight(Math.round(wall.height));
     setBaseCount(null);
-    setScannedWall(wall);
-    setCandidates(null);
-  };
-
-  const startScan = async () => {
-    if (scanning) return;
-    setScanError(null);
-    setScanning(true);
-    try {
-      const walls = wallsFromScan(await scanWalls());
-      if (walls.length === 0) setScanError('No walls found. Try scanning again.');
-      else if (walls.length === 1) applyWall(walls[0]);
-      else setCandidates(walls);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/cancel/i.test(msg)) setScanError(msg);
-    } finally {
-      setScanning(false);
-    }
+    setFitWallId(wall.id);
   };
 
   const generate = () => {
@@ -77,7 +51,7 @@ export const MediaWallSheet: React.FC<Props> = ({ isPhone, onDone }) => {
     const proj = projects.find((p) => p.id === activeProjectId);
     const exists = proj?.objects.some((o) => o.generator === MEDIA_WALL_TAG);
     if (exists && !window.confirm('Replace the media wall already in this project?')) return;
-    if (insertMediaWall({ wallWidth, wallHeight, tvSize, baseCount: baseCount ?? autoBaseCount(wallWidth), upperStyle, baseDepth })) {
+    if (insertMediaWall({ wallWidth, wallHeight, tvSize, baseCount: baseCount ?? autoBaseCount(wallWidth), upperStyle, baseDepth }, fitWall?.id)) {
       setOpen(false);
       onDone();
     }
@@ -85,8 +59,7 @@ export const MediaWallSheet: React.FC<Props> = ({ isPhone, onDone }) => {
 
   const toggleTap = useReliableTap(() => setOpen((v) => !v));
   const generateTap = useReliableTap(generate);
-  const scanTap = useReliableTap(() => { void startScan(); });
-  const clearScanTap = useReliableTap(() => setScannedWall(undefined));
+  const changeWallTap = useReliableTap(() => setFitWallId(null));
   const upperTap = { shelves: useReliableTap(() => setUpperStyle('shelves')), cabinets: useReliableTap(() => setUpperStyle('cabinets')) };
 
   const num = (label: string, value: number, set: (n: number) => void, testId: string) => (
@@ -110,29 +83,22 @@ export const MediaWallSheet: React.FC<Props> = ({ isPhone, onDone }) => {
       </button>
       {open && (
         <div data-testid="media-wall-form" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 4px 8px' }}>
-          {canScan && (
-            <button type="button" data-testid="mw-scan" onClick={scanTap} onPointerUp={scanTap} disabled={scanning}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', borderRadius: 10,
-                border: '1px solid rgba(224,159,62,0.7)', background: 'transparent', color: '#e09f3e', fontWeight: 600, fontSize: 13 }}>
-              <ScanLine size={16} /> {scanning ? 'Scanning…' : 'Scan wall'}
-            </button>
-          )}
-          {scanError && <span style={{ fontSize: 12, color: '#ef4444' }}>{scanError}</span>}
-          {candidates && (
+          {pickingWall && (
             <div data-testid="mw-wall-picker" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 12, color: '#9ca3af' }}>Pick the wall for the media wall:</span>
-              {candidates.map((w) => (
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>Which wall?</span>
+              {roomWalls!.map((w: RoomWall) => (
                 <WallChoice key={w.id} wall={w} onPick={applyWall} />
               ))}
             </div>
           )}
-          {scannedWall && !candidates && (
+          {fitWall && (
             <div style={{ ...fieldStyle, fontSize: 12, color: '#9ca3af' }}>
-              <span>Scanned: {describeWall(scannedWall)}</span>
-              <button type="button" data-testid="mw-clear-scan" onClick={clearScanTap} onPointerUp={clearScanTap}
-                style={{ border: 'none', background: 'transparent', color: '#e09f3e', fontSize: 12 }}>Clear</button>
+              <span>Fitting to {describeWall(fitWall)}</span>
+              <button type="button" data-testid="mw-change-wall" onClick={changeWallTap} onPointerUp={changeWallTap}
+                style={{ border: 'none', background: 'transparent', color: '#e09f3e', fontSize: 12 }}>Change</button>
             </div>
           )}
+          {!pickingWall && <>
           {num('Wall width (in)', wallWidth, setWallWidth, 'mw-width')}
           {num('Wall height (in)', wallHeight, setWallHeight, 'mw-height')}
           {num('TV size (in)', tvSize, setTvSize, 'mw-tv')}
@@ -154,6 +120,7 @@ export const MediaWallSheet: React.FC<Props> = ({ isPhone, onDone }) => {
             style={{ marginTop: 4, padding: '10px 12px', borderRadius: 10, border: 'none', background: '#e09f3e', color: '#fff', fontWeight: 700, fontSize: 14 }}>
             Generate
           </button>
+          </>}
         </div>
       )}
     </div>

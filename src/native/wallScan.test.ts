@@ -1,32 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { describeWall, wallsFromScan } from './wallScan';
-import { MEDIA_WALL_DEFAULTS, openingReferenceParts, MEDIA_WALL_TAG } from '../generators/mediaWall';
+import { describeWall } from './wallScan';
+import { roomFromScan, roomScanParts, wallToWorld, ROOM_SCAN_TAG } from '../generators/roomScan';
+import { generateCutList } from '../utils/exportUtils';
+import type { FurnitureProject } from '../types/furniture';
 
+// Column-major transform: x axis, y axis, z axis (normal), translation (inches).
+const tf = (ax: number[], n: number[], t: number[]) => [ax[0], 0, ax[1], 0, 0, 1, 0, 0, n[0], 0, n[1], 0, t[0], t[1], t[2], 1];
+// 144 x 120 room centered at (100, 48, 50): back wall at z = -10, front at z = 110, sides at x = 28 / 172.
 const scan = {
   walls: [
-    { id: 'a', width: 144.04, height: 96, transform: [] },
-    { id: 'b', width: 120, height: 96, transform: [] },
+    { id: 'back', width: 144, height: 96, transform: tf([1, 0], [0, 1], [100, 48, -10]) },
+    { id: 'front', width: 144, height: 96, transform: tf([1, 0], [0, 1], [100, 48, 110]) },
+    { id: 'left', width: 120, height: 96, transform: tf([0, 1], [1, 0], [28, 48, 50]) },
+    { id: 'right', width: 120, height: 96, transform: tf([0, 1], [1, 0], [172, 48, 50]) },
   ],
-  windows: [{ id: 'w1', kind: 'window' as const, wallId: 'a', width: 36, height: 48, offsetX: 20, bottom: 30 }],
-  doors: [{ id: 'd1', kind: 'door' as const, wallId: 'b', width: 32, height: 80, offsetX: 4, bottom: 0 }],
-  openings: [],
+  windows: [{ id: 'w1', kind: 'window' as const, wallId: 'back', width: 36, height: 48, offsetX: 20, bottom: 30 }],
+  doors: [], openings: [],
 };
 
-describe('wallsFromScan', () => {
-  it('groups openings by wall and labels them', () => {
-    const walls = wallsFromScan(scan);
-    expect(walls).toHaveLength(2);
-    expect(walls[0].openings.map((o) => o.id)).toEqual(['w1']);
-    expect(describeWall(walls[0])).toBe('Wall 1 — 144×96 in, 1 window');
-    expect(describeWall(walls[1])).toBe('Wall 2 — 120×96 in, 1 door');
+describe('roomFromScan', () => {
+  const room = roomFromScan(scan);
+  it('centers the room, floors it and faces walls inward', () => {
+    const back = room.walls[0];
+    expect(back).toMatchObject({ x: 0, z: -60, yaw: 0 });
+    expect(room.walls[1]).toMatchObject({ z: 60, yaw: 180 });
+    expect(room.walls[2]).toMatchObject({ x: -72, yaw: 90 });
+    expect(describeWall(back)).toBe('Wall 1 — 144×96 in, 1 window');
   });
-});
-
-describe('openingReferenceParts', () => {
-  it('places tagged panels on the wall face from the left edge', () => {
-    const [p] = openingReferenceParts(MEDIA_WALL_DEFAULTS, wallsFromScan(scan)[0].openings);
-    expect(p.generator).toBe(MEDIA_WALL_TAG);
-    expect(p.position.x).toBeCloseTo(-72 + 20 + 18);
-    expect(p.position.y).toBeCloseTo(30 + 24);
+  it('maps wall-local points into the room', () => {
+    const p = wallToWorld(room.walls[2], { x: 0, y: 10, z: 12 });
+    expect(p.x).toBeCloseTo(-60);
+    expect(p.z).toBeCloseTo(0);
+  });
+  it('makes locked reference parts kept out of the cut list', () => {
+    const parts = roomScanParts(room);
+    expect(parts).toHaveLength(5);
+    expect(parts.every((p) => p.locked && p.generator === ROOM_SCAN_TAG)).toBe(true);
+    const win = parts[1];
+    expect(win.position.x).toBeCloseTo(-72 + 20 + 18);
+    expect(win.position.y).toBeCloseTo(54);
+    const project = { unit: 'in', objects: parts.map((p, i) => ({ ...p, id: String(i) })) } as unknown as FurnitureProject;
+    expect(generateCutList(project)).toHaveLength(0);
   });
 });

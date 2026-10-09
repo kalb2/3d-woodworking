@@ -88,6 +88,8 @@ export interface FurnitureObject {
   board?: BoardOptions;
   /** Set on parts made by a generator (e.g. "media-wall") so re-runs can replace them. */
   generator?: string;
+  /** Reference geometry (scanned room, reference wall): not stock, skipped by the cut list. */
+  reference?: boolean;
 }
 
 export interface SnapSettings {
@@ -118,6 +120,17 @@ export interface ScannedWall {
   openings: ScannedOpening[];
 }
 
+/** A scanned wall placed in the room: (x, z) is the center of its interior face, yaw (deg) turns local +z into the room. */
+export interface RoomWall extends ScannedWall {
+  x: number;
+  z: number;
+  yaw: number;
+}
+
+export interface ScannedRoom {
+  walls: RoomWall[];
+}
+
 export interface FurnitureProject {
   id: string;
   name: string;
@@ -129,8 +142,8 @@ export interface FurnitureProject {
   showFloor: boolean;
   floorOpacity: number;
   backgroundColor?: string;
-  /** Wall picked from the last LiDAR scan (media wall form). */
-  scannedWall?: ScannedWall;
+  /** Compact LiDAR room scan (walls + openings, inches). */
+  scannedRoom?: ScannedRoom;
 }
 
 export type TemplateCategory = 'Blocks' | 'Boards' | 'Rounds' | 'Layouts';

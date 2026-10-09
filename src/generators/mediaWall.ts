@@ -109,7 +109,7 @@ export function generateMediaWall(raw: MediaWallInput): MediaWallPart[] {
   const accent = PRESET_WOOD_MATERIALS.walnut;
   const parts: MediaWallPart[] = [];
 
-  parts.push(part('Reference wall', 'cube', { x: W, y: H, z: WALL_T }, { x: left, y: 0, z: -WALL_T }, wallMat));
+  parts.push({ ...part('Reference wall', 'cube', { x: W, y: H, z: WALL_T }, { x: left, y: 0, z: -WALL_T }, wallMat), reference: true });
 
   // Base run
   parts.push(part('Toe kick', 'board', { x: W, y: TOE_H, z: PANEL_T },
@@ -186,8 +186,8 @@ export function openingReferenceParts(raw: MediaWallInput, openings: ScannedOpen
     const h = Math.min(o.height, H - y0);
     if (w < 1 || h < 1) return;
     const label = o.kind === 'window' ? 'Window' : o.kind === 'door' ? 'Door' : 'Opening';
-    out.push(part(`${label} ${i + 1} (reference)`, 'cube', { x: w, y: h, z: OPENING_T },
-      { x: -W / 2 + x0, y: y0, z: 0 }, glass));
+    out.push({ ...part(`${label} ${i + 1} (reference)`, 'cube', { x: w, y: h, z: OPENING_T },
+      { x: -W / 2 + x0, y: y0, z: 0 }, glass), reference: true });
   });
   return out;
 }

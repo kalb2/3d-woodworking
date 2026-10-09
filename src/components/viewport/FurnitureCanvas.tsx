@@ -156,7 +156,7 @@ export const FurnitureCanvas: React.FC = () => {
             object={obj}
             isSelected={selectedObjectIds.includes(obj.id)}
             pickGroup={editingGroupId !== obj.id}
-            onPointerDown={(e) => handlePartPointerDown(e, obj.id)}
+            onPointerDown={obj.generator === 'room-scan' ? undefined : (e) => handlePartPointerDown(e, obj.id)}
           />
         ))}
 
