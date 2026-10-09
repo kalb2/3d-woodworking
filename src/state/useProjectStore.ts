@@ -191,7 +191,26 @@ interface ProjectState {
   setUnit: (unit: LengthUnit) => void;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+/** Max undo steps kept per project. */
+export const HISTORY_LIMIT = 100;
+
+export const useProjectStore = create<ProjectState>((set, get) => {
+  /** Swap the active project's objects for a history entry; the saved project then matches it. */
+  const restoreHistory = (index: number) => {
+    const { historyStack, activeProjectId, selectedObjectIds, editingGroupId, saveCurrentProject } = get();
+    const objects: FurnitureObject[] = JSON.parse(JSON.stringify(historyStack[index]));
+    const ids = new Set(objects.map((o) => o.id));
+    const keep = selectedObjectIds.filter((id) => ids.has(id));
+    set((state) => ({
+      historyIndex: index,
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, updatedAt: Date.now() } : p)),
+      selectedObjectIds: keep,
+      selectedObjectId: keep[keep.length - 1] ?? null,
+      editingGroupId: editingGroupId && ids.has(editingGroupId) ? editingGroupId : null,
+    }));
+    saveCurrentProject();
+  };
+  return {
   projects: [INITIAL_PROJECT],
   activeProjectId: INITIAL_PROJECT.id,
   selectedObjectId: INITIAL_PROJECT.objects[0]?.id ?? null,
@@ -889,53 +908,32 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   toggleDimensions: () => set((state) => ({ showDimensions: !state.showDimensions })),
 
   pushHistoryState: () => {
-    const { projects, activeProjectId, historyStack, historyIndex } = get();
+    const { projects, activeProjectId, historyStack, historyIndex, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
+    const snapshot = JSON.stringify(proj.objects);
+    // A gesture that changed nothing (tap on a handle, no-op edit) is not an undo step.
+    if (historyStack[historyIndex] && JSON.stringify(historyStack[historyIndex]) === snapshot) return;
 
     const newHistory = historyStack.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(proj.objects)));
-
-    if (newHistory.length > 50) newHistory.shift();
+    newHistory.push(JSON.parse(snapshot));
+    while (newHistory.length > HISTORY_LIMIT) newHistory.shift();
 
     set({
       historyStack: newHistory,
       historyIndex: newHistory.length - 1
     });
+    saveCurrentProject();
   },
 
   undo: () => {
-    const { historyIndex, historyStack, activeProjectId, saveCurrentProject } = get();
-    if (historyIndex > 0) {
-      const prevIndex = historyIndex - 1;
-      const prevObjects = JSON.parse(JSON.stringify(historyStack[prevIndex]));
-
-      set(state => ({
-        historyIndex: prevIndex,
-        projects: state.projects.map(p =>
-          p.id === activeProjectId ? { ...p, objects: prevObjects } : p
-        )
-      }));
-
-      saveCurrentProject();
-    }
+    const { historyIndex } = get();
+    if (historyIndex > 0) restoreHistory(historyIndex - 1);
   },
 
   redo: () => {
-    const { historyIndex, historyStack, activeProjectId, saveCurrentProject } = get();
-    if (historyIndex < historyStack.length - 1) {
-      const nextIndex = historyIndex + 1;
-      const nextObjects = JSON.parse(JSON.stringify(historyStack[nextIndex]));
-
-      set(state => ({
-        historyIndex: nextIndex,
-        projects: state.projects.map(p =>
-          p.id === activeProjectId ? { ...p, objects: nextObjects } : p
-        )
-      }));
-
-      saveCurrentProject();
-    }
+    const { historyIndex, historyStack } = get();
+    if (historyIndex < historyStack.length - 1) restoreHistory(historyIndex + 1);
   },
 
   toggleFloor: () => {
@@ -987,4 +985,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
     saveCurrentProject();
   }
-}));
+};
+});

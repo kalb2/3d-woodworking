@@ -7,11 +7,9 @@ import {
   Tv,
   List,
   Pencil,
-  Redo,
   Settings,
   Share2,
   SlidersHorizontal,
-  Undo,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -35,18 +33,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
   const {
     activeProjectId,
     projects,
-    historyIndex,
-    historyStack,
-    undo,
-    redo,
     renameProject,
   } = useProjectStore();
   const currentProject = projects.find((project) => project.id === activeProjectId);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(currentProject?.name ?? '');
   const [copied, setCopied] = useState(false);
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < historyStack.length - 1;
 
   const parts = useReliableTap(() => {
     setSidebarPanel('scene');
@@ -97,17 +89,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
       window.setTimeout(onClose, 700);
     });
   });
-  const undoTap = useReliableTap(() => {
-    if (!canUndo) return;
-    undo();
-    onClose();
-  });
-  const redoTap = useReliableTap(() => {
-    if (!canRedo) return;
-    redo();
-    onClose();
-  });
-
   const saveRename = () => {
     const name = draft.trim();
     if (currentProject && name) renameProject(currentProject.id, name);
@@ -191,14 +172,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
       <button type="button" className="phone-sheet-row" data-testid="menu-copy-json" onClick={copyJson} onPointerUp={copyJson}>
         <Share2 size={18} />
         <span>{copied ? 'Copied' : 'Copy JSON'}</span>
-      </button>
-      <button type="button" className="phone-sheet-row" data-testid="menu-undo" disabled={!canUndo} onClick={undoTap} onPointerUp={undoTap}>
-        <Undo size={18} />
-        <span>Undo</span>
-      </button>
-      <button type="button" className="phone-sheet-row" data-testid="menu-redo" disabled={!canRedo} onClick={redoTap} onPointerUp={redoTap}>
-        <Redo size={18} />
-        <span>Redo</span>
       </button>
     </div>
   );

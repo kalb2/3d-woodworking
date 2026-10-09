@@ -13,6 +13,7 @@ import {
   Ungroup,
   Trash2,
 } from 'lucide-react';
+import { UndoRedoButtons } from './UndoRedoButtons';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
@@ -74,6 +75,7 @@ export const PhoneCanvasHeader: React.FC = () => {
       </div>
 
       <div className="phone-header-actions">
+        <UndoRedoButtons className="phone-header-icon-btn" size={20} />
         <PhoneTapButton
           className="phone-header-icon-btn"
           onTap={() => {
