@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
+import { LockOpen } from 'lucide-react';
 import type { FurnitureObject } from '../../types/furniture';
 
 type Kind = 'wall' | 'window' | 'door' | 'opening';
@@ -49,7 +50,7 @@ const DashedEdges: React.FC<{ geometry: THREE.BufferGeometry; color: string; das
 };
 
 /** Floating "Wall N" label at the top of the wall's inside face; fades out when far away. */
-const WallLabel: React.FC<{ text: string; y: number; z: number }> = ({ text, y, z }) => {
+const WallLabel: React.FC<{ text: string; y: number; z: number; unlocked?: boolean }> = ({ text, y, z, unlocked }) => {
   const anchor = useRef<THREE.Group>(null);
   const el = useRef<HTMLDivElement>(null);
   const tmp = useMemo(() => new THREE.Vector3(), []);
@@ -64,14 +65,16 @@ const WallLabel: React.FC<{ text: string; y: number; z: number }> = ({ text, y, 
   return (
     <group ref={anchor} position={[0, y, z]}>
       <Html center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
-        <div ref={el} className="room-wall-label">{text}</div>
+        <div ref={el} className={`room-wall-label${unlocked ? ' is-unlocked' : ''}`}>
+          {unlocked && <LockOpen size={11} style={{ marginRight: 4, verticalAlign: '-1px' }} />}{text}
+        </div>
       </Html>
     </group>
   );
 };
 
 /** Scanned room part (wall / window / door / opening). Reference only: no wood, no part outline. */
-export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean; onPointerDown?: (e: any) => void }> = ({ object, focused, onPointerDown }) => {
+export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean; unlocked?: boolean; onPointerDown?: (e: any) => void }> = ({ object, focused, unlocked, onPointerDown }) => {
   const { dimensions: d, position: p, rotation: r } = object;
   const kind = roomPartKind(object);
   const geometry = useMemo(() => new THREE.BoxGeometry(Math.max(d.length, 0.1), Math.max(d.height, 0.1), Math.max(d.width, 0.1)), [d.length, d.height, d.width]);
@@ -90,18 +93,18 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
   const accent = '#e09f3e';
   return (
     <group position={[p.x, p.y, p.z]} rotation={rot}>
-      <mesh geometry={geometry} onClick={onPointerDown} receiveShadow={kind === 'wall'} renderOrder={kind === 'wall' ? 0 : 1}>
+      <mesh geometry={geometry} onClick={unlocked ? undefined : onPointerDown} onPointerDown={unlocked ? onPointerDown : undefined} receiveShadow={kind === 'wall'} renderOrder={kind === 'wall' ? 0 : 1}>
         {kind === 'wall' && <meshStandardMaterial map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} transparent opacity={0.92} />}
         {kind === 'window' && <meshStandardMaterial color="#bfe1ff" roughness={0.08} metalness={0.1} transparent opacity={0.45} depthWrite={false} />}
         {kind === 'door' && <meshStandardMaterial color="#e2e8f0" roughness={1} transparent opacity={0.3} depthWrite={false} />}
         {kind === 'opening' && <meshBasicMaterial color="#ffffff" transparent opacity={0.05} depthWrite={false} />}
       </mesh>
       {kind === 'wall' && <DashedEdges geometry={geometry} color={focused ? accent : '#94a3b8'} dashed={!focused} opacity={focused ? 1 : 0.8} />}
-      {kind === 'window' && <DashedEdges geometry={geometry} color="#4f8fd0" dashed={false} />}
-      {kind === 'door' && <DashedEdges geometry={geometry} color="#475569" dashed={false} />}
-      {kind === 'opening' && <DashedEdges geometry={geometry} color="#64748b" dashed />}
+      {kind === 'window' && <DashedEdges geometry={geometry} color={focused ? accent : '#4f8fd0'} dashed={false} />}
+      {kind === 'door' && <DashedEdges geometry={geometry} color={focused ? accent : '#475569'} dashed={false} />}
+      {kind === 'opening' && <DashedEdges geometry={geometry} color={focused ? accent : '#64748b'} dashed={!focused} />}
       {kind === 'wall' && (
-        <WallLabel text={object.name.replace(/ \(scan\)$/, '')} y={d.height / 2 - 8} z={d.width / 2 + 1} />
+        <WallLabel text={object.name.replace(/ \(scan\)$/, '')} y={d.height / 2 - 8} z={d.width / 2 + 1} unlocked={unlocked} />
       )}
     </group>
   );

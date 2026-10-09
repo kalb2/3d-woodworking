@@ -4,7 +4,6 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { EditorOverflowList } from './EditorOverflow';
-import { UndoRedoButtons } from './UndoRedoButtons';
 
 interface IPadHeaderProps {
   onOpenCutList: () => void;
@@ -66,8 +65,7 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         </button>
       </div>
 
-      <div className="editor-topbar-more" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <UndoRedoButtons className="glass-panel glass-button editor-more-btn" />
+      <div className="editor-topbar-more">
         <button
           type="button"
           className="glass-panel glass-button editor-more-btn"

@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
+import { UndoRedoButtons } from './UndoRedoButtons';
 
 export const TransformMenu: React.FC = () => {
   const {
@@ -46,6 +47,8 @@ export const TransformMenu: React.FC = () => {
   if (isPhone) return null;
 
   return (
+    <>
+    <UndoRedoButtons placement="ipad" />
     <div className="transform-menu" data-testid="transform-menu" role="toolbar" aria-label="Move, resize, and rotate">
       <ResizeSizeRow />
       <RotateAngleRow />
@@ -158,5 +161,6 @@ export const TransformMenu: React.FC = () => {
       )}
       </div>
     </div>
+    </>
   );
 };

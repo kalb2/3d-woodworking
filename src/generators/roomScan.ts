@@ -133,6 +133,8 @@ export function roomScanParts(room: ScannedRoom): Part[] {
       parts.push({
         ...base,
         name: `${wall.label} ${label} ${i + 1} (scan)`,
+        wallId: wall.id,
+        openingId: o.id,
         shape: 'cube',
         dimensions: { length: o.width, height: o.height, width: OPENING_T },
         position: wallToWorld(wall, { x: -wall.width / 2 + o.offsetX + o.width / 2, y: o.bottom + o.height / 2, z: OPENING_T / 2 }),
@@ -142,4 +144,50 @@ export function roomScanParts(room: ScannedRoom): Part[] {
     });
   }
   return parts;
+}
+
+const isOpeningName = (name: string) => /\b(Window|Door|Opening)\b/.test(name);
+
+/**
+ * Rebuild the compact room data from the (possibly user-edited) room-scan
+ * parts, so fitting and templates use the corrected walls. Walls whose part
+ * was deleted drop out; openings follow their panels. Pure.
+ */
+export function syncRoomFromParts(room: ScannedRoom, objects: FurnitureObject[]): ScannedRoom {
+  const scan = objects.filter((o) => o.generator === ROOM_SCAN_TAG);
+  const walls: RoomWall[] = [];
+  for (const wall of room.walls) {
+    const part = scan.find((o) => o.wallId === wall.id && !isOpeningName(o.name));
+    if (!part) continue;
+    const yaw = part.rotation.y;
+    const { normal } = wallFrame(yaw);
+    const t = part.dimensions.width / 2;
+    const next: RoomWall = {
+      ...wall,
+      width: r1(part.dimensions.length),
+      height: r1(part.dimensions.height),
+      yaw: r1(yaw),
+      x: r1(part.position.x + normal.x * t),
+      z: r1(part.position.z + normal.z * t),
+      openings: [],
+    };
+    const { along } = wallFrame(next.yaw);
+    // Scans from before opening ids keep their openings as scanned.
+    if (!scan.some((p) => p.openingId)) { next.openings = wall.openings; walls.push(next); continue; }
+    for (const o of wall.openings) {
+      const op = scan.find((p) => p.openingId === o.id);
+      if (!op) continue;
+      const lx = (op.position.x - next.x) * along.x + (op.position.z - next.z) * along.z;
+      const w = op.dimensions.length, h = op.dimensions.height;
+      next.openings.push({
+        ...o,
+        width: r1(w),
+        height: r1(h),
+        offsetX: r1(lx + next.width / 2 - w / 2),
+        bottom: r1(Math.max(0, op.position.y - h / 2)),
+      });
+    }
+    walls.push(next);
+  }
+  return { walls };
 }

@@ -67,3 +67,24 @@ describe('roomFromScan (L-shaped room)', () => {
     }
   });
 });
+
+import { syncRoomFromParts } from '../generators/roomScan';
+describe('syncRoomFromParts (unlocked wall edits)', () => {
+  const room = roomFromScan(scan);
+  const parts = roomScanParts(room).map((p, i) => ({ ...p, id: String(i) }));
+  it('follows a moved/resized wall and carries its window along', () => {
+    const edited = parts.map((p) => {
+      if (p.wallId === 'back' && !p.openingId) return { ...p, dimensions: { ...p.dimensions, length: 160 }, position: { ...p.position, z: p.position.z - 10 } };
+      if (p.openingId === 'w1') return { ...p, position: { ...p.position, z: p.position.z - 10 } };
+      return p;
+    });
+    const next = syncRoomFromParts(room, edited);
+    const back = next.walls.find((w) => w.id === 'back')!;
+    expect(back.width).toBe(160);
+    expect(back.z).toBeCloseTo(-70);
+    expect(back.openings[0].offsetX).toBeCloseTo(20 + 8);
+  });
+  it('drops deleted walls', () => {
+    expect(syncRoomFromParts(room, parts.filter((p) => p.wallId !== 'left')).walls).toHaveLength(3);
+  });
+});

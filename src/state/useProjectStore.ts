@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
-import { roomScanParts } from '../generators/roomScan';
+import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
@@ -172,6 +172,8 @@ interface ProjectState {
   insertBuiltIn: (req: BuiltInRequest) => string | null;
   /** Removes a built-in's group and all its parts. */
   deleteBuiltIn: (groupId: string) => void;
+  /** Lock/unlock the scanned room's walls for editing (per project). */
+  setRoomLocked: (locked: boolean) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -191,6 +193,11 @@ interface ProjectState {
   setUnit: (unit: LengthUnit) => void;
 }
 
+/** Keep project.scannedRoom in step with edited room-scan parts. */
+function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): FurnitureProject {
+  return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
+}
+
 /** Max undo steps kept per project. */
 export const HISTORY_LIMIT = 100;
 
@@ -203,7 +210,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const keep = selectedObjectIds.filter((id) => ids.has(id));
     set((state) => ({
       historyIndex: index,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, updatedAt: Date.now() } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...withRoomSync(p, objects), updatedAt: Date.now() } : p)),
       selectedObjectIds: keep,
       selectedObjectId: keep[keep.length - 1] ?? null,
       editingGroupId: editingGroupId && ids.has(editingGroupId) ? editingGroupId : null,
@@ -659,6 +666,17 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     return result.groupId;
   },
 
+  setRoomLocked: (locked) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId
+        ? { ...p, roomLocked: locked, objects: p.objects.map((o) => (o.generator === 'room-scan' ? { ...o, locked } : o)) }
+        : p)),
+      ...(locked ? { selectedObjectId: null, selectedObjectIds: [] } : {}),
+    }));
+    saveCurrentProject();
+  },
+
   deleteBuiltIn: (groupId) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
@@ -809,9 +827,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       });
     }
 
+    const roomEdit = existingObj.generator === 'room-scan';
     set(state => ({
       projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
+        p.id === activeProjectId ? (roomEdit ? withRoomSync(p, updatedObjects) : { ...p, objects: updatedObjects }) : p
       )
     }));
 
@@ -841,7 +860,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     set(state => ({
       projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
+        p.id === activeProjectId ? (target?.generator === 'room-scan' ? withRoomSync(p, updatedObjects) : { ...p, objects: updatedObjects }) : p
       ),
       selectedObjectId: nextSelected,
       selectedObjectIds: nextSelected ? (remaining.length ? remaining : [nextSelected]) : [],

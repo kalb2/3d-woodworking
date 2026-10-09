@@ -94,8 +94,10 @@ export interface FurnitureObject {
   builtIn?: BuiltInInfo;
   /** On a built-in's parts: the instance they belong to. */
   builtInId?: string;
-  /** On room-scan wall parts: the scanned wall id. */
+  /** On room-scan parts: the scanned wall id (walls and their openings). */
   wallId?: string;
+  /** On room-scan opening parts: the scanned opening id. */
+  openingId?: string;
 }
 
 export type BuiltInTemplateId = 'media-wall';
@@ -163,6 +165,8 @@ export interface FurnitureProject {
   backgroundColor?: string;
   /** Compact LiDAR room scan (walls + openings, inches). */
   scannedRoom?: ScannedRoom;
+  /** Scanned walls are locked (not selectable) unless this is explicitly false. */
+  roomLocked?: boolean;
 }
 
 export type TemplateCategory = 'Blocks' | 'Boards' | 'Rounds' | 'Layouts';

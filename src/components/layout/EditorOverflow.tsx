@@ -4,6 +4,8 @@ import {
   FileCode,
   FileSpreadsheet,
   Layers,
+  Lock,
+  LockOpen,
   Tv,
   List,
   Pencil,
@@ -49,6 +51,9 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onOpenCutList();
   });
   const settings = useReliableTap(() => openOverlay('settings', true));
+  const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
+  const roomLocked = currentProject?.roomLocked !== false;
+  const toggleRoomLock = useReliableTap(() => useProjectStore.getState().setRoomLocked(!roomLocked));
   const hasBuiltIns = Boolean(currentProject?.objects.some((o) => o.shape === 'group' && o.builtIn));
   const builtIns = useReliableTap(() => {
     onClose();
@@ -110,6 +115,16 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
           <Tv size={18} />
           <span>Built-ins</span>
+        </button>
+      )}
+      {hasRoom && (
+        <button type="button" className="phone-sheet-row" role="switch" aria-checked={roomLocked} data-testid="menu-lock-walls"
+          onClick={toggleRoomLock} onPointerUp={toggleRoomLock} style={{ justifyContent: 'space-between' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {roomLocked ? <Lock size={18} /> : <LockOpen size={18} />}
+            <span>Lock scanned walls</span>
+          </span>
+          <span className={`menu-switch${roomLocked ? ' is-on' : ''}`} aria-hidden="true"><span /></span>
         </button>
       )}
       <button type="button" className="phone-sheet-row" data-testid="tool-settings" onClick={settings} onPointerUp={settings}>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, LockOpen, MoreHorizontal, X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
 import { describeWall } from '../native/wallScan';
@@ -127,6 +127,9 @@ export const BuiltInSheet: React.FC = () => {
   const room = project?.scannedRoom;
   const exitTap = useReliableTap(exitGroup);
   const dismissWall = useReliableTap(() => flow.focusWall(null));
+  const setRoomLocked = useProjectStore((s) => s.setRoomLocked);
+  const roomLocked = project?.roomLocked !== false;
+  const lockTap = useReliableTap(() => setRoomLocked(!roomLocked));
   const addForWall = useReliableTap(() => { if (flow.focusWallId) flow.startAddForWall(flow.focusWallId); });
   const closeTap = useReliableTap(flow.close);
   const backTap = useReliableTap(flow.back);
@@ -141,6 +144,13 @@ export const BuiltInSheet: React.FC = () => {
         <button type="button" data-testid="wall-add-template" onClick={addForWall} onPointerUp={addForWall}
           style={{ border: 'none', borderRadius: 999, padding: '6px 12px', background: '#e09f3e', color: '#fff', fontWeight: 700, fontSize: 13 }}>
           Add template
+        </button>
+        <button type="button" data-testid="wall-lock-toggle" aria-label={roomLocked ? 'Unlock walls' : 'Lock walls'} aria-pressed={roomLocked}
+          title={roomLocked ? 'Walls locked: tap to unlock for editing' : 'Walls unlocked: tap to lock'}
+          onClick={lockTap} onPointerUp={lockTap}
+          style={{ border: 'none', borderRadius: 999, padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+            background: roomLocked ? 'rgba(255,255,255,0.14)' : '#fbbf24', color: roomLocked ? '#fff' : '#1f2937', fontWeight: 700 }}>
+          {roomLocked ? <Lock size={14} /> : <><LockOpen size={14} /> Unlocked</>}
         </button>
         <button type="button" aria-label="Dismiss" onClick={dismissWall} onPointerUp={dismissWall}
           style={{ border: 'none', background: 'transparent', color: '#fff', padding: 4, display: 'flex' }}>

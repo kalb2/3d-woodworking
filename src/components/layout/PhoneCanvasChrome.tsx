@@ -75,7 +75,6 @@ export const PhoneCanvasHeader: React.FC = () => {
       </div>
 
       <div className="phone-header-actions">
-        <UndoRedoButtons className="phone-header-icon-btn" size={20} />
         <PhoneTapButton
           className="phone-header-icon-btn"
           onTap={() => {
@@ -161,6 +160,7 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
+      {!contentOpen && <UndoRedoButtons placement="phone" />}
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}

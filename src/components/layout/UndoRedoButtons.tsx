@@ -3,25 +3,28 @@ import { Redo2, Undo2 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useReliableTap } from '../../utils/reliableTap';
 
-/** Undo / redo pills for the top bar; each shows only when it can act. */
-export const UndoRedoButtons: React.FC<{ className: string; size?: number }> = ({ className, size = 18 }) => {
+/**
+ * Undo / redo pair in a fixed bottom-left spot. Both slots always render (the
+ * unavailable one dimmed) so nothing shifts under a finger; the whole pair is
+ * hidden only when the project has no history at all.
+ */
+export const UndoRedoButtons: React.FC<{ placement: 'phone' | 'ipad' }> = ({ placement }) => {
   const canUndo = useProjectStore((s) => s.historyIndex > 0);
   const canRedo = useProjectStore((s) => s.historyIndex < s.historyStack.length - 1);
   const undoTap = useReliableTap(() => useProjectStore.getState().undo());
   const redoTap = useReliableTap(() => useProjectStore.getState().redo());
+  if (!canUndo && !canRedo) return null;
   return (
-    <>
-      {canUndo && (
-        <button type="button" className={className} onClick={undoTap} onPointerUp={undoTap} title="Undo" aria-label="Undo" data-testid="topbar-undo">
-          <Undo2 size={size} />
-        </button>
-      )}
-      {canRedo && (
-        <button type="button" className={className} onClick={redoTap} onPointerUp={redoTap} title="Redo" aria-label="Redo" data-testid="topbar-redo">
-          <Redo2 size={size} />
-        </button>
-      )}
-    </>
+    <div className={`undo-redo-pair is-${placement}`} data-testid="undo-redo">
+      <button type="button" className="undo-redo-btn" disabled={!canUndo} aria-disabled={!canUndo}
+        onClick={undoTap} onPointerUp={undoTap} title="Undo" aria-label="Undo" data-testid="undo-btn">
+        <Undo2 size={18} />
+      </button>
+      <button type="button" className="undo-redo-btn" disabled={!canRedo} aria-disabled={!canRedo}
+        onClick={redoTap} onPointerUp={redoTap} title="Redo" aria-label="Redo" data-testid="redo-btn">
+        <Redo2 size={18} />
+      </button>
+    </div>
   );
 };
 
