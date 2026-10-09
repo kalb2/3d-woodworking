@@ -2703,3 +2703,77 @@ html, body, #root {
     gap: 2px;
   }
 }
+
+.media-wall-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.media-wall-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.media-wall-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.media-wall-field .glass-input {
+  min-height: 40px;
+  font-size: 16px;
+}
+
+.media-wall-choices,
+.media-wall-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.media-wall-choices .glass-button,
+.media-wall-actions .glass-button {
+  flex: 1;
+  min-height: 42px;
+}
+
+.media-wall-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.media-wall-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.media-wall-back {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  min-height: 32px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}

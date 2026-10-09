@@ -102,11 +102,14 @@ interface AppState {
   preferences: AppPreferences;
   overlays: OverlayVisibility;
   sidebarPanel: SidebarPanel;
+  mediaWallSheet: boolean;
 
   setView: (view: 'home' | 'editor') => void;
   setHomeTab: (tab: HomeTab) => void;
   openHome: (tab?: HomeTab) => void;
   setSidebarPanel: (panel: SidebarPanel) => void;
+  openMediaWallSheet: () => void;
+  closeMediaWallSheet: () => void;
   updatePreferences: (updates: Partial<AppPreferences>) => void;
   loadPreferences: () => void;
   setOverlayOpen: (id: OverlayId, open: boolean) => void;
@@ -121,8 +124,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   preferences: { ...DEFAULT_PREFS },
   overlays: initialOverlayVisibility(),
   sidebarPanel: 'shapes',
+  mediaWallSheet: false,
 
-  setView: (view) => set({ currentView: view }),
+  setView: (view) => set({ currentView: view, mediaWallSheet: view === 'home' ? false : get().mediaWallSheet }),
 
   setHomeTab: (tab) => set({ homeTab: tab }),
 
@@ -133,7 +137,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentView: 'home',
       homeTab: tab ?? get().homeTab,
       overlays: { ...ALL_OVERLAYS_CLOSED },
+      mediaWallSheet: false,
     }),
+
+  openMediaWallSheet: () => set({
+    sidebarPanel: 'templates',
+    mediaWallSheet: true,
+    overlays: { ...ALL_OVERLAYS_CLOSED, sidebar: true },
+  }),
+
+  closeMediaWallSheet: () => set({ mediaWallSheet: false }),
 
   updatePreferences: (updates) => {
     const newPrefs = { ...get().preferences, ...updates };
@@ -190,7 +203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED } }),
+  dismissOverlays: () => set({ overlays: { ...ALL_OVERLAYS_CLOSED }, mediaWallSheet: false }),
 
   resetOverlaysForLayout: (isPhone) => {
     if (isPhone) {
