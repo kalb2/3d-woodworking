@@ -132,7 +132,7 @@ export const SidebarNav: React.FC = () => {
           onClick={() => selectTab('templates')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
-          <span>Layouts</span>
+          <span>Templates</span>
         </button>
 
         <button
@@ -272,10 +272,10 @@ export const SidebarNav: React.FC = () => {
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Shape layouts
+              Templates
             </div>
             <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.45 }}>
-              Drop a starter into this project, or open the Templates tab to begin a new one.
+              Add a built-in or drop a starter into this project.
             </p>
             <button
               type="button"

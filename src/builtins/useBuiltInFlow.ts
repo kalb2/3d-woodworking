@@ -12,8 +12,10 @@ interface BuiltInFlowState {
   template: BuiltInTemplateId | null;
   /** Group id of the built-in being edited. */
   editGroupId: string | null;
-  /** Waiting for a tap on a scanned wall in the scene. */
-  picking: boolean;
+  /** Scanned wall tapped in the scene (contextual action bar). */
+  focusWallId: string | null;
+  /** The add flow started from a tapped wall (Back closes instead of showing the wall list). */
+  fromWall: boolean;
   focus: FocusRequest | null;
   startAdd: (hasRoom: boolean) => void;
   startEdit: (groupId: string, template: BuiltInTemplateId, wallId?: string) => void;
@@ -22,7 +24,8 @@ interface BuiltInFlowState {
   chooseWall: (wallId: string | null) => void;
   chooseTemplate: (id: BuiltInTemplateId) => void;
   back: () => void;
-  setPicking: (picking: boolean) => void;
+  focusWall: (wallId: string | null) => void;
+  startAddForWall: (wallId: string) => void;
   requestFocus: (target: { x: number; y: number; z: number }, radius: number) => void;
 }
 
@@ -32,20 +35,22 @@ export const useBuiltInFlow = create<BuiltInFlowState>((set, get) => ({
   wallId: null,
   template: null,
   editGroupId: null,
-  picking: false,
+  focusWallId: null,
+  fromWall: false,
   focus: null,
-  startAdd: (hasRoom) => set({ mode: 'add', step: hasRoom ? 'wall' : 'template', wallId: null, template: null, editGroupId: null, picking: false }),
-  startEdit: (groupId, template, wallId) => set({ mode: 'add', step: 'form', wallId: wallId ?? null, template, editGroupId: groupId, picking: false }),
-  openList: () => set({ mode: 'list', picking: false }),
-  close: () => set({ mode: null, picking: false, editGroupId: null }),
-  chooseWall: (wallId) => set({ wallId, step: 'template', picking: false, mode: 'add' }),
+  startAdd: (hasRoom) => set({ mode: 'add', step: hasRoom ? 'wall' : 'template', wallId: null, template: null, editGroupId: null, fromWall: false, focusWallId: null }),
+  startAddForWall: (wallId) => set({ mode: 'add', step: 'template', wallId, template: null, editGroupId: null, fromWall: true, focusWallId: null }),
+  startEdit: (groupId, template, wallId) => set({ mode: 'add', step: 'form', wallId: wallId ?? null, template, editGroupId: groupId, fromWall: false }),
+  openList: () => set({ mode: 'list', focusWallId: null }),
+  close: () => set({ mode: null, editGroupId: null, fromWall: false }),
+  chooseWall: (wallId) => set({ wallId, step: 'template', mode: 'add' }),
   chooseTemplate: (id) => set({ template: id, step: 'form' }),
   back: () => {
-    const { step, editGroupId } = get();
-    if (editGroupId || step === 'wall') return set({ mode: null, editGroupId: null });
+    const { step, editGroupId, fromWall } = get();
+    if (editGroupId || step === 'wall' || (step === 'template' && fromWall)) return set({ mode: null, editGroupId: null, fromWall: false });
     if (step === 'form') return set({ step: 'template' });
     set({ step: 'wall' });
   },
-  setPicking: (picking) => set({ picking }),
+  focusWall: (wallId) => set({ focusWallId: wallId }),
   requestFocus: (target, radius) => set({ focus: { ...target, radius, nonce: Date.now() } }),
 }));

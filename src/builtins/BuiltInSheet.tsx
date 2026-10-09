@@ -126,17 +126,27 @@ export const BuiltInSheet: React.FC = () => {
   const exitGroup = useProjectStore((s) => s.exitGroup);
   const room = project?.scannedRoom;
   const exitTap = useReliableTap(exitGroup);
-  const cancelPick = useReliableTap(() => flow.setPicking(false));
+  const dismissWall = useReliableTap(() => flow.focusWall(null));
+  const addForWall = useReliableTap(() => { if (flow.focusWallId) flow.startAddForWall(flow.focusWallId); });
   const closeTap = useReliableTap(flow.close);
   const backTap = useReliableTap(flow.back);
 
   if (!project) return null;
 
-  if (flow.picking) {
+  const focusedWall = flow.focusWallId ? room?.walls.find((w) => w.id === flow.focusWallId) : undefined;
+  if (!flow.mode && focusedWall) {
     return (
-      <button type="button" style={chipStyle} data-testid="builtin-pick-chip" onClick={cancelPick} onPointerUp={cancelPick}>
-        Tap a wall <X size={14} />
-      </button>
+      <div style={{ ...chipStyle, gap: 10, padding: '6px 6px 6px 14px' }} data-testid="wall-action-bar">
+        <span>{focusedWall.label} · {Math.round(focusedWall.width)}×{Math.round(focusedWall.height)} in</span>
+        <button type="button" data-testid="wall-add-template" onClick={addForWall} onPointerUp={addForWall}
+          style={{ border: 'none', borderRadius: 999, padding: '6px 12px', background: '#e09f3e', color: '#fff', fontWeight: 700, fontSize: 13 }}>
+          Add template
+        </button>
+        <button type="button" aria-label="Dismiss" onClick={dismissWall} onPointerUp={dismissWall}
+          style={{ border: 'none', background: 'transparent', color: '#fff', padding: 4, display: 'flex' }}>
+          <X size={14} />
+        </button>
+      </div>
     );
   }
 
@@ -163,7 +173,7 @@ export const BuiltInSheet: React.FC = () => {
     title = 'Which wall?';
     body = (
       <>
-        <Row onTap={() => flow.setPicking(true)} testId="builtin-tap-wall"><span>Tap a wall in the scene</span></Row>
+        <span style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>Tip: close this and tap a wall in the scene to start there. Or pick one:</span>
         {room?.walls.map((w) => (
           <Row key={w.id} onTap={() => flow.chooseWall(w.id)}><span>{describeWall(w)}</span><ChevronRight size={16} /></Row>
         ))}
@@ -190,7 +200,7 @@ export const BuiltInSheet: React.FC = () => {
     <div className="new-project-backdrop" data-testid="builtin-sheet" onPointerUp={(e) => { if (e.target === e.currentTarget) flow.close(); }}>
       <div className="new-project-card-sheet glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          {flow.mode === 'add' && (flow.step === 'form' || (flow.step === 'template' && !!room?.walls.length)) ? (
+          {flow.mode === 'add' && (flow.step === 'form' || (flow.step === 'template' && !!room?.walls.length && !flow.fromWall)) ? (
             <button type="button" className="glass-button" aria-label="Back" onClick={backTap} onPointerUp={backTap} style={{ padding: 6, minHeight: 40, minWidth: 40 }}>
               <ChevronLeft size={16} />
             </button>

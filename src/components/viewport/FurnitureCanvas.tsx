@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { FurnitureMesh } from './FurnitureMesh';
+import { RoomScanMesh } from './RoomScanMesh';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
@@ -68,7 +69,7 @@ export const FurnitureCanvas: React.FC = () => {
     activeGizmoMode,
   } = useProjectStore();
   const lastTap = useRef<{ id: string; time: number } | null>(null);
-  const picking = useBuiltInFlow((s) => s.picking);
+  const focusWallId = useBuiltInFlow((s) => s.focusWallId);
 
   const { preferences } = useAppStore();
 
@@ -81,6 +82,7 @@ export const FurnitureCanvas: React.FC = () => {
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const clearSelection = () => {
+    if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     if (editingGroupId) exitGroup();
     else selectObject(null);
   };
@@ -93,12 +95,15 @@ export const FurnitureCanvas: React.FC = () => {
     event.stopPropagation();
     const walls = currentProject.scannedRoom?.walls ?? [];
     const wall = walls.find((w) => w.id === obj.wallId) ?? walls.find((w) => `${w.label} (scan)` === obj.name);
-    if (wall) useBuiltInFlow.getState().chooseWall(wall.id);
+    if (!wall) return;
+    if (editingGroupId) exitGroup();
+    selectObject(null);
+    useBuiltInFlow.getState().focusWall(wall.id);
   };
 
   const handlePartPointerDown = (event: any, objId: string) => {
     event.stopPropagation();
-    if (picking) return;
+    if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     const obj = currentProject.objects.find((item) => item.id === objId);
     if (!obj) return;
     const additive = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
@@ -184,15 +189,21 @@ export const FurnitureCanvas: React.FC = () => {
         <CameraFocus />
 
         {/* Render all furniture objects in active project */}
-        {currentProject.objects.map((obj) => (
+        {currentProject.objects.map((obj) => obj.generator === 'room-scan' ? (
+          <RoomScanMesh
+            key={obj.id}
+            object={obj}
+            focused={Boolean(focusWallId && isRoomWall(obj) && (obj.wallId === focusWallId
+              || currentProject.scannedRoom?.walls.find((w) => w.id === focusWallId)?.label + ' (scan)' === obj.name))}
+            onPointerDown={isRoomWall(obj) ? (e) => handleRoomWallPick(e, obj) : undefined}
+          />
+        ) : (
           <FurnitureMesh
             key={obj.id}
             object={obj}
             isSelected={selectedObjectIds.includes(obj.id)}
             pickGroup={editingGroupId !== obj.id}
-            onPointerDown={obj.generator === 'room-scan'
-              ? (picking && isRoomWall(obj) ? (e) => handleRoomWallPick(e, obj) : undefined)
-              : (e) => handlePartPointerDown(e, obj.id)}
+            onPointerDown={(e) => handlePartPointerDown(e, obj.id)}
           />
         ))}
 

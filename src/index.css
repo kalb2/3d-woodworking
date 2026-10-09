@@ -2703,3 +2703,15 @@ html, body, #root {
     gap: 2px;
   }
 }
+
+.room-wall-label {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}

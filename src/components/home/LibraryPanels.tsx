@@ -6,6 +6,8 @@ import type { PresetTemplate, TemplateCategory } from '../../types/furniture';
 import type { DeviceShare } from '../../utils/share';
 
 const CATEGORIES: Array<TemplateCategory | 'All'> = ['All', 'Blocks', 'Boards', 'Rounds', 'Layouts'];
+/** Display names; the stored category id 'Layouts' reads as 'Assemblies' (everything here is a template). */
+const categoryLabel = (c: TemplateCategory | 'All') => (c === 'Layouts' ? 'Assemblies' : c);
 
 function partCount(template: PresetTemplate): number {
   return template.objects.length;
@@ -39,7 +41,7 @@ export const TemplatesPanel: React.FC<{
             className={`library-chip${category === item ? ' is-active' : ''}`}
             onClick={() => setCategory(item)}
           >
-            {item}
+            {categoryLabel(item)}
           </button>
         ))}
       </div>
@@ -56,7 +58,7 @@ export const TemplatesPanel: React.FC<{
                   <Box size={12} />
                   {partCount(template)} {partCount(template) === 1 ? 'shape' : 'shapes'}
                 </span>
-                <span className="library-kicker">{template.category}</span>
+                <span className="library-kicker">{categoryLabel(template.category)}</span>
               </div>
               <span>{template.author ?? 'The Workbench'}</span>
             </div>
@@ -120,7 +122,7 @@ export const CommunityPanel: React.FC<{
                 <Sparkles size={12} />
                 Included
               </span>
-              <span>{template.category}</span>
+              <span>{categoryLabel(template.category)}</span>
             </div>
             <div className="card-actions">
               <button type="button" className="primary" onClick={() => onStartTemplate(template.id)}>
