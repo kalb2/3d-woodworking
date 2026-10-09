@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Camera,
   FileCode,
@@ -6,6 +6,7 @@ import {
   Layers,
   Lock,
   LockOpen,
+  ScanLine,
   Tv,
   List,
   Pencil,
@@ -18,6 +19,8 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { isWallScanSupported, scanWalls } from '../../native/wallScan';
+import { roomFromScan } from '../../generators/roomScan';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -51,6 +54,34 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onOpenCutList();
   });
   const settings = useReliableTap(() => openOverlay('settings', true));
+  const [canScan, setCanScan] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void isWallScanSupported().then((ok) => { if (alive) setCanScan(ok); });
+    return () => { alive = false; };
+  }, []);
+  const scanRoom = useReliableTap(() => {
+    if (scanning) return;
+    const proj = useProjectStore.getState().projects.find((p) => p.id === useProjectStore.getState().activeProjectId);
+    if (proj?.scannedRoom?.walls.length && !window.confirm('Replace scanned room? Your parts and built-ins stay.')) return;
+    setScanning(true);
+    onClose();
+    void scanWalls()
+      .then((result) => {
+        const room = roomFromScan(result);
+        if (!useProjectStore.getState().addScannedRoom(room)) {
+          window.alert('No walls found. Try scanning again.');
+          return;
+        }
+        useBuiltInFlow.getState().requestFrame();
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/cancel/i.test(msg)) window.alert(`Scan failed: ${msg}`);
+      })
+      .finally(() => setScanning(false));
+  });
   const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
   const roomLocked = currentProject?.roomLocked !== false;
   const toggleRoomLock = useReliableTap(() => useProjectStore.getState().setRoomLocked(!roomLocked));
@@ -115,6 +146,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
           <Tv size={18} />
           <span>Built-ins</span>
+        </button>
+      )}
+      {canScan && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-scan-room" disabled={scanning} onClick={scanRoom} onPointerUp={scanRoom}>
+          <ScanLine size={18} />
+          <span>{scanning ? 'Scanning…' : 'Scan room'}</span>
         </button>
       )}
       {hasRoom && (

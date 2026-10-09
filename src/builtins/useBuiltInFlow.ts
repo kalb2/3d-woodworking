@@ -17,6 +17,9 @@ interface BuiltInFlowState {
   /** The add flow started from a tapped wall (Back closes instead of showing the wall list). */
   fromWall: boolean;
   focus: FocusRequest | null;
+  /** Bumped to re-frame the whole scene. */
+  frameNonce: number;
+  requestFrame: () => void;
   startAdd: (hasRoom: boolean) => void;
   startEdit: (groupId: string, template: BuiltInTemplateId, wallId?: string) => void;
   openList: () => void;
@@ -38,6 +41,8 @@ export const useBuiltInFlow = create<BuiltInFlowState>((set, get) => ({
   focusWallId: null,
   fromWall: false,
   focus: null,
+  frameNonce: 0,
+  requestFrame: () => set({ frameNonce: Date.now() }),
   startAdd: (hasRoom) => set({ mode: 'add', step: hasRoom ? 'wall' : 'template', wallId: null, template: null, editGroupId: null, fromWall: false, focusWallId: null }),
   startAddForWall: (wallId) => set({ mode: 'add', step: 'template', wallId, template: null, editGroupId: null, fromWall: true, focusWallId: null }),
   startEdit: (groupId, template, wallId) => set({ mode: 'add', step: 'form', wallId: wallId ?? null, template, editGroupId: groupId, fromWall: false }),

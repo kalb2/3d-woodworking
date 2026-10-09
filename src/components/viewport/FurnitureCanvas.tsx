@@ -61,6 +61,7 @@ const DEFAULT_CAMERA = new THREE.Vector3(50, 45, 65);
 const AutoFrame: React.FC<{ projectId: string }> = ({ projectId }) => {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  const frameNonce = useBuiltInFlow((s) => s.frameNonce);
   React.useEffect(() => {
     if (!controls) return;
     const proj = useProjectStore.getState().projects.find((p) => p.id === projectId);
@@ -84,7 +85,7 @@ const AutoFrame: React.FC<{ projectId: string }> = ({ projectId }) => {
       camera.position.copy(center.clone().add(DEFAULT_CAMERA.clone().normalize().multiplyScalar(dist)));
     }
     controls.update();
-  }, [projectId, camera, controls]);
+  }, [projectId, camera, controls, frameNonce]);
   return null;
 };
 

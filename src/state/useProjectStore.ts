@@ -172,6 +172,8 @@ interface ProjectState {
   insertBuiltIn: (req: BuiltInRequest) => string | null;
   /** Removes a built-in's group and all its parts. */
   deleteBuiltIn: (groupId: string) => void;
+  /** Put a scanned room into the current project, replacing only an earlier room scan. */
+  addScannedRoom: (room: ScannedRoom) => boolean;
   /** Lock/unlock the scanned room's walls for editing (per project). */
   setRoomLocked: (locked: boolean) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
@@ -664,6 +666,25 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     pushHistoryState();
     saveCurrentProject();
     return result.groupId;
+  },
+
+  addScannedRoom: (room) => {
+    const { projects, activeProjectId, pushHistoryState } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || room.walls.length === 0) return false;
+    const stamp = Date.now();
+    const roomParts: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}` }));
+    const kept = proj.objects.filter((o) => o.generator !== 'room-scan');
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId
+        ? { ...p, objects: [...roomParts, ...kept], scannedRoom: room, roomLocked: undefined }
+        : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: null,
+    }));
+    pushHistoryState();
+    return true;
   },
 
   setRoomLocked: (locked) => {

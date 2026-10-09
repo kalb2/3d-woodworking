@@ -139,22 +139,22 @@ export const BuiltInSheet: React.FC = () => {
   const focusedWall = flow.focusWallId ? room?.walls.find((w) => w.id === flow.focusWallId) : undefined;
   if (!flow.mode && focusedWall) {
     return (
-      <div style={{ ...chipStyle, gap: 10, padding: '6px 6px 6px 14px' }} data-testid="wall-action-bar">
-        <span>{focusedWall.label} · {Math.round(focusedWall.width)}×{Math.round(focusedWall.height)} in</span>
-        <button type="button" data-testid="wall-add-template" onClick={addForWall} onPointerUp={addForWall}
-          style={{ border: 'none', borderRadius: 999, padding: '6px 12px', background: '#e09f3e', color: '#fff', fontWeight: 700, fontSize: 13 }}>
-          Add template
+      <div className="wall-action-bar" data-testid="wall-action-bar">
+        <div className="wall-action-label">
+          <strong>{focusedWall.label}</strong>
+          <span>{Math.round(focusedWall.width)} × {Math.round(focusedWall.height)} in</span>
+        </div>
+        <button type="button" className="wall-action-add" data-testid="wall-add-template" onClick={addForWall} onPointerUp={addForWall}>
+          + Template
         </button>
-        <button type="button" data-testid="wall-lock-toggle" aria-label={roomLocked ? 'Unlock walls' : 'Lock walls'} aria-pressed={roomLocked}
+        <button type="button" className={`wall-action-icon${roomLocked ? '' : ' is-unlocked'}`} data-testid="wall-lock-toggle"
+          aria-label={roomLocked ? 'Unlock walls' : 'Lock walls'} aria-pressed={roomLocked}
           title={roomLocked ? 'Walls locked: tap to unlock for editing' : 'Walls unlocked: tap to lock'}
-          onClick={lockTap} onPointerUp={lockTap}
-          style={{ border: 'none', borderRadius: 999, padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
-            background: roomLocked ? 'rgba(255,255,255,0.14)' : '#fbbf24', color: roomLocked ? '#fff' : '#1f2937', fontWeight: 700 }}>
-          {roomLocked ? <Lock size={14} /> : <><LockOpen size={14} /> Unlocked</>}
+          onClick={lockTap} onPointerUp={lockTap}>
+          {roomLocked ? <Lock size={16} /> : <LockOpen size={16} />}
         </button>
-        <button type="button" aria-label="Dismiss" onClick={dismissWall} onPointerUp={dismissWall}
-          style={{ border: 'none', background: 'transparent', color: '#fff', padding: 4, display: 'flex' }}>
-          <X size={14} />
+        <button type="button" className="wall-action-icon" aria-label="Dismiss" onClick={dismissWall} onPointerUp={dismissWall}>
+          <X size={16} />
         </button>
       </div>
     );

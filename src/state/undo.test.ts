@@ -74,3 +74,19 @@ describe('undo / redo', () => {
     expect(s().historyIndex).toBe(0);
   });
 });
+
+describe('addScannedRoom', () => {
+  const wall = (id: string) => ({ id, label: 'Wall 1', width: 120, height: 96, x: 0, z: -60, yaw: 0, openings: [] });
+  it('adds to the current project and replaces only an earlier scan', () => {
+    s().createProject('Scan later', 'in');
+    const projectId = s().activeProjectId;
+    s().addObject('cube');
+    const userParts = objs().filter((o) => o.generator !== 'room-scan').length;
+    expect(s().addScannedRoom({ walls: [wall('a')] })).toBe(true);
+    expect(s().addScannedRoom({ walls: [wall('b'), { ...wall('c'), label: 'Wall 2' }] })).toBe(true);
+    expect(s().activeProjectId).toBe(projectId);
+    expect(objs().filter((o) => o.generator === 'room-scan')).toHaveLength(2);
+    expect(objs().filter((o) => o.generator !== 'room-scan')).toHaveLength(userParts);
+    expect(s().projects.find((p) => p.id === projectId)!.scannedRoom!.walls.map((w) => w.id)).toEqual(['b', 'c']);
+  });
+});
