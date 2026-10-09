@@ -12,11 +12,13 @@ import {
   Layers,
   RectangleHorizontal,
   Blend,
+  Tv,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
 import { PROJECT_TEMPLATES } from '../../catalog/templates';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
+import { MediaWallSheet } from '../layout/MediaWallSheet';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
@@ -36,7 +38,7 @@ const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?
 
 export const SidebarNav: React.FC = () => {
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel } = useAppStore();
+  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel, mediaWallSheet, openMediaWallSheet, closeMediaWallSheet } = useAppStore();
   const [activeTab, setActiveTab] = useState<SidebarPanel>(sidebarPanel);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export const SidebarNav: React.FC = () => {
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const lastAddAt = useRef(0);
+  const openWall = useReliableTap(() => openMediaWallSheet());
   const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
     fireReliableTap(event, () => {
       const now = performance.now();
@@ -101,10 +104,25 @@ export const SidebarNav: React.FC = () => {
         gap: 8,
         padding: '8px 10px 4px',
       }}>
-        <span className={isPhone ? 'phone-sheet-title' : undefined} style={isPhone ? undefined : { fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>Add</span>
-        <OverlayDismissButton onDismiss={() => setOverlayOpen('sidebar', false)} />
+        <span className={isPhone ? 'phone-sheet-title' : undefined} style={isPhone ? undefined : { fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>{mediaWallSheet ? 'Media wall' : 'Add'}</span>
+        <OverlayDismissButton onDismiss={() => {
+          closeMediaWallSheet();
+          setOverlayOpen('sidebar', false);
+        }} />
       </div>
 
+      {mediaWallSheet ? (
+        <div style={{ flex: isPhone ? 'none' : 1, overflowY: isPhone ? 'visible' : 'auto', padding: 12 }}>
+          <MediaWallSheet
+            onBack={() => closeMediaWallSheet()}
+            onDone={() => {
+              closeMediaWallSheet();
+              setOverlayOpen('sidebar', false);
+            }}
+          />
+        </div>
+      ) : (
+      <>
       {/* Tab Switcher */}
       <div className={isPhone ? 'phone-sheet-tabs' : undefined} style={isPhone ? undefined : {
         display: 'flex',
@@ -122,6 +140,7 @@ export const SidebarNav: React.FC = () => {
 
         <button
           className={isPhone ? `phone-sheet-tab${activeTab === 'templates' ? ' is-active' : ''}` : `glass-button ${activeTab === 'templates' ? 'active' : ''}`}
+          data-testid="add-tab-layouts"
           onClick={() => selectTab('templates')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
@@ -265,6 +284,24 @@ export const SidebarNav: React.FC = () => {
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Built-ins
+            </div>
+            <button
+              type="button"
+              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+              data-testid="open-media-wall"
+              aria-label="Media wall"
+              onClick={openWall}
+              onPointerUp={openWall}
+              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
+            >
+              <Tv size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Media wall</span>
+                <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>Wall size, TV, and base cabinets</span>
+              </div>
+            </button>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>
               Shape layouts
             </div>
             <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.45 }}>
@@ -325,6 +362,8 @@ export const SidebarNav: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
     </aside>
   );
 };

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
+import { buildMediaWallObjects, replaceMediaWall } from '../catalog/mediaWall';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
-import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import type { FurnitureObject, FurnitureProject, LengthUnit, MediaWallParams, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
@@ -142,6 +143,8 @@ interface ProjectState {
   editingGroupId: string | null;
   activeGizmoMode: 'move' | 'resize' | 'rotate';
   showDimensions: boolean;
+  viewportFocusId: string | null;
+  viewportFocusNonce: number;
 
   historyStack: FurnitureObject[][];
   historyIndex: number;
@@ -166,6 +169,7 @@ interface ProjectState {
   addWoodPreset: (presetId: string) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
+  applyMediaWall: (params: MediaWallParams) => void;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -192,6 +196,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   editingGroupId: null,
   activeGizmoMode: 'move',
   showDimensions: true,
+  viewportFocusId: null,
+  viewportFocusNonce: 0,
   historyStack: [[...INITIAL_PROJECT.objects]],
   historyIndex: 0,
 
@@ -496,7 +502,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   enterGroup: (id) => {
     const proj = get().projects.find((p) => p.id === get().activeProjectId);
-    const child = proj?.objects.find((object) => object.parentId === id);
+    const members = proj?.objects.filter((object) => object.parentId === id) ?? [];
+    const child = members.find((object) => !object.locked) ?? members[0];
     set({
       editingGroupId: id,
       multiSelect: false,
@@ -634,6 +641,32 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true;
   },
 
+  applyMediaWall: (params) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+
+    const stamp = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const next = buildMediaWallObjects(params, (role, index) => `${role}_${stamp}_${index}`);
+    const group = next.find((object) => object.shape === 'group');
+    if (!group) return;
+    const objects = replaceMediaWall(proj.objects, next);
+
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects } : p
+      ),
+      selectedObjectId: group.id,
+      selectedObjectIds: [group.id],
+      multiSelect: false,
+      editingGroupId: null,
+      viewportFocusId: group.id,
+      viewportFocusNonce: state.viewportFocusNonce + 1,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory = false) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
@@ -641,6 +674,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const existingObj = proj.objects.find(o => o.id === id);
     if (!existingObj) return;
+
+    if (existingObj.locked && (updates.position || updates.rotation || updates.dimensions)) {
+      const rest: Partial<FurnitureObject> = { ...updates };
+      delete rest.position;
+      delete rest.rotation;
+      delete rest.dimensions;
+      if (Object.keys(rest).length === 0) return;
+      updates = rest;
+    }
 
     // Groups keep their own pivot. Members stay on the floor themselves.
     if (updates.position && proj.snapSettings.floorCollision && existingObj.shape !== 'group') {
@@ -765,11 +807,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         z: source.position.z + 4
       }
     };
+    delete dup.generator;
+    delete dup.mediaWall;
 
     const copies: FurnitureObject[] = [dup];
     if (source.shape === 'group') {
       proj.objects.filter((object) => object.parentId === source.id).forEach((child, index) => {
-        copies.push({
+        const copy: FurnitureObject = {
           ...child,
           id: `${dupId}_c${index}`,
           parentId: dupId,
@@ -778,7 +822,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             y: child.position.y,
             z: child.position.z + 4,
           },
-        });
+        };
+        delete copy.generator;
+        delete copy.mediaWall;
+        copies.push(copy);
       });
     }
 

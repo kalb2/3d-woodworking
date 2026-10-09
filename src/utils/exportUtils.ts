@@ -18,6 +18,8 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
 
   for (const obj of project.objects) {
     if (!obj.visible) continue;
+    // Groups are folders, and a locked part is the reference wall, not stock.
+    if (obj.shape === 'group' || obj.locked) continue;
 
     const unit = project.unit;
     const key = `${obj.shape}_${obj.dimensions.length}_${obj.dimensions.width}_${obj.dimensions.height}_${obj.material.name}`;

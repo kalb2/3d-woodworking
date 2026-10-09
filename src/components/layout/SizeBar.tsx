@@ -90,7 +90,7 @@ const FloorDistanceSlider: React.FC<{
 export const MoveFloorRow: React.FC = () => {
   const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
   const [draft, setDraft] = useState<string | null>(null);
-  if (activeGizmoMode !== 'move' || !project || !object) return null;
+  if (activeGizmoMode !== 'move' || !project || !object || object.locked) return null;
 
   const scale = unitScale(project.unit);
   const gapInches = Math.max(object.position.y - object.dimensions.height / 2, 0);
@@ -153,7 +153,7 @@ export const MoveFloorRow: React.FC = () => {
 export const ResizeSizeRow: React.FC = () => {
   const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
   const [linked, setLinked] = useState(false);
-  if (activeGizmoMode !== 'resize' || !project || !object || object.shape === 'group') return null;
+  if (activeGizmoMode !== 'resize' || !project || !object || object.shape === 'group' || object.locked) return null;
 
   const scale = unitScale(project.unit);
   const step = project.unit === 'mm' ? 1 : project.unit === 'ft' ? 0.01 : 0.1;
@@ -236,7 +236,7 @@ function writeRotation(
 export const RotateAngleRow: React.FC = () => {
   const { object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
   const [drafts, setDrafts] = useState<Partial<Record<'x' | 'y' | 'z', string>>>({});
-  if (activeGizmoMode !== 'rotate' || !object || object.shape === 'group') return null;
+  if (activeGizmoMode !== 'rotate' || !object || object.shape === 'group' || object.locked) return null;
 
   const commit = () => {
     setDrafts({});

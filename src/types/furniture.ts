@@ -74,6 +74,16 @@ export interface Rotation3D {
   z: number;
 }
 
+/** Answers for one generated media wall. Inches, except the upper style. */
+export interface MediaWallParams {
+  wallWidth: number;
+  wallHeight: number;
+  tvSize: number;
+  baseCount: number;
+  uppers: 'shelves' | 'cabinets';
+  baseDepth: number;
+}
+
 export interface FurnitureObject {
   id: string;
   name: string;
@@ -86,6 +96,10 @@ export interface FurnitureObject {
   visible?: boolean;
   parentId?: string;
   board?: BoardOptions;
+  /** Set on parts a generator owns, so a later run can replace that run. */
+  generator?: 'media-wall';
+  /** Stored on the Media wall group so the sheet can reopen the same answers. */
+  mediaWall?: MediaWallParams;
 }
 
 export interface SnapSettings {

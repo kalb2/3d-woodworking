@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useEffect, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -30,6 +30,50 @@ const GroundContactShadow: React.FC = () => {
       />
     </group>
   );
+};
+
+/** Pull the camera back so a generated assembly fits a phone-height canvas. */
+const FrameAssembly: React.FC = () => {
+  const nonce = useProjectStore((state) => state.viewportFocusNonce);
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls);
+  const width = useThree((state) => state.size.width);
+  const height = useThree((state) => state.size.height);
+
+  useEffect(() => {
+    if (!nonce) return;
+    const perspective = camera as THREE.PerspectiveCamera;
+    if (!perspective.isPerspectiveCamera) return;
+
+    const fit = () => {
+      const state = useProjectStore.getState();
+      const project = state.projects.find((item) => item.id === state.activeProjectId);
+      const object = project?.objects.find((item) => item.id === state.viewportFocusId);
+      if (!object) return false;
+      if (width < 10 || height < 10) return false;
+      const target = new THREE.Vector3(object.position.x, object.position.y * 0.92, object.position.z);
+      const vFov = (perspective.fov * Math.PI) / 180;
+      const aspect = width / height;
+      const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+      const distW = (object.dimensions.length / 2) / Math.tan(hFov / 2);
+      const distH = (object.dimensions.height / 2) / Math.tan(vFov / 2);
+      const dist = Math.max(distW, distH, 40) * 1.7;
+      const direction = new THREE.Vector3(0.2, 0.32, 1).normalize();
+      perspective.position.copy(target).addScaledVector(direction, dist);
+      perspective.lookAt(target);
+      perspective.updateProjectionMatrix();
+      const orbit = controls as { target?: THREE.Vector3; update?: () => void } | null;
+      orbit?.target?.copy(target);
+      orbit?.update?.();
+      return true;
+    };
+
+    if (fit()) return;
+    const retry = window.setTimeout(fit, 50);
+    return () => window.clearTimeout(retry);
+  }, [nonce, camera, controls, width, height]);
+
+  return null;
 };
 
 export const FurnitureCanvas: React.FC = () => {
@@ -81,6 +125,7 @@ export const FurnitureCanvas: React.FC = () => {
 
     if (editingGroupId) {
       if (obj.parentId === editingGroupId) {
+        if (obj.locked) return;
         selectObject(obj.id, { additive });
         return;
       }
@@ -132,6 +177,8 @@ export const FurnitureCanvas: React.FC = () => {
             Default touch gestures: 1-finger = orbit, 2-finger = dolly+pan.
             Gizmo handles disable controls.enabled during drag to prevent conflicts.
             Distances are inches. 250 stopped a phone on a 4×8 sheet; 4000 frames a bunk or a small shop. */}
+        <FrameAssembly />
+
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault

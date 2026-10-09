@@ -1,6 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
+import { useReliableTap } from '../../utils/reliableTap';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
@@ -16,7 +17,8 @@ function formatMeasure(inches: number, scale: number) {
 
 export const ObjectInspector: React.FC = () => {
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen } = useAppStore();
+  const { overlays, setOverlayOpen, openMediaWallSheet } = useAppStore();
+  const rerunMediaWall = useReliableTap(() => openMediaWallSheet());
   const { projects, activeProjectId, selectedObjectId, updateObject } = useProjectStore();
 
   const currentProject = projects.find((project) => project.id === activeProjectId);
@@ -86,6 +88,24 @@ export const ObjectInspector: React.FC = () => {
       {isGroup && (
         <p className="part-properties-note" data-testid="group-properties-note">
           This group moves and rotates as one piece. Choose Edit parts to change a member.
+        </p>
+      )}
+
+      {isGroup && object.generator === 'media-wall' && (
+        <button
+          type="button"
+          className="glass-button"
+          data-testid="media-wall-rerun"
+          onClick={rerunMediaWall}
+          onPointerUp={rerunMediaWall}
+        >
+          Re-run media wall
+        </button>
+      )}
+
+      {object.locked && (
+        <p className="part-properties-note" data-testid="locked-part-note">
+          This reference wall stays put. Move and resize the other parts.
         </p>
       )}
 

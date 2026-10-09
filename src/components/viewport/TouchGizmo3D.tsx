@@ -265,7 +265,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     };
   }, [activeAxis, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
 
-  if (activeGizmoMode === 'resize') return null;
+  if (activeGizmoMode === 'resize' || object.locked) return null;
 
   const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
     if (axis === 'x' || axis === 'y' || axis === 'z') setReadoutAxis(axis);

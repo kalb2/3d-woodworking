@@ -142,7 +142,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     };
   }, [activeAxis, camera, gl, raycaster, controls, object.id, updateObject, pushHistoryState]);
 
-  if (object.shape === 'group') return null;
+  if (object.shape === 'group' || object.locked) return null;
 
   return (
     <group position={[x, y, z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
