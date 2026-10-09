@@ -98,6 +98,26 @@ export interface SnapSettings {
   floorCollision: boolean; // Enables floor barrier at y >= 0
 }
 
+export interface ScannedOpening {
+  id: string;
+  kind: 'window' | 'door' | 'opening';
+  width: number;
+  height: number;
+  /** Inches from the wall's left edge to the opening's left edge. */
+  offsetX: number;
+  /** Inches from the floor to the opening's bottom. */
+  bottom: number;
+}
+
+/** One wall from a LiDAR scan, in inches. Kept small so it syncs with the project. */
+export interface ScannedWall {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+  openings: ScannedOpening[];
+}
+
 export interface FurnitureProject {
   id: string;
   name: string;
@@ -109,6 +129,8 @@ export interface FurnitureProject {
   showFloor: boolean;
   floorOpacity: number;
   backgroundColor?: string;
+  /** Wall picked from the last LiDAR scan (media wall form). */
+  scannedWall?: ScannedWall;
 }
 
 export type TemplateCategory = 'Blocks' | 'Boards' | 'Rounds' | 'Layouts';

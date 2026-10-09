@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
-import { generateMediaWall, MEDIA_WALL_TAG, type MediaWallInput } from '../generators/mediaWall';
-import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import { generateMediaWall, MEDIA_WALL_TAG, openingReferenceParts, type MediaWallInput } from '../generators/mediaWall';
+import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedWall, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
@@ -169,6 +169,7 @@ interface ProjectState {
   insertTemplate: (templateId: string) => boolean;
   /** Adds a generated media wall as one group, replacing any earlier one in this project. */
   insertMediaWall: (input: MediaWallInput) => boolean;
+  setScannedWall: (wall: ScannedWall | undefined) => void;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -623,7 +624,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!proj) return false;
     const stamp = Date.now();
     const groupId = `grp_${stamp}_mediawall`;
-    const parts: FurnitureObject[] = generateMediaWall(input).map((object, index) => ({
+    const openings = proj.scannedWall?.openings ?? [];
+    const parts: FurnitureObject[] = [...generateMediaWall(input), ...openingReferenceParts(input, openings)].map((object, index) => ({
       ...object,
       id: `obj_${stamp}_${index}_${Math.random().toString(36).slice(2, 6)}`,
       parentId: groupId,
@@ -670,6 +672,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pushHistoryState();
     saveCurrentProject();
     return true;
+  },
+
+  setScannedWall: (wall) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, scannedWall: wall } : p)),
+    }));
+    saveCurrentProject();
   },
 
   insertTemplate: (templateId) => {

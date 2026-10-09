@@ -11,7 +11,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // otherwise create one with CAPBridgeViewController (Capacitor 8.5 template).
         if window == nil {
             window = UIWindow(windowScene: windowScene)
-            window?.rootViewController = CAPBridgeViewController()
+            window?.rootViewController = MainViewController()
         }
         window?.backgroundColor = UIColor(red: 248.0 / 255.0, green: 250.0 / 255.0, blue: 252.0 / 255.0, alpha: 1)
         window?.makeKeyAndVisible()
