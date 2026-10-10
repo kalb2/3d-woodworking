@@ -64,25 +64,19 @@ export const ObjectInspector: React.FC = () => {
         <OverlayDismissButton onDismiss={() => setOverlayOpen('inspector', false)} />
       </div>
 
-      <label className="part-properties-name">
-        Name
+      <div className="part-properties-title-row">
         <input
           className="glass-input"
           data-testid="part-name"
+          aria-label="Name"
+          title={`${object.name} (${shapeLabel(object.shape)})`}
           value={object.name}
           onChange={(event) => updateObject(object.id, { name: event.target.value })}
         />
-      </label>
-      <p className="part-properties-shape" data-testid="part-shape">{shapeLabel(object.shape)}</p>
-
-      <p className="part-properties-size" data-testid="part-size">
-        <span>{length}</span>
-        <span aria-hidden="true">×</span>
-        <span>{width}</span>
-        <span aria-hidden="true">×</span>
-        <span>{height}</span>
-        <span className="part-properties-unit">{unit}</span>
-      </p>
+        <span className="part-properties-dims" data-testid="part-size">
+          {length} × {width} × {height} {unit}
+        </span>
+      </div>
 
       {object.shape === 'board' && (
         <div className="part-properties-board" data-testid="board-tools">

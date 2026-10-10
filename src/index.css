@@ -2906,3 +2906,29 @@ html, body, #root {
 .finish-chip.is-selected .finish-swatch {
   box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #e09f3e;
 }
+
+/* Name + dimensions on one line. */
+.part-properties {
+  gap: 10px;
+}
+.part-properties-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.part-properties-title-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  font-weight: 600;
+}
+.part-properties-dims {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
