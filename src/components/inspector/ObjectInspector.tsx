@@ -10,8 +10,10 @@ import type { RoutedEdge } from '../../types/furniture';
 import { defaultBoardOptions } from '../../utils/boardGeometry';
 import { shapeLabel } from '../../catalog/shapeCatalog';
 
-function formatMeasure(inches: number, scale: number) {
-  return (inches * scale).toFixed(2);
+/** Clean number: at most 2 decimals, no trailing zeros (24, 23.5, 0.75). */
+export function formatMeasure(inches: number, scale: number) {
+  const v = Math.round(inches * scale * 100) / 100;
+  return String(Object.is(v, -0) ? 0 : v);
 }
 
 export const ObjectInspector: React.FC = () => {
@@ -81,19 +83,12 @@ export const ObjectInspector: React.FC = () => {
         <span>{height}</span>
         <span className="part-properties-unit">{unit}</span>
       </p>
-      <p className="part-properties-size-caption">Length × width × height. Change size with Resize.</p>
-
-      {isGroup && (
-        <p className="part-properties-note" data-testid="group-properties-note">
-          This group moves and rotates as one piece. Choose Edit parts to change a member.
-        </p>
-      )}
 
       {object.shape === 'board' && (
         <div className="part-properties-board" data-testid="board-tools">
-          <span className="part-properties-kicker">Board</span>
+          <span className="part-properties-kicker">Board ({unit})</span>
           <label>
-            Corner radius ({unit})
+            Corner radius
             <input
               type="number"
               className="glass-input"
@@ -122,7 +117,7 @@ export const ObjectInspector: React.FC = () => {
             ))}
           </div>
           <label>
-            Hole diameter ({unit})
+            Hole diameter
             <input
               type="number"
               className="glass-input"

@@ -2853,3 +2853,56 @@ html, body, #root {
   background: #fbbf24;
   color: #1f2937;
 }
+
+/* Floating Add: bottom right, mirrors the undo/redo pair on the left. */
+.add-fab {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #e09f3e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 8px 20px rgba(224, 159, 62, 0.35), 0 2px 6px rgba(15, 23, 42, 0.15);
+  z-index: 46;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.add-fab.is-phone {
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(100% + 6px);
+}
+.add-fab.is-ipad {
+  right: max(20px, env(safe-area-inset-right, 0px));
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+}
+.undo-redo-pair.is-phone {
+  bottom: calc(100% + 10px);
+}
+/* Properties pill sits centered so it never meets the Add button at the right. */
+.phone-properties-entry {
+  align-self: center;
+}
+
+/* Solid round swatches with a clear selected ring. */
+.finish-chip-grid .finish-swatch {
+  width: 30px;
+  height: 30px;
+  background-image: none !important;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+}
+.finish-chip {
+  border: 2px solid transparent;
+  background: transparent;
+}
+.finish-chip.is-selected {
+  border-color: transparent;
+  background: transparent;
+}
+.finish-chip.is-selected .finish-swatch {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #e09f3e;
+}

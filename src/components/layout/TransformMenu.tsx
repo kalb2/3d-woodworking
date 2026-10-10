@@ -49,6 +49,9 @@ export const TransformMenu: React.FC = () => {
   return (
     <>
     <UndoRedoButtons placement="ipad" />
+    <button type="button" className="add-fab is-ipad" data-testid="toolbar-add" aria-label="Add" title="Add" onClick={addPart} onPointerUp={addPart}>
+      <Plus size={24} strokeWidth={2.2} />
+    </button>
     <div className="transform-menu" data-testid="transform-menu" role="toolbar" aria-label="Move, resize, and rotate">
       <ResizeSizeRow />
       <RotateAngleRow />
@@ -104,15 +107,6 @@ export const TransformMenu: React.FC = () => {
       >
         <Trash2 size={18} />
         <span>Delete</span>
-      </button>
-      <button
-        type="button"
-        data-testid="toolbar-add"
-        onClick={addPart}
-        onPointerUp={addPart}
-      >
-        <Plus size={18} />
-        <span>Add</span>
       </button>
       {selectedObjectIds.length >= 2 && (
         <button
