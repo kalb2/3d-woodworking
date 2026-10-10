@@ -121,7 +121,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseGeometry, holesKey],
   );
-  const focusHoleId = useHoleFocus((st) => (st.objectId === object.id ? st.holeId : null));
+  const focusHoleId = useHoleFocus((st) => (st.objectId === object.id && st.editing ? st.holeId : null));
   const focusHole = focusHoleId ? holes.find((h) => h.id === focusHoleId) : undefined;
   const focusMarker = useMemo(() => {
     if (!focusHole) return null;
@@ -131,7 +131,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     const geom = (focusHole.kind ?? 'round') === 'rect'
       ? new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, Math.max(0.1, focusHole.height ?? w)))
       : new THREE.EdgesGeometry(new THREE.CircleGeometry(w / 2 + 0.05, 40));
-    return { geom, position: surface.clone().addScaledVector(axis, -0.03), quaternion: q };
+    return { geom, position: surface.clone().addScaledVector(axis, -0.03), quaternion: q, handle: Math.max(0.12, Math.min(0.35, w * 0.18)) };
   }, [focusHole, length, width, height]);
 
   const groupOutline = useMemo(() => {
@@ -175,9 +175,15 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         )}
       </mesh>
       {focusMarker && (
-        <lineSegments geometry={focusMarker.geom} position={focusMarker.position} quaternion={focusMarker.quaternion} renderOrder={5}>
-          <lineBasicMaterial color="#e09f3e" depthTest={false} toneMapped={false} />
-        </lineSegments>
+        <group position={focusMarker.position} quaternion={focusMarker.quaternion}>
+          <lineSegments geometry={focusMarker.geom} renderOrder={5}>
+            <lineBasicMaterial color="#e09f3e" depthTest={false} toneMapped={false} />
+          </lineSegments>
+          <mesh renderOrder={6}>
+            <circleGeometry args={[focusMarker.handle, 24]} />
+            <meshBasicMaterial color="#e09f3e" depthTest={false} toneMapped={false} />
+          </mesh>
+        </group>
       )}
       {isGroup && isSelected && groupOutline && (
         <lineSegments geometry={groupOutline}>

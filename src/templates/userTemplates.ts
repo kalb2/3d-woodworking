@@ -134,3 +134,5 @@ export const useUserTemplates = create<UserTemplateState>((set, get) => {
 
 /** Latest orbit target (updated by the canvas each frame, no re-renders). */
 export const cameraTarget = { x: 0, z: 0 };
+/** Unit vector from the orbit target toward the camera. */
+export const cameraDir = { x: 0.5, y: 0.6, z: 0.6 };

@@ -49,3 +49,28 @@ describe('cutHoles', () => {
     expect(cutHoles(board, d, [{ id: 'a', x: 0, z: 0, diameter: 2 }], true)).toBe(board);
   });
 });
+
+import { clampHole, describeHole, faceFromNormal, faceTowards, hitsHole, localToHole } from './holes';
+describe('hole mode helpers', () => {
+  const d = { length: 24, height: 0.75, width: 12 };
+  it('maps part-local face points to hole offsets', () => {
+    expect(localToHole('top', { x: 3, y: 0.375, z: -2 })).toEqual({ x: 3, z: 2 });
+    expect(localToHole('front', { x: 3, y: 0.1, z: 6 })).toEqual({ x: 3, z: 0.1 });
+    expect(localToHole('side', { x: 12, y: 0.1, z: -4 })).toEqual({ x: -4, z: 0.1 });
+  });
+  it('keeps the hole inside its face', () => {
+    expect(clampHole(d, { id: 'a', x: 50, z: -50, diameter: 2 })).toMatchObject({ x: 11, z: -5 });
+    expect(clampHole(d, { id: 'b', x: 50, z: 0, diameter: 2, kind: 'rect', height: 4, face: 'top' })).toMatchObject({ x: 11, z: 0 });
+  });
+  it('picks faces from normals and camera direction', () => {
+    expect(faceFromNormal({ x: 0, y: 1, z: 0 })).toBe('top');
+    expect(faceFromNormal({ x: 0, y: -1, z: 0 })).toBeNull();
+    expect(faceTowards({ x: 0.2, y: 0.3, z: 0.9 })).toBe('front');
+  });
+  it('detects taps on a hole and describes it cleanly', () => {
+    const h = { id: 'a', x: 2, z: 1, diameter: 1 };
+    expect(hitsHole(h, 'top', { x: 2.3, z: 1.2 })).toBe(true);
+    expect(hitsHole(h, 'front', { x: 2, z: 1 })).toBe(false);
+    expect(describeHole(h, 'in', 1)).toBe('Round Ø 1 in · Top');
+  });
+});

@@ -1,13 +1,15 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
-import { cameraTarget } from '../../templates/userTemplates';
+import { cameraDir, cameraTarget } from '../../templates/userTemplates';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { FurnitureMesh } from './FurnitureMesh';
 import { RoomScanMesh } from './RoomScanMesh';
+import { HoleDragger } from './HoleDragger';
+import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
@@ -61,8 +63,11 @@ const DEFAULT_CAMERA = new THREE.Vector3(50, 45, 65);
 /** Mirrors the orbit target into a plain object for placement (no React updates). */
 const TrackTarget: React.FC = () => {
   const controls = useThree((s) => s.controls) as { target: THREE.Vector3 } | null;
-  useFrame(() => {
-    if (controls) { cameraTarget.x = controls.target.x; cameraTarget.z = controls.target.z; }
+  useFrame(({ camera }) => {
+    if (!controls) return;
+    cameraTarget.x = controls.target.x; cameraTarget.z = controls.target.z;
+    const d = camera.position.clone().sub(controls.target).normalize();
+    cameraDir.x = d.x; cameraDir.y = d.y; cameraDir.z = d.z;
   });
   return null;
 };
@@ -113,6 +118,7 @@ export const FurnitureCanvas: React.FC = () => {
   } = useProjectStore();
   const lastTap = useRef<{ id: string; time: number } | null>(null);
   const focusWallId = useBuiltInFlow((s) => s.focusWallId);
+  const holeEdit = useHoleFocus();
 
   const { preferences } = useAppStore();
 
@@ -125,6 +131,7 @@ export const FurnitureCanvas: React.FC = () => {
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const clearSelection = () => {
+    if (useHoleFocus.getState().editing) { useHoleFocus.getState().exit(); return; }
     if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     if (editingGroupId) exitGroup();
     else selectObject(null);
@@ -256,8 +263,16 @@ export const FurnitureCanvas: React.FC = () => {
           />
         ))}
 
+        {/* Hole mode: drag the edited hole; otherwise taps on a selected part's holes start editing */}
+        {(() => {
+          const target = holeEdit.editing
+            ? currentProject.objects.find((o) => o.id === holeEdit.objectId)
+            : selectedObject && supportsHoles(selectedObject.shape) && getHoles(selectedObject).length ? selectedObject : undefined;
+          return target ? <HoleDragger key={target.id} object={target} editing={holeEdit.editing} /> : null;
+        })()}
+
         {/* Active Selected Object Controls */}
-        {selectedObject && (
+        {selectedObject && !holeEdit.editing && (
           <>
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (

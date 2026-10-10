@@ -2950,3 +2950,21 @@ html, body, #root {
 .hole-field-input button { border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; border-radius: 6px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; color: inherit; }
 .hole-field-input .hole-thru { width: auto; padding: 0 8px; font-size: 12px; }
 .hole-add { align-self: flex-start; border: 1px dashed rgba(148, 163, 184, 0.8); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text-main); }
+
+/* Hole list + hole mode */
+.hole-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(15, 23, 42, 0.08); background: transparent; font: inherit; font-size: 13px; color: var(--text-main); text-align: left; }
+.hole-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hole-choice button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-main); }
+.hole-mode-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 240; display: flex; flex-direction: column; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: #ffffff; border-radius: 20px 20px 0 0; box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12); }
+.hole-bar-hint { font-size: 11px; color: var(--text-muted); text-align: center; }
+.hole-bar-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.hole-bar-size { display: flex; align-items: center; gap: 4px; }
+.hole-bar-size button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; display: flex; align-items: center; justify-content: center; padding: 0; color: inherit; }
+.hole-bar-size-label { font-size: 13px; color: var(--text-muted); }
+.hole-bar-input { width: 56px; padding: 6px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.5); font-size: 14px; text-align: center; background: transparent; color: var(--text-main); }
+.hole-mode-bar .hole-seg button { padding: 7px 10px; font-size: 12px; display: flex; align-items: center; }
+.hole-bar-exact label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.hole-bar-btn { display: flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-main); }
+.hole-bar-btn.is-on { border-color: #e09f3e; color: #e09f3e; }
+.hole-bar-btn.is-danger { color: #dc2626; }
+.hole-bar-btn.is-primary { background: #e09f3e; border-color: #e09f3e; color: #fff; }

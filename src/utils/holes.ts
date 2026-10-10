@@ -18,10 +18,11 @@ export function holesUpdate(o: FurnitureObject, holes: BoardHole[]): Partial<Fur
   return { holes };
 }
 
-export function newHole(o: FurnitureObject, index = getHoles(o).length): BoardHole {
+export function newHole(o: FurnitureObject, index = getHoles(o).length, kind: 'round' | 'rect' = 'round', face: BoardHole['face'] = 'top'): BoardHole {
   const d = o.dimensions;
-  const size = Math.max(0.25, Math.min(1, Math.min(d.length, d.width) / 4));
-  return { id: `hole_${Date.now()}_${index}`, x: 0, z: 0, diameter: Math.round(size * 4) / 4, face: 'top' };
+  const { u, v } = faceSize(d, face);
+  const size = Math.round(Math.max(0.25, Math.min(1, Math.min(u, v) / 4)) * 4) / 4;
+  return { id: `hole_${Date.now()}_${index}`, x: 0, z: 0, diameter: size, face, ...(kind === 'rect' ? { kind, height: size } : {}) };
 }
 
 /** Thickness of the part measured through a face. */
@@ -96,9 +97,79 @@ export function cutHoles(base: THREE.BufferGeometry, d: Dimensions3D, holes: Boa
   }
 }
 
-/** Hole row currently focused in Properties (highlighted on the part). */
-export const useHoleFocus = create<{ objectId: string | null; holeId: string | null; set: (objectId: string | null, holeId: string | null) => void }>((set) => ({
+/** Hole mode: which part/hole is being edited on the canvas. */
+export const useHoleFocus = create<{
+  objectId: string | null;
+  holeId: string | null;
+  editing: boolean;
+  set: (objectId: string | null, holeId: string | null) => void;
+  edit: (objectId: string, holeId: string) => void;
+  exit: () => void;
+}>((set) => ({
   objectId: null,
   holeId: null,
+  editing: false,
   set: (objectId, holeId) => set({ objectId, holeId }),
+  edit: (objectId, holeId) => set({ objectId, holeId, editing: true }),
+  exit: () => set({ objectId: null, holeId: null, editing: false }),
 }));
+
+/** Half extents of a hole on its face (u along x, v along z). */
+export function holeHalf(h: BoardHole) {
+  const hu = Math.max(0.025, h.diameter / 2);
+  const hv = (h.kind ?? 'round') === 'rect' ? Math.max(0.025, (h.height ?? h.diameter) / 2) : hu;
+  return { hu, hv };
+}
+
+/** Face size (u, v extents) for a part. */
+export function faceSize(d: Dimensions3D, face: BoardHole['face']) {
+  if (face === 'front') return { u: d.length, v: d.height };
+  if (face === 'side') return { u: d.width, v: d.height };
+  return { u: d.length, v: d.width };
+}
+
+/** Keep a hole inside its face. */
+export function clampHole(d: Dimensions3D, h: BoardHole): BoardHole {
+  const { u, v } = faceSize(d, h.face);
+  const { hu, hv } = holeHalf(h);
+  const cu = Math.max(0, u / 2 - hu), cv = Math.max(0, v / 2 - hv);
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+  return { ...h, x: r3(Math.max(-cu, Math.min(cu, h.x))), z: r3(Math.max(-cv, Math.min(cv, h.z))) };
+}
+
+/** Part-local point on a face -> hole offsets on that face. */
+export function localToHole(face: NonNullable<BoardHole['face']>, p: { x: number; y: number; z: number }) {
+  if (face === 'front') return { x: p.x, z: p.y };
+  if (face === 'side') return { x: p.z, z: p.y };
+  return { x: p.x, z: -p.z };
+}
+
+/** Which +face a part-local normal points at (null for the opposite faces / hole walls). */
+export function faceFromNormal(n: { x: number; y: number; z: number }): NonNullable<BoardHole['face']> | null {
+  if (n.y > 0.9) return 'top';
+  if (n.z > 0.9) return 'front';
+  if (n.x > 0.9) return 'side';
+  return null;
+}
+
+/** The +face that best faces a part-local direction to the camera. */
+export function faceTowards(dir: { x: number; y: number; z: number }): NonNullable<BoardHole['face']> {
+  const best = [['top', dir.y], ['front', dir.z], ['side', dir.x]] as const;
+  return [...best].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+/** Is a face point (hole offsets) inside a hole's footprint (with a little slack)? */
+export function hitsHole(h: BoardHole, face: NonNullable<BoardHole['face']>, at: { x: number; z: number }, slack = 0.4): boolean {
+  if ((h.face ?? 'top') !== face) return false;
+  const { hu, hv } = holeHalf(h);
+  return Math.abs(at.x - h.x) <= hu + slack && Math.abs(at.z - h.z) <= hv + slack;
+}
+
+export function describeHole(h: BoardHole, unit: string, scale: number): string {
+  const c = (v: number) => String(Math.round(v * scale * 100) / 100);
+  const face = (h.face ?? 'top');
+  const size = (h.kind ?? 'round') === 'rect'
+    ? `Square ${c(h.diameter)}${(h.height ?? h.diameter) !== h.diameter ? `×${c(h.height!)}` : ''} ${unit}`
+    : `Round Ø ${c(h.diameter)} ${unit}`;
+  return `${size} · ${face[0].toUpperCase() + face.slice(1)}${h.depth !== undefined ? ` · ${c(h.depth)} deep` : ''}`;
+}
