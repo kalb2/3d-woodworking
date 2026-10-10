@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, Circle, Square } from 'lucide-react';
+import { ChevronRight, Circle, Square, SquareDashedBottom } from 'lucide-react';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -16,7 +16,7 @@ export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; sca
     useAppStore.getState().setOverlayOpen('inspector', false);
     useHoleFocus.getState().edit(object.id, holeId);
   };
-  const add = (kind: 'round' | 'rect') => {
+  const add = (kind: 'round' | 'rect' | 'notch') => {
     // Face that looks most toward the camera, in the part's local frame.
     const yaw = (object.rotation.y * Math.PI) / 180;
     const c = Math.cos(-yaw), s = Math.sin(-yaw);
@@ -29,7 +29,7 @@ export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; sca
 
   return (
     <div className="holes-section" data-testid="holes-section">
-      {holes.length > 0 && <span className="part-properties-kicker">Holes</span>}
+      {holes.length > 0 && <span className="part-properties-kicker">Cuts</span>}
       {holes.map((h) => (
         <button key={h.id} type="button" className="hole-list-row" data-testid="hole-row" onClick={() => enterHoleMode(h.id)}>
           <span>{describeHole(h, unit, scale)}</span>
@@ -38,11 +38,12 @@ export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; sca
       ))}
       {choosing ? (
         <div className="hole-choice" data-testid="hole-choice">
-          <button type="button" onClick={() => add('round')} data-testid="hole-add-round"><Circle size={22} /> Round</button>
-          <button type="button" onClick={() => add('rect')} data-testid="hole-add-square"><Square size={22} /> Square</button>
+          <button type="button" onClick={() => add('round')} data-testid="hole-add-round"><Circle size={22} /> Round hole</button>
+          <button type="button" onClick={() => add('rect')} data-testid="hole-add-square"><Square size={22} /> Square hole</button>
+          <button type="button" onClick={() => add('notch')} data-testid="hole-add-notch"><SquareDashedBottom size={22} /> Notch</button>
         </div>
       ) : (
-        <button type="button" className="hole-add" data-testid="hole-add" onClick={() => setChoosing(true)}>+ Add hole</button>
+        <button type="button" className="hole-add" data-testid="hole-add" onClick={() => setChoosing(true)}>+ Add cut</button>
       )}
     </div>
   );

@@ -8,7 +8,7 @@ import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
 import { positiveSize } from '../../theme/partSurface';
-import { cutHoles, getHoles, holeFrame, supportsHoles, useHoleFocus } from '../../utils/holes';
+import { cutHoles, faceAxes, faceThickness, footprint, getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -125,13 +125,15 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const focusHole = focusHoleId ? holes.find((h) => h.id === focusHoleId) : undefined;
   const focusMarker = useMemo(() => {
     if (!focusHole) return null;
-    const { surface, axis } = holeFrame({ length, width, height }, focusHole);
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis.clone().negate());
-    const w = Math.max(0.1, focusHole.diameter);
-    const geom = (focusHole.kind ?? 'round') === 'rect'
-      ? new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, Math.max(0.1, focusHole.height ?? w)))
-      : new THREE.EdgesGeometry(new THREE.CircleGeometry(w / 2 + 0.05, 40));
-    return { geom, position: surface.clone().addScaledVector(axis, -0.03), quaternion: q, handle: Math.max(0.12, Math.min(0.35, w * 0.18)) };
+    const dims = { length, width, height };
+    const { u, v, n } = faceAxes(focusHole.face);
+    const f = footprint(focusHole);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, n.clone().cross(u), n));
+    const geom = (focusHole.kind ?? 'round') === 'round'
+      ? new THREE.EdgesGeometry(new THREE.CircleGeometry(f.wu / 2 + 0.05, 40))
+      : new THREE.EdgesGeometry(new THREE.PlaneGeometry(f.wu, f.wv));
+    const position = n.clone().multiplyScalar(faceThickness(dims, focusHole.face) / 2 + 0.03).addScaledVector(u, f.cu).addScaledVector(v, f.cv);
+    return { geom, position, quaternion: q, handle: Math.max(0.12, Math.min(0.35, Math.min(f.wu, f.wv) * 0.18)) };
   }, [focusHole, length, width, height]);
 
   const groupOutline = useMemo(() => {

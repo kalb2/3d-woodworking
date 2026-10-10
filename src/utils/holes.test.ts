@@ -74,3 +74,29 @@ describe('hole mode helpers', () => {
     expect(describeHole(h, 'in', 1)).toBe('Round Ø 1 in · Top');
   });
 });
+
+describe('notches', () => {
+  const d = { length: 24, height: 4, width: 12 };
+  const obj = { id: 'o', name: 'o', shape: 'cube' as const, dimensions: d, position: { x: 0, y: 2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: PRESET_WOOD_MATERIALS.birch };
+  it('defaults to 1.5 × 0.75 on an edge, through', () => {
+    const n = newHole(obj, 0, 'notch', 'top');
+    expect(n).toMatchObject({ kind: 'notch', diameter: 1.5, height: 0.75, edge: 'v+', x: 0, z: 5.625 });
+    expect(n.depth).toBeUndefined();
+    expect(describeHole(n, 'in', 1)).toBe('Notch 1.5 × 0.75 in · Back edge');
+  });
+  it('snaps to the nearest edge and slides along it', () => {
+    const n = newHole(obj, 0, 'notch', 'top');
+    expect(clampHole(d, { ...n, x: 11.9, z: 0 })).toMatchObject({ edge: 'u+', x: 11.625 });
+    expect(clampHole(d, { ...n, x: 3, z: -5.9 })).toMatchObject({ edge: 'v-', x: 3, z: -5.625 });
+    expect(clampHole(d, { ...n, x: 11.5, z: 5.99 })).toMatchObject({ edge: 'v+', x: 11.25 });
+  });
+  it('cuts an open notch (geometry changes; cutter reaches past the edge)', () => {
+    const plain = new THREE.BoxGeometry(24, 4, 12).toNonIndexed().getAttribute('position').count;
+    const n = newHole(obj, 0, 'notch', 'front');
+    const out = cutHoles(new THREE.BoxGeometry(24, 4, 12), d, [n]);
+    expect(out.getAttribute('position').count).toBeGreaterThan(plain);
+    out.computeBoundingBox();
+    // The top edge of the front face is opened: the box still spans full height elsewhere.
+    expect(out.boundingBox!.max.y).toBeCloseTo(2);
+  });
+});

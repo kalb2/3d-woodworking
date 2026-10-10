@@ -33,10 +33,12 @@ export interface BoardHole {
   face?: HoleFace;
   /** Depth into the part; absent = through. */
   depth?: number;
-  /** Default 'round'. */
-  kind?: 'round' | 'rect';
-  /** Rectangular holes: size along z. */
+  /** Default 'round'. A notch is a rectangle open on one edge of the face. */
+  kind?: 'round' | 'rect' | 'notch';
+  /** Rectangular holes: size along z. Notches: depth in from the edge. */
   height?: number;
+  /** Notches: which edge of the face it opens onto (u = x offset axis, v = y offset axis). */
+  edge?: 'u-' | 'u+' | 'v-' | 'v+';
 }
 
 export interface BoardOptions {
