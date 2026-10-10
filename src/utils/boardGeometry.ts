@@ -6,8 +6,8 @@ export const isOutlineHole = (h: BoardHole) => (h.face ?? 'top') === 'top' && h.
 
 export function defaultBoardOptions(): BoardOptions {
   return {
-    cornerRadius: 0.75,
-    edge: 'roundover',
+    cornerRadius: 0,
+    edge: 'none',
     holes: [],
   };
 }
@@ -51,7 +51,7 @@ export function createBoardGeometry(dimensions: Dimensions3D, board: BoardOption
     shape.holes.push(path);
   }
 
-  const bevel = board.edge === 'none' ? 0 : Math.min(height * 0.42, 0.22);
+  const bevel = board.edge === 'none' ? 0 : Math.min(height * 0.45, Math.max(0.01, board.edgeSize ?? 0.22));
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: Math.max(height - bevel, height * 0.5),
     bevelEnabled: board.edge !== 'none',

@@ -202,7 +202,10 @@ export const SidebarNav: React.FC = () => {
               );
             })}
 
-            {/* Standard Lumber & Sheet Stock Presets */}
+            {/* Sheet goods and lumber, one category each */}
+            {(['Plywood sheets', 'MDF sheets', 'Lumber'] as const).map((category) => (
+              <React.Fragment key={category}>
+            
             <div style={{
               fontSize: 12,
               fontWeight: isPhone ? 500 : 600,
@@ -213,10 +216,10 @@ export const SidebarNav: React.FC = () => {
               borderTop: isPhone ? '1px solid #eef2f6' : '1px solid rgba(255,255,255,0.08)',
               paddingTop: 12
             }}>
-              Standard Wood Sizes
+              {category}
             </div>
 
-            {STANDARD_WOOD_PRESETS.map((preset) => (
+            {STANDARD_WOOD_PRESETS.filter((p) => p.category === category).map((preset) => (
               <button
                 key={preset.id}
                 type="button"
@@ -256,6 +259,8 @@ export const SidebarNav: React.FC = () => {
                   </span>
                 </div>
               </button>
+            ))}
+              </React.Fragment>
             ))}
           </div>
         )}

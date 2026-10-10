@@ -45,6 +45,8 @@ export interface BoardOptions {
   cornerRadius: number;
   holes: BoardHole[];
   edge: RoutedEdge;
+  /** Chamfer/roundover size in inches; absent = automatic (older parts). */
+  edgeSize?: number;
 }
 
 export type WoodSpecies =
@@ -58,7 +60,8 @@ export type WoodSpecies =
   | 'birch'
   | 'plywood'
   | 'custom_paint'
-  | 'metal_accent';
+  | 'metal_accent'
+  | 'mdf';
 
 export interface WoodMaterial {
   id: WoodSpecies;

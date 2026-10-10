@@ -113,3 +113,28 @@ describe('unlock then delete a scanned wall', () => {
     expect(objs().find((o) => o.id === s().selectedObjectId)?.generator).not.toBe('room-scan');
   });
 });
+
+describe('boards and sheet presets', async () => {
+  const { STANDARD_WOOD_PRESETS } = await import('./useProjectStore');
+  const { shapeCatalogEntry } = await import('../catalog/shapeCatalog');
+  const { defaultBoardOptions } = await import('../utils/boardGeometry');
+  it('names boards "Board" with square edges by default', () => {
+    expect(shapeCatalogEntry('board')!.defaultName).toBe('Board');
+    expect(defaultBoardOptions()).toMatchObject({ edge: 'none', cornerRadius: 0, holes: [] });
+  });
+  it('has plywood and MDF sheet categories with their finishes', () => {
+    const ply = STANDARD_WOOD_PRESETS.filter((p) => p.category === 'Plywood sheets');
+    const mdf = STANDARD_WOOD_PRESETS.filter((p) => p.category === 'MDF sheets');
+    expect(ply.map((p) => p.dimensions.height)).toEqual([0.25, 0.5, 0.75]);
+    expect(mdf.map((p) => p.dimensions.height)).toEqual([0.25, 0.5, 0.75]);
+    expect(ply.every((p) => p.material.species === 'plywood')).toBe(true);
+    expect(mdf.every((p) => p.material.species === 'mdf')).toBe(true);
+  });
+  it('inserting an MDF sheet applies the MDF finish', () => {
+    s().createProject('Sheets', 'in');
+    s().addWoodPreset('mdf_4x8_3_4');
+    const o = objs()[objs().length - 1];
+    expect(o.material.species).toBe('mdf');
+    expect(o.shape).toBe('board');
+  });
+});

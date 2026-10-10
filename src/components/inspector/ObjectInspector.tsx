@@ -99,18 +99,37 @@ export const ObjectInspector: React.FC = () => {
               }}
             />
           </label>
-          <div className="part-properties-edges">
-            {(['none', 'roundover', 'chamfer'] as RoutedEdge[]).map((edge) => (
-              <button
-                key={edge}
-                type="button"
-                data-testid={`board-edge-${edge}`}
-                className={`glass-button${board.edge === edge ? ' active' : ''}`}
-                onClick={() => updateObject(object.id, { board: { ...board, edge } })}
-              >
-                {edge === 'none' ? 'Square' : edge === 'roundover' ? 'Round' : 'Chamfer'}
-              </button>
-            ))}
+          <div className="part-properties-edge-row">
+            <span>Edges</span>
+            <div className="part-properties-edges">
+              {(['none', 'chamfer', 'roundover'] as RoutedEdge[]).map((edge) => (
+                <button
+                  key={edge}
+                  type="button"
+                  data-testid={`board-edge-${edge}`}
+                  className={`glass-button${board.edge === edge ? ' active' : ''}`}
+                  onClick={() => updateObject(object.id, { board: { ...board, edge, edgeSize: edge === 'none' ? board.edgeSize : (board.edgeSize ?? 0.125) } })}
+                >
+                  {edge === 'none' ? 'Square' : edge === 'roundover' ? 'Rounded' : 'Chamfered'}
+                </button>
+              ))}
+            </div>
+            {board.edge !== 'none' && (
+              <input
+                type="number"
+                className="glass-input part-properties-edge-size"
+                data-testid="board-edge-size"
+                aria-label="Edge size"
+                min={0}
+                step="0.0625"
+                value={formatMeasure(board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22), scale)}
+                onChange={(event) => {
+                  const num = parseFloat(event.target.value);
+                  if (Number.isNaN(num) || num <= 0) return;
+                  updateObject(object.id, { board: { ...board, edgeSize: num / scale } });
+                }}
+              />
+            )}
           </div>
         </div>
       )}

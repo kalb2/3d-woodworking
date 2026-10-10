@@ -126,8 +126,15 @@ export const TransparentFloor: React.FC<TransparentFloorProps> = ({ visible }) =
 
   const material = useMemo(() => {
     const mat = new InfiniteWorkshopGridMaterial();
-    mat.transparent = true;
-    mat.depthTest = true;
+    // Draw the grid in the OPAQUE pass, before any part (renderOrder below), with
+    // manual alpha blending and no depth write. Parts then paint over it
+    // completely, so lines can never show through wood regardless of depth
+    // precision or gl_FragDepth support on the device.
+    mat.transparent = false;
+    mat.blending = THREE.CustomBlending;
+    mat.blendSrc = THREE.SrcAlphaFactor;
+    mat.blendDst = THREE.OneMinusSrcAlphaFactor;
+    mat.depthTest = false;
     mat.depthWrite = false;
     mat.toneMapped = true;
     mat.side = THREE.DoubleSide;
@@ -148,7 +155,7 @@ export const TransparentFloor: React.FC<TransparentFloorProps> = ({ visible }) =
       geometry={geometry}
       material={material}
       frustumCulled={false}
-      renderOrder={-1}
+      renderOrder={-1000}
       raycast={() => {}}
     />
   );

@@ -15,49 +15,34 @@ export interface WoodPreset {
   dimensions: { length: number; width: number; height: number };
   material: WoodMaterial;
   shape: ShapeType;
+  category: PresetCategory;
 }
 
+export type PresetCategory = 'Plywood sheets' | 'MDF sheets' | 'Lumber';
+
+const THICKNESSES: Array<[string, number]> = [['1/4', 0.25], ['1/2', 0.5], ['3/4', 0.75]];
+const sheet = (kind: 'plywood' | 'mdf', [label, t]: [string, number]): WoodPreset => ({
+  id: `${kind}_4x8_${label.replace('/', '_')}`,
+  label: `${kind === 'plywood' ? 'Plywood' : 'MDF'} 4×8 · ${label}"`,
+  description: `96" × 48" × ${t}"`,
+  dimensions: { length: 96, width: 48, height: t },
+  material: kind === 'plywood' ? PRESET_WOOD_MATERIALS.plywood : PRESET_WOOD_MATERIALS.mdf,
+  shape: 'board',
+  category: kind === 'plywood' ? 'Plywood sheets' : 'MDF sheets',
+});
+
 export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
-  {
-    id: 'plywood_4x8_3_4',
-    label: '4×8 Plywood Sheet (3/4")',
-    description: '96" × 48" × 0.75" — Standard cabinet-grade plywood',
-    dimensions: { length: 96, width: 48, height: 0.75 },
-    material: PRESET_WOOD_MATERIALS.birch,
-    shape: 'cube'
-  },
-  {
-    id: 'plywood_4x8_1_2',
-    label: '4×8 Plywood Sheet (1/2")',
-    description: '96" × 48" × 0.5" — Thinner plywood for backing/shelves',
-    dimensions: { length: 96, width: 48, height: 0.5 },
-    material: PRESET_WOOD_MATERIALS.birch,
-    shape: 'cube'
-  },
+  ...THICKNESSES.map((t) => sheet('plywood', t)),
+  ...THICKNESSES.map((t) => sheet('mdf', t)),
   {
     id: 'pine_2x4_8ft',
-    label: '2×4 Pine Board (8ft)',
-    description: '96" × 3.5" × 1.5" — Standard dimensional lumber',
+    label: '2×4 Pine (8 ft)',
+    description: '96" × 3.5" × 1.5"',
     dimensions: { length: 96, width: 3.5, height: 1.5 },
     material: PRESET_WOOD_MATERIALS.pine,
-    shape: 'cube'
+    shape: 'cube',
+    category: 'Lumber',
   },
-  {
-    id: 'mdf_4x8_3_4',
-    label: '4×8 MDF Sheet (3/4")',
-    description: '96" × 48" × 0.75" — Medium density fiberboard',
-    dimensions: { length: 96, width: 48, height: 0.75 },
-    material: PRESET_WOOD_MATERIALS.custom_paint,
-    shape: 'cube'
-  },
-  {
-    id: 'mdf_4x8_1_2',
-    label: '4×8 MDF Sheet (1/2")',
-    description: '96" × 48" × 0.5" — Thinner MDF sheet stock',
-    dimensions: { length: 96, width: 48, height: 0.5 },
-    material: PRESET_WOOD_MATERIALS.custom_paint,
-    shape: 'cube'
-  }
 ];
 
 const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
@@ -599,13 +584,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: preset.label,
+      name: nextStockName(proj.objects.map((o) => o.name), preset.label),
       shape: preset.shape,
       dimensions: { ...preset.dimensions },
       position: { x: 0, y: preset.dimensions.height / 2, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: preset.material,
-      visible: true
+      material: { ...preset.material },
+      visible: true,
+      board: preset.shape === 'board' ? defaultBoardOptions() : undefined,
     };
 
     const updatedObjects = [...proj.objects, newObj];

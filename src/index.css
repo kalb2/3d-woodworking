@@ -2969,3 +2969,5 @@ html, body, #root {
 .hole-bar-btn.is-danger { color: #dc2626; }
 .hole-bar-btn.is-primary { background: #e09f3e; border-color: #e09f3e; color: #fff; }
 .hole-bar-more { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid rgba(15, 23, 42, 0.06); }
+.part-properties-edge-row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); flex-wrap: wrap; }
+.part-properties-edge-size { width: 64px; text-align: right; }
