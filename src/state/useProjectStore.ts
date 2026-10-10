@@ -3,6 +3,7 @@ import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalo
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
+import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
@@ -172,6 +173,8 @@ interface ProjectState {
   insertBuiltIn: (req: BuiltInRequest) => string | null;
   /** Removes a built-in's group and all its parts. */
   deleteBuiltIn: (groupId: string) => void;
+  /** Insert a saved user template as one group (or a single part); one undo step. */
+  insertUserTemplate: (template: UserTemplate, place: { at?: { x: number; z: number }; wallId?: string | null }) => boolean;
   /** Put a scanned room into the current project, replacing only an earlier room scan. */
   addScannedRoom: (room: ScannedRoom) => boolean;
   /** Lock/unlock the scanned room's walls for editing (per project). */
@@ -667,6 +670,26 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     pushHistoryState();
     saveCurrentProject();
     return result.groupId;
+  },
+
+  insertUserTemplate: (template, place) => {
+    const { projects, activeProjectId, pushHistoryState } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return false;
+    const wall = place.wallId ? proj.scannedRoom?.walls.find((w) => w.id === place.wallId) : undefined;
+    const placement: Placement = wall ? { wall } : { at: place.at };
+    const added = instantiateUserTemplate(template, placement, LIGHT_STARTING_WOOD);
+    if (added.length === 0) return false;
+    const top = added.find((o) => o.shape === 'group') ?? added[0];
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: [...p.objects, ...added] } : p)),
+      selectedObjectId: top.id,
+      selectedObjectIds: [top.id],
+      editingGroupId: null,
+      multiSelect: false,
+    }));
+    pushHistoryState();
+    return true;
   },
 
   addScannedRoom: (room) => {

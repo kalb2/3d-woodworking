@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Tv,
   Box,
   Cylinder,
   Circle,
@@ -15,12 +14,11 @@ import {
   Blend,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
-import { PROJECT_TEMPLATES } from '../../catalog/templates';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
-import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { TemplatesTab } from './TemplatesTab';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
@@ -52,7 +50,6 @@ export const SidebarNav: React.FC = () => {
   const {
     addObject,
     addWoodPreset,
-    insertTemplate,
     projects,
     activeProjectId,
     selectedObjectId,
@@ -65,11 +62,6 @@ export const SidebarNav: React.FC = () => {
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const lastAddAt = useRef(0);
-  const startBuiltIn = () => {
-    const { projects, activeProjectId } = useProjectStore.getState();
-    const proj = projects.find((p) => p.id === activeProjectId);
-    useBuiltInFlow.getState().startAdd(Boolean(proj?.scannedRoom?.walls.length));
-  };
   const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
     fireReliableTap(event, () => {
       const now = performance.now();
@@ -271,38 +263,7 @@ export const SidebarNav: React.FC = () => {
         {/* TEMPLATES TAB */}
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button
-              type="button"
-              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-              data-testid="add-builtin"
-              onClick={addPart(startBuiltIn)}
-              onPointerUp={addPart(startBuiltIn)}
-              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
-            >
-              <Tv size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Add template</span>
-                <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>Built-ins like a media wall, fitted to a scanned wall.</span>
-              </div>
-            </button>
-            {PROJECT_TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-                data-testid={`insert-template-${template.id}`}
-                aria-label={template.name}
-                onClick={addPart(() => { insertTemplate(template.id); })}
-                onPointerUp={addPart(() => { insertTemplate(template.id); })}
-                style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
-              >
-                <Layers size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{template.name}</span>
-                  <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>{template.description}</span>
-                </div>
-              </button>
-            ))}
+            <TemplatesTab isPhone={isPhone} onDone={() => setOverlayOpen('sidebar', false)} />
           </div>
         )}
 

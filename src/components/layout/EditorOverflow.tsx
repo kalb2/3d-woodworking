@@ -6,6 +6,7 @@ import {
   Layers,
   Lock,
   LockOpen,
+  BookmarkPlus,
   ScanLine,
   Tv,
   List,
@@ -21,6 +22,7 @@ import { useReliableTap } from '../../utils/reliableTap';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { isWallScanSupported, scanWalls } from '../../native/wallScan';
 import { roomFromScan } from '../../generators/roomScan';
+import { partsFromSelection, useUserTemplates } from '../../templates/userTemplates';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -81,6 +83,20 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         if (!/cancel/i.test(msg)) window.alert(`Scan failed: ${msg}`);
       })
       .finally(() => setScanning(false));
+  });
+  const selectedObj = currentProject?.objects.find((o) => o.id === selectedObjectId);
+  const canSaveTemplate = Boolean(selectedObj && selectedObj.generator !== 'room-scan' && !selectedObj.reference);
+  const saveTemplate = useReliableTap(() => {
+    const state = useProjectStore.getState();
+    const proj = state.projects.find((p) => p.id === state.activeProjectId);
+    if (!proj || !state.selectedObjectId) return;
+    const sel = proj.objects.find((o) => o.id === state.selectedObjectId);
+    const parts = partsFromSelection(proj.objects, state.selectedObjectId);
+    if (parts.length === 0) { window.alert('Nothing to save in this selection.'); return; }
+    const name = window.prompt('Save as template', sel?.name ?? 'Template');
+    if (name === null) return;
+    useUserTemplates.getState().save(name, parts);
+    onClose();
   });
   const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
   const roomLocked = currentProject?.roomLocked !== false;
@@ -150,6 +166,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
           <Tv size={18} />
           <span>Built-ins</span>
+        </button>
+      )}
+      {canSaveTemplate && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-save-template" onClick={saveTemplate} onPointerUp={saveTemplate}>
+          <BookmarkPlus size={18} />
+          <span>Save as template</span>
         </button>
       )}
       {canScan && (

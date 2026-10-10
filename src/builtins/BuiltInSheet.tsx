@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, LockOpen, MoreHorizontal, X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
+import { useAppStore } from '../state/useAppStore';
 import { useReliableTap } from '../utils/reliableTap';
 import { describeWall } from '../native/wallScan';
 import { autoBaseCount, MEDIA_WALL_DEFAULTS, type UpperStyle } from '../generators/mediaWall';
@@ -138,7 +139,14 @@ export const BuiltInSheet: React.FC = () => {
       setRoomLocked(true);
     }
   });
-  const addForWall = useReliableTap(() => { if (flow.focusWallId) flow.startAddForWall(flow.focusWallId); });
+  const addForWall = useReliableTap(() => {
+    if (!flow.focusWallId) return;
+    // Open the Templates tab with this wall preselected.
+    flow.setTargetWall(flow.focusWallId);
+    flow.focusWall(null);
+    useAppStore.getState().setSidebarPanel('templates');
+    useAppStore.getState().openOverlay('sidebar');
+  });
   const closeTap = useReliableTap(flow.close);
   const backTap = useReliableTap(flow.back);
 
@@ -218,7 +226,7 @@ export const BuiltInSheet: React.FC = () => {
     <div className="new-project-backdrop" data-testid="builtin-sheet" onPointerUp={(e) => { if (e.target === e.currentTarget) flow.close(); }}>
       <div className="new-project-card-sheet glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          {flow.mode === 'add' && (flow.step === 'form' || (flow.step === 'template' && !!room?.walls.length && !flow.fromWall)) ? (
+          {flow.mode === 'add' && flow.step === 'form' && !!room?.walls.length && !flow.fromWall && !existing ? (
             <button type="button" className="glass-button" aria-label="Back" onClick={backTap} onPointerUp={backTap} style={{ padding: 6, minHeight: 40, minWidth: 40 }}>
               <ChevronLeft size={16} />
             </button>

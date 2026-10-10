@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { cameraTarget } from '../../templates/userTemplates';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -56,6 +57,15 @@ const CameraFocus: React.FC = () => {
 };
 
 const DEFAULT_CAMERA = new THREE.Vector3(50, 45, 65);
+
+/** Mirrors the orbit target into a plain object for placement (no React updates). */
+const TrackTarget: React.FC = () => {
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3 } | null;
+  useFrame(() => {
+    if (controls) { cameraTarget.x = controls.target.x; cameraTarget.z = controls.target.z; }
+  });
+  return null;
+};
 
 /** On project open/switch, frame everything in the scene (or the default view when empty). */
 const AutoFrame: React.FC<{ projectId: string }> = ({ projectId }) => {
@@ -221,6 +231,7 @@ export const FurnitureCanvas: React.FC = () => {
         {currentProject.showFloor && <GroundContactShadow />}
 
         <CameraFocus />
+        <TrackTarget />
         <AutoFrame projectId={currentProject.id} />
 
         {/* Render all furniture objects in active project */}
