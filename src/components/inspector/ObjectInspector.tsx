@@ -9,6 +9,8 @@ import { unitScale } from '../../utils/units';
 import type { RoutedEdge } from '../../types/furniture';
 import { defaultBoardOptions } from '../../utils/boardGeometry';
 import { shapeLabel } from '../../catalog/shapeCatalog';
+import { supportsHoles } from '../../utils/holes';
+import { HolesSection } from './HolesSection';
 
 /** Clean number: at most 2 decimals, no trailing zeros (24, 23.5, 0.75). */
 export function formatMeasure(inches: number, scale: number) {
@@ -110,41 +112,10 @@ export const ObjectInspector: React.FC = () => {
               </button>
             ))}
           </div>
-          <label>
-            Hole diameter
-            <input
-              type="number"
-              className="glass-input"
-              data-testid="board-hole-diameter"
-              min={0}
-              step="0.25"
-              value={formatMeasure(board.holes[0]?.diameter ?? 0, scale)}
-              onChange={(event) => {
-                const num = parseFloat(event.target.value);
-                if (Number.isNaN(num) || num < 0) return;
-                const diameter = num / scale;
-                const holes = board.holes.length
-                  ? board.holes.map((hole, index) => index === 0 ? { ...hole, diameter } : hole)
-                  : [{ id: `hole_${Date.now()}`, x: 0, z: 0, diameter }];
-                updateObject(object.id, { board: { ...board, holes } });
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="glass-button"
-            data-testid="board-add-hole"
-            onClick={() => updateObject(object.id, {
-              board: {
-                ...board,
-                holes: [...board.holes, { id: `hole_${Date.now()}`, x: board.holes.length * 2, z: 0, diameter: 1 }],
-              },
-            })}
-          >
-            Add hole
-          </button>
         </div>
       )}
+
+      {supportsHoles(object.shape) && <HolesSection object={object} unit={unit} scale={scale} />}
 
       {!isGroup && <PartColorSection />}
     </div>

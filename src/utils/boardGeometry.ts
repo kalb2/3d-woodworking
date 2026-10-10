@@ -1,11 +1,14 @@
 import * as THREE from 'three';
-import type { BoardOptions, Dimensions3D } from '../types/furniture';
+import type { BoardHole, BoardOptions, Dimensions3D } from '../types/furniture';
+
+/** A round, through, top-face hole: cut directly in the extruded outline. */
+export const isOutlineHole = (h: BoardHole) => (h.face ?? 'top') === 'top' && h.depth === undefined && (h.kind ?? 'round') === 'round';
 
 export function defaultBoardOptions(): BoardOptions {
   return {
     cornerRadius: 0.75,
     edge: 'roundover',
-    holes: [{ id: 'hole_1', x: 0, z: 0, diameter: 1.5 }],
+    holes: [],
   };
 }
 
@@ -39,7 +42,8 @@ export function createBoardGeometry(dimensions: Dimensions3D, board: BoardOption
     shape.absarc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5, false);
   }
 
-  for (const hole of board.holes) {
+  // Only simple through-holes on the broad face are cut in the 2D outline; others go through CSG.
+  for (const hole of board.holes.filter(isOutlineHole)) {
     const diameter = Math.min(Math.max(hole.diameter, 0), Math.min(length, width) * 0.85);
     if (diameter < 0.08) continue;
     const path = new THREE.Path();

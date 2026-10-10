@@ -13,13 +13,30 @@ export type LengthUnit = 'in' | 'cm' | 'mm' | 'ft';
 
 export type RoutedEdge = 'none' | 'roundover' | 'chamfer';
 
+export type HoleFace = 'top' | 'front' | 'side';
+
 export interface BoardHole {
   id: string;
-  /** Offset from the board center, along length (X). */
+  /**
+   * Horizontal offset from the face center (inches). Top face: along length (X).
+   * Front face: along length (X). Side face: along width (Z).
+   */
   x: number;
-  /** Offset from the board center, along width (Z). */
+  /**
+   * Second offset from the face center (inches). Top face: along width (Z).
+   * Front/side faces: up (Y).
+   */
   z: number;
+  /** Round: diameter. Rectangular: width (along x). */
   diameter: number;
+  /** Default 'top' (the board's broad face). */
+  face?: HoleFace;
+  /** Depth into the part; absent = through. */
+  depth?: number;
+  /** Default 'round'. */
+  kind?: 'round' | 'rect';
+  /** Rectangular holes: size along z. */
+  height?: number;
 }
 
 export interface BoardOptions {
@@ -86,6 +103,8 @@ export interface FurnitureObject {
   visible?: boolean;
   parentId?: string;
   board?: BoardOptions;
+  /** Holes on non-board box parts (boards keep theirs in board.holes). */
+  holes?: BoardHole[];
   /** Set on parts made by a generator (e.g. "media-wall") so re-runs can replace them. */
   generator?: string;
   /** Reference geometry (scanned room, reference wall): not stock, skipped by the cut list. */

@@ -8,6 +8,7 @@ import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
 import { positiveSize } from '../../theme/partSurface';
+import { cutHoles, getHoles, holeFrame, supportsHoles, useHoleFocus } from '../../utils/holes';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -39,7 +40,9 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     : shape === 'cylinder' || shape === 'pole'
       ? [length / 2, height, width / 2]
       : [1, 1, 1];
-  const geometry = useMemo(() => {
+  const holes = supportsHoles(shape) ? getHoles(object) : [];
+  const holesKey = JSON.stringify(holes);
+  const baseGeometry = useMemo(() => {
     const l = positiveSize(dimensions.length);
     const w = positiveSize(dimensions.width);
     const h = positiveSize(dimensions.height);
@@ -113,6 +116,23 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         return new THREE.BoxGeometry(l, h, w);
     }
   }, [shape, roundPart, roundPart ? null : `${dimensions.length}|${dimensions.width}|${dimensions.height}`, object.board]);
+  const geometry = useMemo(
+    () => (holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseGeometry, holesKey],
+  );
+  const focusHoleId = useHoleFocus((st) => (st.objectId === object.id ? st.holeId : null));
+  const focusHole = focusHoleId ? holes.find((h) => h.id === focusHoleId) : undefined;
+  const focusMarker = useMemo(() => {
+    if (!focusHole) return null;
+    const { surface, axis } = holeFrame({ length, width, height }, focusHole);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis.clone().negate());
+    const w = Math.max(0.1, focusHole.diameter);
+    const geom = (focusHole.kind ?? 'round') === 'rect'
+      ? new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, Math.max(0.1, focusHole.height ?? w)))
+      : new THREE.EdgesGeometry(new THREE.CircleGeometry(w / 2 + 0.05, 40));
+    return { geom, position: surface.clone().addScaledVector(axis, -0.03), quaternion: q };
+  }, [focusHole, length, width, height]);
 
   const groupOutline = useMemo(() => {
     if (shape !== 'group') return null;
@@ -154,6 +174,11 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
           />
         )}
       </mesh>
+      {focusMarker && (
+        <lineSegments geometry={focusMarker.geom} position={focusMarker.position} quaternion={focusMarker.quaternion} renderOrder={5}>
+          <lineBasicMaterial color="#e09f3e" depthTest={false} toneMapped={false} />
+        </lineSegments>
+      )}
       {isGroup && isSelected && groupOutline && (
         <lineSegments geometry={groupOutline}>
           <lineBasicMaterial color={SELECTION_COLOR} depthTest={false} toneMapped={false} />

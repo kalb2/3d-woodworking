@@ -2932,3 +2932,21 @@ html, body, #root {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Holes (Properties) */
+.holes-section { display: flex; flex-direction: column; gap: 8px; }
+.hole-row { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, 0.08); }
+.hole-row.is-focused { border-color: #e09f3e; box-shadow: 0 0 0 1px #e09f3e inset; }
+.hole-row-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hole-row-title { font-size: 12px; font-weight: 700; margin-right: auto; }
+.hole-seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.5); }
+.hole-seg button { border: none; background: transparent; padding: 4px 7px; font-size: 11px; color: inherit; }
+.hole-seg button.is-on { background: #e09f3e; color: #fff; }
+.hole-remove { border: none; background: transparent; padding: 4px; display: flex; color: #94a3b8; }
+.hole-row-fields { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.hole-field { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.hole-field-input { display: flex; align-items: center; gap: 2px; }
+.hole-field-input input { width: 48px; padding: 4px 6px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.5); font-size: 13px; text-align: right; background: transparent; color: var(--text-main); }
+.hole-field-input button { border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; border-radius: 6px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; color: inherit; }
+.hole-field-input .hole-thru { width: auto; padding: 0 8px; font-size: 12px; }
+.hole-add { align-self: flex-start; border: 1px dashed rgba(148, 163, 184, 0.8); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text-main); }
