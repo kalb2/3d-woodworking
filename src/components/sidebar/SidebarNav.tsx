@@ -38,7 +38,7 @@ const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?
 
 export const SidebarNav: React.FC = () => {
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel } = useAppStore();
+  const { overlays, setOverlayOpen, sidebarPanel, setSidebarPanel } = useAppStore();
   const [activeTab, setActiveTab] = useState<SidebarPanel>(sidebarPanel);
 
   useEffect(() => {
@@ -271,22 +271,6 @@ export const SidebarNav: React.FC = () => {
         {/* TEMPLATES TAB */}
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Templates
-            </div>
-            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.45 }}>
-              Add a built-in or drop a starter into this project.
-            </p>
-            <button
-              type="button"
-              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-              data-testid="browse-templates"
-              onClick={addPart(() => openHome('templates'))}
-              onPointerUp={addPart(() => openHome('templates'))}
-              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '10px 12px' }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700 }}>Browse templates</span>
-            </button>
             <button
               type="button"
               className={isPhone ? 'phone-sheet-row' : 'glass-button'}
