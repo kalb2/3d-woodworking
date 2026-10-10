@@ -17,6 +17,8 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		B1C2D3E41FED79650016851F /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E51FED79650016851F /* MainViewController.swift */; };
+		B1C2D3E61FED79650016851F /* WallScanPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E71FED79650016851F /* WallScanPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +34,8 @@
 		B7E11A001FED796500168520 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		B1C2D3E51FED79650016851F /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		B1C2D3E71FED79650016851F /* WallScanPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallScanPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +74,8 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A1B2C3D51FED79650016851F /* SceneDelegate.swift */,
+				B1C2D3E71FED79650016851F /* WallScanPlugin.swift */,
+				B1C2D3E51FED79650016851F /* MainViewController.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -171,6 +177,8 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A1B2C3D41FED79650016851F /* SceneDelegate.swift in Sources */,
+				B1C2D3E61FED79650016851F /* WallScanPlugin.swift in Sources */,
+				B1C2D3E41FED79650016851F /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +323,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZNKG8BKXAT;
 				INFOPLIST_FILE = App/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					RoomPlan,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -339,6 +352,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZNKG8BKXAT;
 				INFOPLIST_FILE = App/Info.plist;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					RoomPlan,
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

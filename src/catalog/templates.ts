@@ -44,15 +44,15 @@ export const PROJECT_TEMPLATES: PresetTemplate[] = [
   },
   {
     id: 'plank-stack',
-    name: 'Plank Stack',
-    description: 'Three flat planks stacked with a small gap so you can grab each one.',
+    name: 'Board Stack',
+    description: 'Three flat boards stacked with a small gap so you can grab each one.',
     category: 'Boards',
     featured: true,
     author: 'The Workbench',
     objects: [
-      part('Plank', 'board', { length: 24, width: 6, height: 0.75 }, { x: 0, y: 0.375, z: 0 }, pine),
-      part('Plank 2', 'board', { length: 24, width: 6, height: 0.75 }, { x: 0, y: 1.5, z: 0 }, pine),
-      part('Plank 3', 'board', { length: 20, width: 6, height: 0.75 }, { x: 0, y: 2.625, z: 0 }, oak),
+      part('Board', 'board', { length: 24, width: 6, height: 0.75 }, { x: 0, y: 0.375, z: 0 }, pine),
+      part('Board 2', 'board', { length: 24, width: 6, height: 0.75 }, { x: 0, y: 1.5, z: 0 }, pine),
+      part('Board 3', 'board', { length: 20, width: 6, height: 0.75 }, { x: 0, y: 2.625, z: 0 }, oak),
     ],
   },
   {

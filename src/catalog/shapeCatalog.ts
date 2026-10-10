@@ -48,11 +48,11 @@ export const SHAPE_CATALOG: ShapeCatalogEntry[] = [
   },
   {
     type: 'board',
-    label: 'Board / Plank',
-    shortLabel: 'Plank',
+    label: 'Board',
+    shortLabel: 'Board',
     group: 'Boards',
-    hint: 'Flat board with optional holes',
-    defaultName: 'Plank',
+    hint: 'Flat board',
+    defaultName: 'Board',
     dimensions: { length: 24, width: 8, height: 0.75 },
   },
   {
@@ -149,7 +149,7 @@ const LEGACY_PART_NAMES: Record<string, string> = {
   'Sphere Knob': 'Ball',
   'Soft Cushion': 'Rounded Block',
   'Box / Panel': 'Box',
-  'Board / Panel': 'Plank',
+  'Board / Panel': 'Board',
 };
 
 const LEGACY_PROJECT_NAMES: Record<string, string> = {

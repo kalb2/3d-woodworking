@@ -14,12 +14,11 @@ import {
   Blend,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
-import { PROJECT_TEMPLATES } from '../../catalog/templates';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
-import { MediaWallSheet } from './MediaWallSheet';
+import { TemplatesTab } from './TemplatesTab';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
@@ -37,7 +36,7 @@ const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?
 
 export const SidebarNav: React.FC = () => {
   const isPhone = useIsPhone();
-  const { overlays, setOverlayOpen, openHome, sidebarPanel, setSidebarPanel } = useAppStore();
+  const { overlays, setOverlayOpen, sidebarPanel, setSidebarPanel } = useAppStore();
   const [activeTab, setActiveTab] = useState<SidebarPanel>(sidebarPanel);
 
   useEffect(() => {
@@ -51,7 +50,6 @@ export const SidebarNav: React.FC = () => {
   const {
     addObject,
     addWoodPreset,
-    insertTemplate,
     projects,
     activeProjectId,
     selectedObjectId,
@@ -126,7 +124,7 @@ export const SidebarNav: React.FC = () => {
           onClick={() => selectTab('templates')}
           style={isPhone ? undefined : { flex: 1, padding: '8px 4px', fontSize: 13 }}
         >
-          <span>Layouts</span>
+          <span>Templates</span>
         </button>
 
         <button
@@ -204,7 +202,10 @@ export const SidebarNav: React.FC = () => {
               );
             })}
 
-            {/* Standard Lumber & Sheet Stock Presets */}
+            {/* Sheet goods and lumber, one category each */}
+            {(['Plywood sheets', 'MDF sheets', 'Lumber'] as const).map((category) => (
+              <React.Fragment key={category}>
+            
             <div style={{
               fontSize: 12,
               fontWeight: isPhone ? 500 : 600,
@@ -215,10 +216,10 @@ export const SidebarNav: React.FC = () => {
               borderTop: isPhone ? '1px solid #eef2f6' : '1px solid rgba(255,255,255,0.08)',
               paddingTop: 12
             }}>
-              Standard Wood Sizes
+              {category}
             </div>
 
-            {STANDARD_WOOD_PRESETS.map((preset) => (
+            {STANDARD_WOOD_PRESETS.filter((p) => p.category === category).map((preset) => (
               <button
                 key={preset.id}
                 type="button"
@@ -259,47 +260,15 @@ export const SidebarNav: React.FC = () => {
                 </div>
               </button>
             ))}
+              </React.Fragment>
+            ))}
           </div>
         )}
 
         {/* TEMPLATES TAB */}
         {activeTab === 'templates' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Shape layouts
-            </div>
-            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.45 }}>
-              Drop a starter into this project, or open the Templates tab to begin a new one.
-            </p>
-            <button
-              type="button"
-              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-              data-testid="browse-templates"
-              onClick={addPart(() => openHome('templates'))}
-              onPointerUp={addPart(() => openHome('templates'))}
-              style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '10px 12px' }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700 }}>Browse templates</span>
-            </button>
-            <MediaWallSheet isPhone={isPhone} onDone={() => setOverlayOpen('sidebar', false)} />
-            {PROJECT_TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-                data-testid={`insert-template-${template.id}`}
-                aria-label={template.name}
-                onClick={addPart(() => { insertTemplate(template.id); })}
-                onPointerUp={addPart(() => { insertTemplate(template.id); })}
-                style={isPhone ? undefined : { justifyContent: 'flex-start', width: '100%', padding: '12px' }}
-              >
-                <Layers size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{template.name}</span>
-                  <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>{template.description}</span>
-                </div>
-              </button>
-            ))}
+            <TemplatesTab isPhone={isPhone} onDone={() => setOverlayOpen('sidebar', false)} />
           </div>
         )}
 

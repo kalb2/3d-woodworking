@@ -112,6 +112,18 @@ export const PRESET_WOOD_MATERIALS: Record<WoodSpecies, WoodMaterial> = {
     metalness: 0.0,
     varnishSheen: 'matte'
   },
+  mdf: {
+    id: 'mdf',
+    name: 'MDF',
+    species: 'mdf',
+    baseColor: '#b99a74',
+    secondaryColor: '#ad8f6a',
+    grainIntensity: 0.04,
+    grainScale: 1.0,
+    roughness: 0.95,
+    metalness: 0.0,
+    varnishSheen: 'matte'
+  },
   custom_paint: {
     id: 'custom_paint',
     name: 'Painted Matte Finish',
@@ -167,6 +179,7 @@ export const FINISH_MATERIALS: { species: WoodSpecies; label: string }[] = [
   { species: 'birch', label: 'Birch' },
   { species: 'pine', label: 'Pine' },
   { species: 'plywood', label: 'Plywood' },
+  { species: 'mdf', label: 'MDF' },
   { species: 'cherry', label: 'Cherry' },
   { species: 'mahogany', label: 'Mahogany' },
   { species: 'teak', label: 'Teak' },
@@ -218,6 +231,7 @@ export function materialFromSpecies(
 }
 
 function isSolidPaint(mat: WoodMaterial): boolean {
+  if (mat.species === 'mdf') return true; // flat, matte, no grain
   return mat.species === 'custom_paint'
     && mat.grainIntensity <= 0.05
     && !(mat.stainOpacity && mat.stainOpacity > 0.02);

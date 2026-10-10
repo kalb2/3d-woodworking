@@ -16,11 +16,15 @@ import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
+import { BuiltInSheet } from './builtins/BuiltInSheet';
+import { HoleModeBar } from './components/layout/HoleModeBar';
+import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { ShareSheet } from './components/share/ShareSheet';
 
 export const App: React.FC = () => {
+  useUndoShortcuts();
   const { loadProjects, selectedObjectId, projects, activeProjectId } = useProjectStore();
   const loadSession = useAccountStore((state) => state.loadSession);
   const {
@@ -137,6 +141,9 @@ export const App: React.FC = () => {
       )}
 
       <TransformMenu />
+
+      <BuiltInSheet />
+      <HoleModeBar />
 
       <CutListDrawer
         isOpen={isCutListOpen}

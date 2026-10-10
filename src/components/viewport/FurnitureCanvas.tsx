@@ -1,10 +1,15 @@
 import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { cameraDir, cameraTarget } from '../../templates/userTemplates';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { FurnitureMesh } from './FurnitureMesh';
+import { RoomScanMesh } from './RoomScanMesh';
+import { HoleDragger } from './HoleDragger';
+import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
@@ -32,6 +37,73 @@ const GroundContactShadow: React.FC = () => {
   );
 };
 
+/** Room-scan wall part (not a window/door panel). Older scans lack `wallId`. */
+const isRoomWall = (obj: { name: string }) => !/\b(Window|Door|Opening)\b/.test(obj.name);
+
+/** Frames the camera on a requested target (Built-ins list). */
+const CameraFocus: React.FC = () => {
+  const focus = useBuiltInFlow((s) => s.focus);
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  React.useEffect(() => {
+    if (!focus || !controls) return;
+    const target = new THREE.Vector3(focus.x, focus.y, focus.z);
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-6) dir.set(0.6, 0.5, 0.8);
+    dir.normalize().multiplyScalar(Math.max(40, focus.radius * 1.6));
+    controls.target.copy(target);
+    camera.position.copy(target.clone().add(dir));
+    controls.update();
+  }, [focus, camera, controls]);
+  return null;
+};
+
+const DEFAULT_CAMERA = new THREE.Vector3(50, 45, 65);
+
+/** Mirrors the orbit target into a plain object for placement (no React updates). */
+const TrackTarget: React.FC = () => {
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3 } | null;
+  useFrame(({ camera }) => {
+    if (!controls) return;
+    cameraTarget.x = controls.target.x; cameraTarget.z = controls.target.z;
+    const d = camera.position.clone().sub(controls.target).normalize();
+    cameraDir.x = d.x; cameraDir.y = d.y; cameraDir.z = d.z;
+  });
+  return null;
+};
+
+/** On project open/switch, frame everything in the scene (or the default view when empty). */
+const AutoFrame: React.FC<{ projectId: string }> = ({ projectId }) => {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  const frameNonce = useBuiltInFlow((s) => s.frameNonce);
+  React.useEffect(() => {
+    if (!controls) return;
+    const proj = useProjectStore.getState().projects.find((p) => p.id === projectId);
+    const box = new THREE.Box3();
+    for (const o of proj?.objects ?? []) {
+      if (o.shape === 'group' || o.visible === false) continue;
+      const r = Math.hypot(o.dimensions.length, o.dimensions.height, o.dimensions.width) / 2;
+      box.expandByPoint(new THREE.Vector3(o.position.x - r, o.position.y - r, o.position.z - r));
+      box.expandByPoint(new THREE.Vector3(o.position.x + r, o.position.y + r, o.position.z + r));
+    }
+    if (box.isEmpty()) {
+      controls.target.set(0, 0, 0);
+      camera.position.copy(DEFAULT_CAMERA);
+    } else {
+      const center = box.getCenter(new THREE.Vector3());
+      const radius = box.getSize(new THREE.Vector3()).length() / 2;
+      const fov = (camera.fov * Math.PI) / 180;
+      const fit = (radius * 1.15) / Math.sin(Math.min(fov, fov * camera.aspect) / 2);
+      const dist = Math.max(10, Math.min(4000, Math.max(fit, DEFAULT_CAMERA.length())));
+      controls.target.copy(center);
+      camera.position.copy(center.clone().add(DEFAULT_CAMERA.clone().normalize().multiplyScalar(dist)));
+    }
+    controls.update();
+  }, [projectId, camera, controls, frameNonce]);
+  return null;
+};
+
 export const FurnitureCanvas: React.FC = () => {
   const {
     projects,
@@ -45,6 +117,8 @@ export const FurnitureCanvas: React.FC = () => {
     activeGizmoMode,
   } = useProjectStore();
   const lastTap = useRef<{ id: string; time: number } | null>(null);
+  const focusWallId = useBuiltInFlow((s) => s.focusWallId);
+  const holeEdit = useHoleFocus();
 
   const { preferences } = useAppStore();
 
@@ -57,6 +131,8 @@ export const FurnitureCanvas: React.FC = () => {
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const clearSelection = () => {
+    if (useHoleFocus.getState().editing) { useHoleFocus.getState().exit(); return; }
+    if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     if (editingGroupId) exitGroup();
     else selectObject(null);
   };
@@ -65,8 +141,20 @@ export const FurnitureCanvas: React.FC = () => {
     if (e.target === e.currentTarget) clearSelection();
   };
 
+  const handleRoomWallPick = (event: any, obj: { wallId?: string; name: string }) => {
+    event.stopPropagation();
+    const walls = currentProject.scannedRoom?.walls ?? [];
+    const wall = walls.find((w) => w.id === obj.wallId) ?? walls.find((w) => `${w.label} (scan)` === obj.name);
+    if (!wall) return;
+    if (editingGroupId) exitGroup();
+    if (currentProject.roomLocked === false) selectObject((obj as { id?: string }).id ?? null);
+    else selectObject(null);
+    useBuiltInFlow.getState().focusWall(wall.id);
+  };
+
   const handlePartPointerDown = (event: any, objId: string) => {
     event.stopPropagation();
+    if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     const obj = currentProject.objects.find((item) => item.id === objId);
     if (!obj) return;
     const additive = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
@@ -149,8 +237,23 @@ export const FurnitureCanvas: React.FC = () => {
         />
         {currentProject.showFloor && <GroundContactShadow />}
 
+        <CameraFocus />
+        <TrackTarget />
+        <AutoFrame projectId={currentProject.id} />
+
         {/* Render all furniture objects in active project */}
-        {currentProject.objects.map((obj) => (
+        {currentProject.objects.map((obj) => obj.generator === 'room-scan' ? (
+          <RoomScanMesh
+            key={obj.id}
+            object={obj}
+            unlocked={currentProject.roomLocked === false}
+            focused={selectedObjectIds.includes(obj.id) || Boolean(focusWallId && isRoomWall(obj) && (obj.wallId === focusWallId
+              || currentProject.scannedRoom?.walls.find((w) => w.id === focusWallId)?.label + ' (scan)' === obj.name))}
+            onPointerDown={isRoomWall(obj)
+              ? (e) => handleRoomWallPick(e, obj)
+              : currentProject.roomLocked === false ? (e) => handlePartPointerDown(e, obj.id) : undefined}
+          />
+        ) : (
           <FurnitureMesh
             key={obj.id}
             object={obj}
@@ -160,8 +263,16 @@ export const FurnitureCanvas: React.FC = () => {
           />
         ))}
 
+        {/* Hole mode: drag the edited hole; otherwise taps on a selected part's holes start editing */}
+        {(() => {
+          const target = holeEdit.editing
+            ? currentProject.objects.find((o) => o.id === holeEdit.objectId)
+            : selectedObject && supportsHoles(selectedObject.shape) && getHoles(selectedObject).length ? selectedObject : undefined;
+          return target ? <HoleDragger key={target.id} object={target} editing={holeEdit.editing} /> : null;
+        })()}
+
         {/* Active Selected Object Controls */}
-        {selectedObject && (
+        {selectedObject && !holeEdit.editing && (
           <>
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (

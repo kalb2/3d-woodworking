@@ -333,7 +333,7 @@ export const HomeScreen: React.FC = () => {
               <div className="home-welcome" data-testid="home-welcome">
                 <div>
                   <strong>Build with shapes and stock</strong>
-                  <p>Add boxes, planks, and round stock in the editor. Or start from a template and share it on this device.</p>
+                  <p>Add boxes, boards, and round stock in the editor. Or start from a template and share it on this device.</p>
                 </div>
                 <div className="home-welcome-actions">
                   <button type="button" className="glass-button active" onClick={() => setHomeTab('templates')}>
@@ -737,7 +737,7 @@ export const HomeScreen: React.FC = () => {
                 <div className="step-num">1</div>
                 <div>
                   <h4>Start with Shapes & Standard Cuts</h4>
-                  <p>Open Add in the editor for boxes, planks, dowels, and standard sheet stock. Or start a project from Templates.</p>
+                  <p>Open Add in the editor for boxes, boards, dowels, and plywood or MDF sheets. Or start a project from Templates.</p>
                 </div>
               </div>
 

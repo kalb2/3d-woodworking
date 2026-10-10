@@ -13,6 +13,7 @@ import {
   Ungroup,
   Trash2,
 } from 'lucide-react';
+import { UndoRedoButtons } from './UndoRedoButtons';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
@@ -159,6 +160,21 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
+      {!contentOpen && <UndoRedoButtons placement="phone" />}
+      {!contentOpen && (
+        <PhoneTapButton
+          className="add-fab is-phone"
+          data-testid="toolbar-add"
+          aria-label="Add"
+          title="Add"
+          onTap={() => {
+            setSidebarPanel('shapes');
+            openOverlay('sidebar');
+          }}
+        >
+          <Plus size={24} strokeWidth={2.2} />
+        </PhoneTapButton>
+      )}
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
@@ -222,17 +238,6 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           className="is-delete"
           onTap={() => {
             if (selectedObject) deleteObject(selectedObject.id);
-          }}
-        />
-        <DockItem
-          label="Add"
-          testId="toolbar-add"
-          icon={<Plus size={22} strokeWidth={1.8} />}
-          active={false}
-          showLabel
-          onTap={() => {
-            setSidebarPanel('shapes');
-            openOverlay('sidebar');
           }}
         />
         {selectedObjectIds.length >= 2 && (

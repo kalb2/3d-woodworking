@@ -1,21 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Camera,
   FileCode,
   FileSpreadsheet,
   Layers,
+  Lock,
+  LockOpen,
+  BookmarkPlus,
+  ScanLine,
+  Tv,
   List,
   Pencil,
-  Redo,
   Settings,
   Share2,
   SlidersHorizontal,
-  Undo,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { isWallScanSupported, scanWalls } from '../../native/wallScan';
+import { roomFromScan } from '../../generators/roomScan';
+import { partsFromSelection, useUserTemplates } from '../../templates/userTemplates';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -33,18 +40,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
   const {
     activeProjectId,
     projects,
-    historyIndex,
-    historyStack,
-    undo,
-    redo,
     renameProject,
   } = useProjectStore();
   const currentProject = projects.find((project) => project.id === activeProjectId);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(currentProject?.name ?? '');
   const [copied, setCopied] = useState(false);
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < historyStack.length - 1;
 
   const parts = useReliableTap(() => {
     setSidebarPanel('scene');
@@ -55,6 +56,60 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onOpenCutList();
   });
   const settings = useReliableTap(() => openOverlay('settings', true));
+  const [canScan, setCanScan] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void isWallScanSupported().then((ok) => { if (alive) setCanScan(ok); });
+    return () => { alive = false; };
+  }, []);
+  const scanRoom = useReliableTap(() => {
+    if (scanning) return;
+    const proj = useProjectStore.getState().projects.find((p) => p.id === useProjectStore.getState().activeProjectId);
+    if (proj?.scannedRoom?.walls.length && !window.confirm('Replace scanned room? Your parts and built-ins stay.')) return;
+    setScanning(true);
+    onClose();
+    void scanWalls()
+      .then((result) => {
+        const room = roomFromScan(result);
+        if (!useProjectStore.getState().addScannedRoom(room)) {
+          window.alert('No walls found. Try scanning again.');
+          return;
+        }
+        useBuiltInFlow.getState().requestFrame();
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/cancel/i.test(msg)) window.alert(`Scan failed: ${msg}`);
+      })
+      .finally(() => setScanning(false));
+  });
+  const selectedObj = currentProject?.objects.find((o) => o.id === selectedObjectId);
+  const canSaveTemplate = Boolean(selectedObj && selectedObj.generator !== 'room-scan' && !selectedObj.reference);
+  const saveTemplate = useReliableTap(() => {
+    const state = useProjectStore.getState();
+    const proj = state.projects.find((p) => p.id === state.activeProjectId);
+    if (!proj || !state.selectedObjectId) return;
+    const sel = proj.objects.find((o) => o.id === state.selectedObjectId);
+    const parts = partsFromSelection(proj.objects, state.selectedObjectId);
+    if (parts.length === 0) { window.alert('Nothing to save in this selection.'); return; }
+    const name = window.prompt('Save as template', sel?.name ?? 'Template');
+    if (name === null) return;
+    useUserTemplates.getState().save(name, parts);
+    onClose();
+  });
+  const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
+  const roomLocked = currentProject?.roomLocked !== false;
+  const toggleRoomLock = useReliableTap(() => {
+    const flow = useBuiltInFlow.getState();
+    useProjectStore.getState().setRoomLocked(!roomLocked, roomLocked ? flow.focusWallId : null);
+    if (roomLocked && flow.focusWallId) { flow.focusWall(null); onClose(); }
+  });
+  const hasBuiltIns = Boolean(currentProject?.objects.some((o) => o.shape === 'group' && o.builtIn));
+  const builtIns = useReliableTap(() => {
+    onClose();
+    useBuiltInFlow.getState().openList();
+  });
   const properties = useReliableTap(() => {
     if (!useProjectStore.getState().selectedObjectId) return;
     openOverlay('inspector', true);
@@ -90,17 +145,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
       window.setTimeout(onClose, 700);
     });
   });
-  const undoTap = useReliableTap(() => {
-    if (!canUndo) return;
-    undo();
-    onClose();
-  });
-  const redoTap = useReliableTap(() => {
-    if (!canRedo) return;
-    redo();
-    onClose();
-  });
-
   const saveRename = () => {
     const name = draft.trim();
     if (currentProject && name) renameProject(currentProject.id, name);
@@ -118,6 +162,34 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Layers size={18} />
         <span>Cut list</span>
       </button>
+      {hasBuiltIns && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
+          <Tv size={18} />
+          <span>Built-ins</span>
+        </button>
+      )}
+      {canSaveTemplate && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-save-template" onClick={saveTemplate} onPointerUp={saveTemplate}>
+          <BookmarkPlus size={18} />
+          <span>Save as template</span>
+        </button>
+      )}
+      {canScan && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-scan-room" disabled={scanning} onClick={scanRoom} onPointerUp={scanRoom}>
+          <ScanLine size={18} />
+          <span>{scanning ? 'Scanning…' : 'Scan room'}</span>
+        </button>
+      )}
+      {hasRoom && (
+        <button type="button" className="phone-sheet-row" role="switch" aria-checked={roomLocked} data-testid="menu-lock-walls"
+          onClick={toggleRoomLock} onPointerUp={toggleRoomLock} style={{ justifyContent: 'space-between' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {roomLocked ? <Lock size={18} /> : <LockOpen size={18} />}
+            <span>Lock scanned walls</span>
+          </span>
+          <span className={`menu-switch${roomLocked ? ' is-on' : ''}`} aria-hidden="true"><span /></span>
+        </button>
+      )}
       <button type="button" className="phone-sheet-row" data-testid="tool-settings" onClick={settings} onPointerUp={settings}>
         <Settings size={18} />
         <span>Settings</span>
@@ -178,14 +250,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
       <button type="button" className="phone-sheet-row" data-testid="menu-copy-json" onClick={copyJson} onPointerUp={copyJson}>
         <Share2 size={18} />
         <span>{copied ? 'Copied' : 'Copy JSON'}</span>
-      </button>
-      <button type="button" className="phone-sheet-row" data-testid="menu-undo" disabled={!canUndo} onClick={undoTap} onPointerUp={undoTap}>
-        <Undo size={18} />
-        <span>Undo</span>
-      </button>
-      <button type="button" className="phone-sheet-row" data-testid="menu-redo" disabled={!canRedo} onClick={redoTap} onPointerUp={redoTap}>
-        <Redo size={18} />
-        <span>Redo</span>
       </button>
     </div>
   );

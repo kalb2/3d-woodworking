@@ -1,4 +1,4 @@
-import type { FurnitureObject, WoodMaterial } from '../types/furniture';
+import type { FurnitureObject, ScannedOpening, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
@@ -109,7 +109,7 @@ export function generateMediaWall(raw: MediaWallInput): MediaWallPart[] {
   const accent = PRESET_WOOD_MATERIALS.walnut;
   const parts: MediaWallPart[] = [];
 
-  parts.push(part('Reference wall', 'cube', { x: W, y: H, z: WALL_T }, { x: left, y: 0, z: -WALL_T }, wallMat));
+  parts.push({ ...part('Reference wall', 'cube', { x: W, y: H, z: WALL_T }, { x: left, y: 0, z: -WALL_T }, wallMat), reference: true });
 
   // Base run
   parts.push(part('Toe kick', 'board', { x: W, y: TOE_H, z: PANEL_T },
@@ -162,4 +162,32 @@ export function generateMediaWall(raw: MediaWallInput): MediaWallPart[] {
     }
   }
   return parts;
+}
+
+const OPENING_T = 0.25;
+
+/**
+ * Thin reference panels for scanned windows/doors, laid just in front of the
+ * reference wall. Layout of the cabinets ignores them in this version.
+ */
+export function openingReferenceParts(raw: MediaWallInput, openings: ScannedOpening[]): MediaWallPart[] {
+  const { wallWidth: W, wallHeight: H } = normalizeMediaWallInput(raw);
+  const glass = mat(PRESET_WOOD_MATERIALS.custom_paint, {
+    name: 'Opening (reference)',
+    baseColor: '#9cc9f0',
+    secondaryColor: '#8bbbe6',
+    grainIntensity: 0,
+  });
+  const out: MediaWallPart[] = [];
+  openings.forEach((o, i) => {
+    const x0 = Math.max(0, Math.min(W, o.offsetX));
+    const y0 = Math.max(0, Math.min(H, o.bottom));
+    const w = Math.min(o.width, W - x0);
+    const h = Math.min(o.height, H - y0);
+    if (w < 1 || h < 1) return;
+    const label = o.kind === 'window' ? 'Window' : o.kind === 'door' ? 'Door' : 'Opening';
+    out.push({ ...part(`${label} ${i + 1} (reference)`, 'cube', { x: w, y: h, z: OPENING_T },
+      { x: -W / 2 + x0, y: y0, z: 0 }, glass), reference: true });
+  });
+  return out;
 }

@@ -2703,3 +2703,271 @@ html, body, #root {
     gap: 2px;
   }
 }
+
+.room-wall-label {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Undo / redo: fixed bottom-left pair. On phone it rides the top edge of the bottom sheet,
+   so it moves up with the sheet (Move/Resize rows) and never meets the right-aligned Properties pill. */
+.undo-redo-pair {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 46;
+}
+.undo-redo-pair.is-phone {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  bottom: calc(100% + 10px);
+}
+.undo-redo-pair.is-ipad {
+  position: absolute;
+  left: max(20px, env(safe-area-inset-left, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.undo-redo-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-main);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.undo-redo-btn:disabled {
+  opacity: 0.35;
+  box-shadow: none;
+  cursor: default;
+}
+
+.room-wall-label.is-unlocked {
+  background: #fbbf24;
+  color: #1f2937;
+}
+.menu-switch {
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.menu-switch span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  transition: transform 0.15s;
+}
+.menu-switch.is-on {
+  background: #e09f3e;
+}
+.menu-switch.is-on span {
+  transform: translateX(16px);
+}
+
+/* Tap-a-wall bar: one row, never wraps (fits 375pt and up). */
+.wall-action-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  z-index: 230;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  max-width: calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+  white-space: nowrap;
+}
+.wall-action-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+  margin-right: 2px;
+}
+.wall-action-label strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.wall-action-label span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wall-action-add {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: #e09f3e;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.wall-action-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  touch-action: manipulation;
+}
+.wall-action-icon.is-unlocked {
+  background: #fbbf24;
+  color: #1f2937;
+}
+
+/* Floating Add: bottom right, mirrors the undo/redo pair on the left. */
+.add-fab {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #e09f3e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 8px 20px rgba(224, 159, 62, 0.35), 0 2px 6px rgba(15, 23, 42, 0.15);
+  z-index: 46;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.add-fab.is-phone {
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(100% + 6px);
+}
+.add-fab.is-ipad {
+  right: max(20px, env(safe-area-inset-right, 0px));
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+}
+.undo-redo-pair.is-phone {
+  bottom: calc(100% + 10px);
+}
+/* Properties pill sits centered so it never meets the Add button at the right. */
+.phone-properties-entry {
+  align-self: center;
+}
+
+/* Solid round swatches with a clear selected ring. */
+.finish-chip-grid .finish-swatch {
+  width: 30px;
+  height: 30px;
+  background-image: none !important;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+}
+.finish-chip {
+  border: 2px solid transparent;
+  background: transparent;
+}
+.finish-chip.is-selected {
+  border-color: transparent;
+  background: transparent;
+}
+.finish-chip.is-selected .finish-swatch {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #e09f3e;
+}
+
+/* Name + dimensions on one line. */
+.part-properties {
+  gap: 10px;
+}
+.part-properties-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.part-properties-title-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  font-weight: 600;
+}
+.part-properties-dims {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Holes (Properties) */
+.holes-section { display: flex; flex-direction: column; gap: 8px; }
+.hole-row { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, 0.08); }
+.hole-row.is-focused { border-color: #e09f3e; box-shadow: 0 0 0 1px #e09f3e inset; }
+.hole-row-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hole-row-title { font-size: 12px; font-weight: 700; margin-right: auto; }
+.hole-seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.5); }
+.hole-seg button { border: none; background: transparent; padding: 4px 7px; font-size: 11px; color: inherit; }
+.hole-seg button.is-on { background: #e09f3e; color: #fff; }
+.hole-remove { border: none; background: transparent; padding: 4px; display: flex; color: #94a3b8; }
+.hole-row-fields { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.hole-field { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.hole-field-input { display: flex; align-items: center; gap: 2px; }
+.hole-field-input input { width: 48px; padding: 4px 6px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.5); font-size: 13px; text-align: right; background: transparent; color: var(--text-main); }
+.hole-field-input button { border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; border-radius: 6px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; color: inherit; }
+.hole-field-input .hole-thru { width: auto; padding: 0 8px; font-size: 12px; }
+.hole-add { align-self: flex-start; border: 1px dashed rgba(148, 163, 184, 0.8); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text-main); }
+
+/* Hole list + hole mode */
+.hole-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(15, 23, 42, 0.08); background: transparent; font: inherit; font-size: 13px; color: var(--text-main); text-align: left; }
+.hole-choice { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.hole-choice button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-main); }
+.hole-mode-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 240; display: flex; flex-direction: column; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: #ffffff; border-radius: 20px 20px 0 0; box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12); }
+.hole-bar-hint { font-size: 11px; color: var(--text-muted); text-align: center; }
+.hole-bar-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.hole-bar-size { display: flex; align-items: center; gap: 4px; }
+.hole-bar-size button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; display: flex; align-items: center; justify-content: center; padding: 0; color: inherit; }
+.hole-bar-size-label { font-size: 13px; color: var(--text-muted); }
+.hole-bar-input { width: 56px; padding: 6px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.5); font-size: 14px; text-align: center; background: transparent; color: var(--text-main); }
+.hole-mode-bar .hole-seg button { padding: 7px 10px; font-size: 12px; display: flex; align-items: center; }
+.hole-bar-exact label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.hole-bar-btn { display: flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(148, 163, 184, 0.5); background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-main); }
+.hole-bar-btn.is-on { border-color: #e09f3e; color: #e09f3e; }
+.hole-bar-btn.is-danger { color: #dc2626; }
+.hole-bar-btn.is-primary { background: #e09f3e; border-color: #e09f3e; color: #fff; }
+.hole-bar-more { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid rgba(15, 23, 42, 0.06); }
+.part-properties-edge-row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); flex-wrap: wrap; }
+.part-properties-edge-size { width: 64px; text-align: right; }

@@ -19,6 +19,7 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
   for (const obj of project.objects) {
     if (!obj.visible) continue;
     if (obj.shape === 'group') continue; // a group is a container, not stock
+    if (obj.reference || obj.generator === 'room-scan') continue; // scanned room / reference walls
 
     const unit = project.unit;
     const key = `${obj.shape}_${obj.dimensions.length}_${obj.dimensions.width}_${obj.dimensions.height}_${obj.material.name}`;
