@@ -73,7 +73,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     pushHistoryState,
     saveCurrentProject,
     projects,
-    activeProjectId
+    activeProjectId,
+    selectedObjectIds,
   } = useProjectStore();
 
   const { camera, raycaster, gl, controls } = useThree() as any;
@@ -273,6 +274,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   }, [activeAxis, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
 
   if (activeGizmoMode === 'resize') return null;
+  // Rotating a multi-selection isn't supported (each would spin alone): Group first.
+  if (!isMove && selectedObjectIds.length > 1) return null;
 
   const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
     if (axis === 'x' || axis === 'y' || axis === 'z') setReadoutAxis(axis);

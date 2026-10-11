@@ -1,5 +1,5 @@
 import React from 'react';
-import { Move, RotateCw, Scaling, Group, Ungroup, Pencil, Check, Copy, Trash2, Plus } from 'lucide-react';
+import { Move, RotateCw, Scaling, Copy, Trash2, Plus } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -13,20 +13,15 @@ export const TransformMenu: React.FC = () => {
     activeProjectId,
     selectedObjectId,
     selectedObjectIds,
-    editingGroupId,
     activeGizmoMode,
     setGizmoMode,
-    groupSelected,
-    ungroup,
-    enterGroup,
-    exitGroup,
-    duplicateObject,
-    deleteObject,
+    duplicateSelected,
+    deleteSelected,
   } = useProjectStore();
 
   const project = projects.find((item) => item.id === activeProjectId);
   const selected = project?.objects.find((item) => item.id === selectedObjectId);
-  const groupId = selected?.shape === 'group' ? selected.id : editingGroupId;
+  const noResize = selected?.shape === 'group' || selectedObjectIds.length > 1;
 
   const openOverlay = useAppStore((state) => state.openOverlay);
   const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
@@ -34,10 +29,10 @@ export const TransformMenu: React.FC = () => {
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
   const canEditSelection = Boolean(selected);
   const duplicateSelection = useReliableTap(() => {
-    if (selected) duplicateObject(selected.id);
+    if (selected) duplicateSelected();
   });
   const deleteSelection = useReliableTap(() => {
-    if (selected) deleteObject(selected.id);
+    if (selected) deleteSelected();
   });
   const addPart = useReliableTap(() => {
     setSidebarPanel('shapes');
@@ -66,6 +61,7 @@ export const TransformMenu: React.FC = () => {
         <Move size={18} />
         <span>Move</span>
       </button>
+      {!noResize && (
       <button
         type="button"
         className={activeGizmoMode === 'resize' ? 'is-active' : ''}
@@ -76,6 +72,7 @@ export const TransformMenu: React.FC = () => {
         <Scaling size={18} />
         <span>Resize</span>
       </button>
+      )}
       <button
         type="button"
         className={activeGizmoMode === 'rotate' ? 'is-active' : ''}
@@ -108,51 +105,6 @@ export const TransformMenu: React.FC = () => {
         <Trash2 size={18} />
         <span>Delete</span>
       </button>
-      {selectedObjectIds.length >= 2 && (
-        <button
-          type="button"
-          data-testid="transform-group"
-          onClick={tap(() => groupSelected())}
-          onPointerUp={tap(() => groupSelected())}
-        >
-          <Group size={18} />
-          <span>Group</span>
-        </button>
-      )}
-      {groupId && selected?.shape === 'group' && !editingGroupId && (
-        <>
-          <button
-            type="button"
-            data-testid="transform-edit-group"
-            onClick={tap(() => enterGroup(groupId))}
-            onPointerUp={tap(() => enterGroup(groupId))}
-          >
-            <Pencil size={18} />
-            <span>Edit parts</span>
-          </button>
-          <button
-            type="button"
-            data-testid="transform-ungroup"
-            onClick={tap(() => ungroup(groupId))}
-            onPointerUp={tap(() => ungroup(groupId))}
-          >
-            <Ungroup size={18} />
-            <span>Ungroup</span>
-          </button>
-        </>
-      )}
-      {editingGroupId && (
-        <button
-          type="button"
-          className="is-active"
-          data-testid="transform-done-group"
-          onClick={tap(() => exitGroup())}
-          onPointerUp={tap(() => exitGroup())}
-        >
-          <Check size={18} />
-          <span>Done</span>
-        </button>
-      )}
       </div>
     </div>
     </>

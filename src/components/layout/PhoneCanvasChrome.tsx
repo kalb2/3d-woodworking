@@ -1,16 +1,12 @@
 import React from 'react';
 import {
-  Check,
   Copy,
   Ellipsis,
-  Group,
   Home,
   Move,
-  Pencil,
   Plus,
   RotateCw,
   Scaling,
-  Ungroup,
   Trash2,
 } from 'lucide-react';
 import { UndoRedoButtons } from './UndoRedoButtons';
@@ -139,20 +135,16 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
     activeProjectId,
     selectedObjectId,
     selectedObjectIds,
-    editingGroupId,
     activeGizmoMode,
     setGizmoMode,
-    groupSelected,
-    ungroup,
-    enterGroup,
-    exitGroup,
-    duplicateObject,
-    deleteObject,
+    duplicateSelected,
+    deleteSelected,
   } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
-  const groupId = selectedObject?.shape === 'group' ? selectedObject.id : editingGroupId;
+  // Groups and multi-selections don't resize (no meaningful per-axis size).
+  const noResize = selectedObject?.shape === 'group' || selectedObjectIds.length > 1;
 
   return (
     <div
@@ -200,14 +192,14 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           showLabel
           onTap={() => setGizmoMode('move')}
         />
-        <DockItem
+        {!noResize && <DockItem
           label="Resize"
           testId="tool-resize"
           icon={<Scaling size={22} strokeWidth={1.8} />}
           active={activeGizmoMode === 'resize'}
           showLabel
           onTap={() => setGizmoMode('resize')}
-        />
+        />}
         <DockItem
           label="Rotate"
           testId="tool-rotate"
@@ -225,7 +217,7 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           showLabel
           className="is-duplicate"
           onTap={() => {
-            if (selectedObject) duplicateObject(selectedObject.id);
+            if (selectedObject) duplicateSelected();
           }}
         />
         <DockItem
@@ -237,45 +229,9 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           showLabel
           className="is-delete"
           onTap={() => {
-            if (selectedObject) deleteObject(selectedObject.id);
+            if (selectedObject) deleteSelected();
           }}
         />
-        {selectedObjectIds.length >= 2 && (
-          <DockItem
-            label="Group"
-            testId="transform-group"
-            icon={<Group size={22} strokeWidth={1.8} />}
-            active={false}
-            onTap={() => groupSelected()}
-          />
-        )}
-        {groupId && selectedObject?.shape === 'group' && !editingGroupId && (
-          <>
-            <DockItem
-              label="Edit"
-              testId="transform-edit-group"
-              icon={<Pencil size={22} strokeWidth={1.8} />}
-              active={false}
-              onTap={() => enterGroup(groupId)}
-            />
-            <DockItem
-              label="Ungroup"
-              testId="transform-ungroup"
-              icon={<Ungroup size={22} strokeWidth={1.8} />}
-              active={false}
-              onTap={() => ungroup(groupId)}
-            />
-          </>
-        )}
-        {editingGroupId && (
-          <DockItem
-            label="Done"
-            testId="transform-done-group"
-            icon={<Check size={22} strokeWidth={1.8} />}
-            active
-            onTap={() => exitGroup()}
-          />
-        )}
       </nav>
       <MoveFloorRow />
       <ResizeSizeRow />
