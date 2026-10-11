@@ -108,6 +108,9 @@ export function placeBuiltIn(
     generator: template.tag,
     builtIn: info,
   };
+  // Editing a nested built-in keeps it in its parent group.
+  const prev = req.editId ? objects.find((o) => o.id === groupId) : undefined;
+  if (prev?.parentId) group.parentId = prev.parentId;
   const kept = objects.filter((o) => o.id !== groupId && o.builtInId !== id);
   return { objects: [...kept, ...placed, group], groupId };
 }

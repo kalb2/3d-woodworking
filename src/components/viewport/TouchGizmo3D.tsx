@@ -189,7 +189,14 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           }
         }
 
-        if (currentProject) {
+        // Several things selected: they all move together by the same delta.
+        const multi = useProjectStore.getState().selectedObjectIds.length > 1;
+        if (multi) {
+          const cur = useProjectStore.getState().projects.find((p) => p.id === activeProjectId)?.objects.find((o) => o.id === object.id);
+          if (cur) {
+            useProjectStore.getState().translateSelection({ x: newPos.x - cur.position.x, y: newPos.y - cur.position.y, z: newPos.z - cur.position.z }, true);
+          }
+        } else if (currentProject) {
           const snapResult = calculateSnappedPosition(
             object,
             newPos,
