@@ -86,6 +86,8 @@ export interface FurnitureObject {
   visible?: boolean;
   parentId?: string;
   board?: BoardOptions;
+  /** Set on parts made by a generator (e.g. "media-wall") so re-runs can replace them. */
+  generator?: string;
 }
 
 export interface SnapSettings {

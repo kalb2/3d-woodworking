@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
+import { generateMediaWall, MEDIA_WALL_TAG, type MediaWallInput } from '../generators/mediaWall';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
@@ -166,6 +167,8 @@ interface ProjectState {
   addWoodPreset: (presetId: string) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
+  /** Adds a generated media wall as one group, replacing any earlier one in this project. */
+  insertMediaWall: (input: MediaWallInput) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -611,6 +614,61 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       historyIndex: 0,
     }));
     get().saveCurrentProject();
+    return true;
+  },
+
+  insertMediaWall: (input) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return false;
+    const stamp = Date.now();
+    const groupId = `grp_${stamp}_mediawall`;
+    const parts: FurnitureObject[] = generateMediaWall(input).map((object, index) => ({
+      ...object,
+      id: `obj_${stamp}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+      parentId: groupId,
+    }));
+    if (parts.length === 0) return false;
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const o of parts) {
+      minX = Math.min(minX, o.position.x - o.dimensions.length / 2);
+      maxX = Math.max(maxX, o.position.x + o.dimensions.length / 2);
+      minY = Math.min(minY, o.position.y - o.dimensions.height / 2);
+      maxY = Math.max(maxY, o.position.y + o.dimensions.height / 2);
+      minZ = Math.min(minZ, o.position.z - o.dimensions.width / 2);
+      maxZ = Math.max(maxZ, o.position.z + o.dimensions.width / 2);
+    }
+    const group: FurnitureObject = {
+      id: groupId,
+      name: 'Media wall',
+      shape: 'group',
+      dimensions: { length: maxX - minX, height: maxY - minY, width: maxZ - minZ },
+      position: { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 },
+      rotation: { x: 0, y: 0, z: 0 },
+      material: LIGHT_STARTING_WOOD,
+      visible: true,
+      generator: MEDIA_WALL_TAG,
+    };
+    // Replace an earlier generated wall: its group and every part still inside it.
+    const oldGroupIds = new Set(
+      proj.objects.filter((o) => o.shape === 'group' && o.generator === MEDIA_WALL_TAG).map((o) => o.id)
+    );
+    const kept = proj.objects.filter(
+      (o) => !(o.generator === MEDIA_WALL_TAG && (o.shape === 'group' || !o.parentId || oldGroupIds.has(o.parentId)))
+    ).map((o) => (o.parentId && oldGroupIds.has(o.parentId) ? { ...o, parentId: undefined } : o));
+
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects: [...kept, ...parts, group] } : p
+      ),
+      selectedObjectId: group.id,
+      selectedObjectIds: [group.id],
+      multiSelect: false,
+      editingGroupId: null,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
     return true;
   },
 
