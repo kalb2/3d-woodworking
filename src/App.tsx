@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
+import { useAccountStore } from './state/useAccountStore';
 import { useAppStore } from './state/useAppStore';
 import { useIsPhone } from './hooks/useIsPhone';
 import { FurnitureCanvas } from './components/viewport/FurnitureCanvas';
@@ -14,32 +15,37 @@ import {
 import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
-import { ProjectModal } from './components/modals/ProjectModal';
 import { CutListDrawer } from './components/modals/CutListDrawer';
+import { BuiltInSheet } from './builtins/BuiltInSheet';
+import { HoleModeBar } from './components/layout/HoleModeBar';
+import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
-import { NewProjectSheet } from './components/modals/NewProjectSheet';
+import { ShareSheet } from './components/share/ShareSheet';
 
 export const App: React.FC = () => {
-  const { loadProjects, selectedObjectId } = useProjectStore();
+  useUndoShortcuts();
+  const { loadProjects, selectedObjectId, projects, activeProjectId } = useProjectStore();
+  const loadSession = useAccountStore((state) => state.loadSession);
   const {
     currentView,
     loadPreferences,
     overlays,
     openOverlay,
+    setSidebarPanel,
     resetOverlaysForLayout,
     setOverlayOpen,
     dismissOverlays,
   } = useAppStore();
   const isPhone = useIsPhone();
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isCutListOpen, setIsCutListOpen] = useState(false);
-  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   useEffect(() => {
     loadProjects();
     loadPreferences();
-  }, [loadProjects, loadPreferences]);
+    void loadSession();
+  }, [loadProjects, loadPreferences, loadSession]);
 
   useEffect(() => {
     if (currentView !== 'editor') return;
@@ -87,9 +93,8 @@ export const App: React.FC = () => {
         <PhoneCanvasHeader />
       ) : (
         <IPadHeader
-          onOpenProjectModal={() => setIsProjectModalOpen(true)}
           onOpenCutList={() => setIsCutListOpen(true)}
-          onNewProject={() => setIsNewProjectOpen(true)}
+          onShareProject={() => setIsShareOpen(true)}
         />
       )}
 
@@ -100,9 +105,8 @@ export const App: React.FC = () => {
             <ObjectInspector />
           </PhoneBottomSheet>
           <PhoneMenuSheet
-            onOpenProjectModal={() => setIsProjectModalOpen(true)}
             onOpenCutList={() => setIsCutListOpen(true)}
-            onNewProject={() => setIsNewProjectOpen(true)}
+            onShareProject={() => setIsShareOpen(true)}
           />
         </>
       )}
@@ -112,7 +116,10 @@ export const App: React.FC = () => {
           label="Shapes"
           icon={<Box size={16} color="#e09f3e" />}
           placement="left"
-          onOpen={() => openOverlay('sidebar', isPhone)}
+          onOpen={() => {
+            setSidebarPanel('shapes');
+            openOverlay('sidebar', isPhone);
+          }}
         />
       )}
 
@@ -135,20 +142,17 @@ export const App: React.FC = () => {
 
       <TransformMenu />
 
-      <NewProjectSheet
-        open={isNewProjectOpen}
-        onClose={() => setIsNewProjectOpen(false)}
-      />
-
-      {/* Modals */}
-      <ProjectModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
-      />
+      <BuiltInSheet />
+      <HoleModeBar />
 
       <CutListDrawer
         isOpen={isCutListOpen}
         onClose={() => setIsCutListOpen(false)}
+      />
+
+      <ShareSheet
+        project={isShareOpen ? (projects.find((project) => project.id === activeProjectId) ?? null) : null}
+        onClose={() => setIsShareOpen(false)}
       />
     </div>
   );

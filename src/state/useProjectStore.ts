@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { FurnitureObject, FurnitureProject, LengthUnit, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
+import { findTemplate, instantiateTemplate } from '../catalog/templates';
+import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
+import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
+import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
+import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 
@@ -10,53 +15,54 @@ export interface WoodPreset {
   dimensions: { length: number; width: number; height: number };
   material: WoodMaterial;
   shape: ShapeType;
+  category: PresetCategory;
 }
 
+export type PresetCategory = 'Plywood sheets' | 'MDF sheets' | 'Lumber';
+
+const THICKNESSES: Array<[string, number]> = [['1/4', 0.25], ['1/2', 0.5], ['3/4', 0.75]];
+const sheet = (kind: 'plywood' | 'mdf', [label, t]: [string, number]): WoodPreset => ({
+  id: `${kind}_4x8_${label.replace('/', '_')}`,
+  label: `${kind === 'plywood' ? 'Plywood' : 'MDF'} 4×8 · ${label}"`,
+  description: `96" × 48" × ${t}"`,
+  dimensions: { length: 96, width: 48, height: t },
+  material: kind === 'plywood' ? PRESET_WOOD_MATERIALS.plywood : PRESET_WOOD_MATERIALS.mdf,
+  shape: 'board',
+  category: kind === 'plywood' ? 'Plywood sheets' : 'MDF sheets',
+});
+
 export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
-  {
-    id: 'plywood_4x8_3_4',
-    label: '4×8 Plywood Sheet (3/4")',
-    description: '96" × 48" × 0.75" — Standard cabinet-grade plywood',
-    dimensions: { length: 96, width: 48, height: 0.75 },
-    material: PRESET_WOOD_MATERIALS.birch,
-    shape: 'cube'
-  },
-  {
-    id: 'plywood_4x8_1_2',
-    label: '4×8 Plywood Sheet (1/2")',
-    description: '96" × 48" × 0.5" — Thinner plywood for backing/shelves',
-    dimensions: { length: 96, width: 48, height: 0.5 },
-    material: PRESET_WOOD_MATERIALS.birch,
-    shape: 'cube'
-  },
+  ...THICKNESSES.map((t) => sheet('plywood', t)),
+  ...THICKNESSES.map((t) => sheet('mdf', t)),
   {
     id: 'pine_2x4_8ft',
-    label: '2×4 Pine Board (8ft)',
-    description: '96" × 3.5" × 1.5" — Standard dimensional lumber',
+    label: '2×4 Pine (8 ft)',
+    description: '96" × 3.5" × 1.5"',
     dimensions: { length: 96, width: 3.5, height: 1.5 },
     material: PRESET_WOOD_MATERIALS.pine,
-    shape: 'cube'
+    shape: 'cube',
+    category: 'Lumber',
   },
-  {
-    id: 'mdf_4x8_3_4',
-    label: '4×8 MDF Sheet (3/4")',
-    description: '96" × 48" × 0.75" — Medium density fiberboard',
-    dimensions: { length: 96, width: 48, height: 0.75 },
-    material: PRESET_WOOD_MATERIALS.custom_paint,
-    shape: 'cube'
-  },
-  {
-    id: 'mdf_4x8_1_2',
-    label: '4×8 MDF Sheet (1/2")',
-    description: '96" × 48" × 0.5" — Thinner MDF for panels',
-    dimensions: { length: 96, width: 48, height: 0.5 },
-    material: PRESET_WOOD_MATERIALS.custom_paint,
-    shape: 'cube'
-  }
 ];
 
 const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
 const LIGHT_STARTING_WOOD = PRESET_WOOD_MATERIALS.birch;
+
+export type ProjectPersistEvent =
+  | { type: 'save' }
+  | { type: 'delete'; id: string; updatedAt: number };
+
+let persistListener: ((event: ProjectPersistEvent) => void) | null = null;
+let persistSuppressed = false;
+
+export function setProjectPersistListener(listener: ((event: ProjectPersistEvent) => void) | null) {
+  persistListener = listener;
+}
+
+function notifyProjectPersist(event: ProjectPersistEvent) {
+  if (persistSuppressed) return;
+  persistListener?.(event);
+}
 
 function isStartingBoard(object: FurnitureObject): boolean {
   return (
@@ -80,74 +86,40 @@ function withLightStartingWood(projects: FurnitureProject[]): FurnitureProject[]
   }));
 }
 
+function defaultSnapSettings(): SnapSettings {
+  return {
+    enabled: true,
+    faceSnap: true,
+    gridSnap: true,
+    gridSize: 0.5,
+    floorCollision: true,
+  };
+}
+
 const createInitialProject = (): FurnitureProject => ({
   id: 'proj_default',
-  name: 'Living Room Coffee Table',
+  name: 'Starter Layout',
   createdAt: Date.now(),
   updatedAt: Date.now(),
   unit: 'in',
   objects: [
     {
-      id: 'tabletop_1',
-      name: 'Table Top',
-      shape: 'bevel_top',
-      dimensions: { length: 48, width: 24, height: 1.5 },
-      position: { x: 0, y: 18, z: 0 },
+      id: 'starter_box',
+      name: 'Box',
+      shape: 'cube',
+      dimensions: { length: 12, width: 12, height: 12 },
+      position: { x: 0, y: 6, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
       material: LIGHT_STARTING_WOOD,
-      visible: true
+      visible: true,
     },
-    {
-      id: 'leg_1',
-      name: 'Front Left Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: -22, y: 8.625, z: -10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_2',
-      name: 'Front Right Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: 22, y: 8.625, z: -10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_3',
-      name: 'Back Left Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: -22, y: 8.625, z: 10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    },
-    {
-      id: 'leg_4',
-      name: 'Back Right Leg',
-      shape: 'cylinder',
-      dimensions: { length: 2, width: 2, height: 17.25 },
-      position: { x: 22, y: 8.625, z: 10 },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: PRESET_WOOD_MATERIALS.metal_accent,
-      visible: true
-    }
   ],
-  snapSettings: {
-    enabled: true,
-    faceSnap: true,
-    gridSnap: true,
-    gridSize: 0.5,
-    floorCollision: true
-  },
+  snapSettings: defaultSnapSettings(),
   showFloor: true,
-  floorOpacity: 0.4
+  floorOpacity: 0.4,
 });
+
+const INITIAL_PROJECT = createInitialProject();
 
 interface ProjectState {
   projects: FurnitureProject[];
@@ -163,6 +135,7 @@ interface ProjectState {
   historyIndex: number;
 
   loadProjects: () => void;
+  replaceAllProjects: (projects: FurnitureProject[]) => void;
   saveCurrentProject: () => void;
   createProject: (name: string, unit?: LengthUnit) => void;
   renameProject: (id: string, newName: string) => void;
@@ -179,7 +152,21 @@ interface ProjectState {
   exitGroup: () => void;
   addObject: (shape: ShapeType, name?: string) => void;
   addWoodPreset: (presetId: string) => void;
-  addPresetTemplate: (templateType: 'table' | 'chair' | 'bookshelf' | 'desk' | 'sofa') => void;
+  createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
+  insertTemplate: (templateId: string) => boolean;
+  /** Adds a built-in (or regenerates `editId`); returns its group id. */
+  insertBuiltIn: (req: BuiltInRequest) => string | null;
+  /** Removes a built-in's group and all its parts. */
+  deleteBuiltIn: (groupId: string) => void;
+  /** Insert a saved user template as one group (or a single part); one undo step. */
+  insertUserTemplate: (template: UserTemplate, place: { at?: { x: number; z: number }; wallId?: string | null }) => boolean;
+  /** Put a scanned room into the current project, replacing only an earlier room scan. */
+  addScannedRoom: (room: ScannedRoom) => boolean;
+  /** Lock/unlock the scanned room's walls for editing (per project). */
+  /** When unlocking with `selectWallId`, that wall's part becomes the selection (ready for Move/Delete). */
+  setRoomLocked: (locked: boolean, selectWallId?: string | null) => void;
+  /** New project whose scene is the scanned room (locked reference parts). */
+  createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
   deleteObject: (id: string) => void;
   duplicateObject: (id: string) => void;
@@ -197,16 +184,40 @@ interface ProjectState {
   setUnit: (unit: LengthUnit) => void;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
-  projects: [createInitialProject()],
-  activeProjectId: 'proj_default',
-  selectedObjectId: 'tabletop_1',
-  selectedObjectIds: ['tabletop_1'],
+/** Keep project.scannedRoom in step with edited room-scan parts. */
+function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): FurnitureProject {
+  return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
+}
+
+/** Max undo steps kept per project. */
+export const HISTORY_LIMIT = 100;
+
+export const useProjectStore = create<ProjectState>((set, get) => {
+  /** Swap the active project's objects for a history entry; the saved project then matches it. */
+  const restoreHistory = (index: number) => {
+    const { historyStack, activeProjectId, selectedObjectIds, editingGroupId, saveCurrentProject } = get();
+    const objects: FurnitureObject[] = JSON.parse(JSON.stringify(historyStack[index]));
+    const ids = new Set(objects.map((o) => o.id));
+    const keep = selectedObjectIds.filter((id) => ids.has(id));
+    set((state) => ({
+      historyIndex: index,
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...withRoomSync(p, objects), updatedAt: Date.now() } : p)),
+      selectedObjectIds: keep,
+      selectedObjectId: keep[keep.length - 1] ?? null,
+      editingGroupId: editingGroupId && ids.has(editingGroupId) ? editingGroupId : null,
+    }));
+    saveCurrentProject();
+  };
+  return {
+  projects: [INITIAL_PROJECT],
+  activeProjectId: INITIAL_PROJECT.id,
+  selectedObjectId: INITIAL_PROJECT.objects[0]?.id ?? null,
+  selectedObjectIds: INITIAL_PROJECT.objects[0] ? [INITIAL_PROJECT.objects[0].id] : [],
   multiSelect: false,
   editingGroupId: null,
   activeGizmoMode: 'move',
   showDimensions: true,
-  historyStack: [[...createInitialProject().objects]],
+  historyStack: [[...INITIAL_PROJECT.objects]],
   historyIndex: 0,
 
   loadProjects: () => {
@@ -215,7 +226,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const projects = withLightStartingWood(parsed);
+          const projects = migrateLegacyLabels(withLightStartingWood(parsed));
           const firstId = projects[0].objects[0]?.id ?? null;
           set({
             projects,
@@ -246,15 +257,41 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedProjects));
       set({ projects: updatedProjects });
+      notifyProjectPersist({ type: 'save' });
     } catch (err) {
       console.warn('Failed to auto-save project:', err);
+    }
+  },
+
+  replaceAllProjects: (projects) => {
+    const previousId = get().activeProjectId;
+    const active = projects.find((project) => project.id === previousId) ?? projects[0] ?? null;
+    const selected = active?.objects.find((object) => object.id === get().selectedObjectId)?.id
+      ?? active?.objects[0]?.id
+      ?? null;
+    persistSuppressed = true;
+    try {
+      set({
+        projects,
+        activeProjectId: active?.id ?? '',
+        selectedObjectId: selected,
+        selectedObjectIds: selected ? [selected] : [],
+        editingGroupId: null,
+        historyStack: active ? [[...active.objects]] : [[]],
+        historyIndex: 0,
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+    } catch (err) {
+      console.warn('Failed to apply synced projects:', err);
+    } finally {
+      persistSuppressed = false;
     }
   },
 
   createProject: (name: string, unit: LengthUnit = 'in') => {
     const defaultCube: FurnitureObject = {
       id: `obj_${Date.now()}_cube`,
-      name: 'Starting Cube',
+      name: 'Box',
       shape: 'cube',
       dimensions: { length: 12, width: 12, height: 12 },
       position: { x: 0, y: 6, z: 0 },
@@ -265,18 +302,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const newProj: FurnitureProject = {
       id: `proj_${Date.now()}`,
-      name: name || 'Untitled Furniture',
+      name: name || 'Untitled Project',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       unit,
       objects: [defaultCube],
-      snapSettings: {
-        enabled: true,
-        faceSnap: true,
-        gridSnap: true,
-        gridSize: 0.5,
-        floorCollision: true
-      },
+      snapSettings: defaultSnapSettings(),
       showFloor: true,
       floorOpacity: 0.4
     };
@@ -349,6 +380,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     } catch (e) {}
+    notifyProjectPersist({ type: 'delete', id, updatedAt: Date.now() });
   },
 
   switchProject: (id: string) => {
@@ -512,20 +544,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
 
-    const defaultMaterial: WoodMaterial = LIGHT_STARTING_WOOD;
-    const isBoard = shape === 'board';
+    const spec = shapeCatalogEntry(shape);
+    const dimensions = spec?.dimensions ?? { length: 12, width: 12, height: 12 };
+    const baseName = spec?.defaultName ?? 'Box';
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: customName || (isBoard ? 'Board' : `${shape.charAt(0).toUpperCase() + shape.slice(1)} Component`),
+      name: customName || nextStockName(proj.objects.map((object) => object.name), baseName),
       shape,
-      dimensions: isBoard
-        ? { length: 24, width: 16, height: 0.75 }
-        : { length: 12, width: 12, height: 12 },
-      position: { x: 0, y: isBoard ? 0.375 : 6, z: 0 },
+      dimensions: { ...dimensions },
+      position: { x: 0, y: dimensions.height / 2, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: defaultMaterial,
+      material: LIGHT_STARTING_WOOD,
       visible: true,
-      board: isBoard ? defaultBoardOptions() : undefined,
+      board: shape === 'board' ? defaultBoardOptions() : undefined,
     };
 
     const updatedObjects = [...proj.objects, newObj];
@@ -553,13 +584,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const newObj: FurnitureObject = {
       id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: preset.label,
+      name: nextStockName(proj.objects.map((o) => o.name), preset.label),
       shape: preset.shape,
       dimensions: { ...preset.dimensions },
       position: { x: 0, y: preset.dimensions.height / 2, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      material: preset.material,
-      visible: true
+      material: { ...preset.material },
+      visible: true,
+      board: preset.shape === 'board' ? defaultBoardOptions() : undefined,
     };
 
     const updatedObjects = [...proj.objects, newObj];
@@ -577,61 +609,178 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     saveCurrentProject();
   },
 
-  addPresetTemplate: (templateType) => {
-    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
-    const proj = projects.find(p => p.id === activeProjectId);
-    if (!proj) return;
+  createProjectFromTemplate: (templateId, unit = 'in') => {
+    const template = findTemplate(templateId);
+    const objects = instantiateTemplate(templateId);
+    if (!template || !objects || objects.length === 0) return false;
 
-    const oak = PRESET_WOOD_MATERIALS.oak;
-    const walnut = PRESET_WOOD_MATERIALS.walnut;
-    const metal = PRESET_WOOD_MATERIALS.metal_accent;
-    let newObjs: FurnitureObject[] = [];
+    const newProj: FurnitureProject = {
+      id: `proj_${Date.now()}`,
+      name: template.name,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      unit,
+      objects,
+      snapSettings: defaultSnapSettings(),
+      showFloor: true,
+      floorOpacity: 0.4,
+    };
 
-    if (templateType === 'table') {
-      newObjs = [
-        { id: `t_${Date.now()}_top`, name: 'Table Top', shape: 'bevel_top', dimensions: { length: 60, width: 36, height: 2 }, position: { x: 0, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `t_${Date.now()}_l1`, name: 'Leg FL', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: -27, y: 14.5, z: -15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l2`, name: 'Leg FR', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: 27, y: 14.5, z: -15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l3`, name: 'Leg BL', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: -27, y: 14.5, z: 15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true },
-        { id: `t_${Date.now()}_l4`, name: 'Leg BR', shape: 'cylinder', dimensions: { length: 3, width: 3, height: 29 }, position: { x: 27, y: 14.5, z: 15 }, rotation: { x: 0, y: 0, z: 0 }, material: metal, visible: true }
-      ];
-    } else if (templateType === 'chair') {
-      newObjs = [
-        { id: `c_${Date.now()}_seat`, name: 'Chair Seat', shape: 'bevel_top', dimensions: { length: 18, width: 18, height: 1.5 }, position: { x: 0, y: 18, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_back`, name: 'Backrest', shape: 'cube', dimensions: { length: 18, width: 1.5, height: 16 }, position: { x: 0, y: 26, z: 8 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l1`, name: 'Leg FL', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: -7.5, y: 8.625, z: -7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l2`, name: 'Leg FR', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: 7.5, y: 8.625, z: -7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l3`, name: 'Leg BL', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: -7.5, y: 8.625, z: 7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true },
-        { id: `c_${Date.now()}_l4`, name: 'Leg BR', shape: 'cylinder', dimensions: { length: 1.5, width: 1.5, height: 17.25 }, position: { x: 7.5, y: 8.625, z: 7.5 }, rotation: { x: 0, y: 0, z: 0 }, material: walnut, visible: true }
-      ];
-    } else if (templateType === 'bookshelf') {
-      newObjs = [
-        { id: `b_${Date.now()}_side1`, name: 'Left Panel', shape: 'cube', dimensions: { length: 1, width: 14, height: 60 }, position: { x: -16, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_side2`, name: 'Right Panel', shape: 'cube', dimensions: { length: 1, width: 14, height: 60 }, position: { x: 16, y: 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf1`, name: 'Bottom Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 2, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf2`, name: 'Middle Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 22, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_shelf3`, name: 'Upper Shelf', shape: 'bevel_top', dimensions: { length: 31, width: 14, height: 1 }, position: { x: 0, y: 42, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true },
-        { id: `b_${Date.now()}_top`, name: 'Top Panel', shape: 'bevel_top', dimensions: { length: 33, width: 15, height: 1.5 }, position: { x: 0, y: 59.25, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true }
-      ];
-    } else {
-      newObjs = [
-        { id: `m_${Date.now()}`, name: 'Base Component', shape: 'cube', dimensions: { length: 24, width: 24, height: 24 }, position: { x: 0, y: 12, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, material: oak, visible: true }
-      ];
-    }
-
-    const updatedObjects = [...proj.objects, ...newObjs];
-
-    set(state => ({
-      projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
-      ),
-      selectedObjectId: newObjs[0].id,
-      selectedObjectIds: [newObjs[0].id],
+    set((state) => ({
+      projects: [...state.projects, newProj],
+      activeProjectId: newProj.id,
+      selectedObjectId: objects[0].id,
+      selectedObjectIds: [objects[0].id],
+      editingGroupId: null,
       multiSelect: false,
+      historyStack: [[...objects]],
+      historyIndex: 0,
     }));
+    get().saveCurrentProject();
+    return true;
+  },
 
+  insertBuiltIn: (req) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return null;
+    const result = placeBuiltIn(proj.objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD);
+    if (!result) return null;
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectId: result.groupId,
+      selectedObjectIds: [result.groupId],
+      multiSelect: false,
+      editingGroupId: null,
+    }));
     pushHistoryState();
     saveCurrentProject();
+    return result.groupId;
+  },
+
+  insertUserTemplate: (template, place) => {
+    const { projects, activeProjectId, pushHistoryState } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return false;
+    const wall = place.wallId ? proj.scannedRoom?.walls.find((w) => w.id === place.wallId) : undefined;
+    const placement: Placement = wall ? { wall } : { at: place.at };
+    const added = instantiateUserTemplate(template, placement, LIGHT_STARTING_WOOD);
+    if (added.length === 0) return false;
+    const top = added.find((o) => o.shape === 'group') ?? added[0];
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: [...p.objects, ...added] } : p)),
+      selectedObjectId: top.id,
+      selectedObjectIds: [top.id],
+      editingGroupId: null,
+      multiSelect: false,
+    }));
+    pushHistoryState();
+    return true;
+  },
+
+  addScannedRoom: (room) => {
+    const { projects, activeProjectId, pushHistoryState } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || room.walls.length === 0) return false;
+    const stamp = Date.now();
+    const roomParts: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}` }));
+    const kept = proj.objects.filter((o) => o.generator !== 'room-scan');
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId
+        ? { ...p, objects: [...roomParts, ...kept], scannedRoom: room, roomLocked: undefined }
+        : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: null,
+    }));
+    pushHistoryState();
+    return true;
+  },
+
+  setRoomLocked: (locked, selectWallId) => {
+    const { activeProjectId, saveCurrentProject, projects, selectedObjectIds } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const wall = selectWallId ? proj?.scannedRoom?.walls.find((w) => w.id === selectWallId) : undefined;
+    const wallPart = wall ? proj?.objects.find((o) => o.generator === 'room-scan' && !o.openingId
+      && !/\b(Window|Door|Opening)\b/.test(o.name) && (o.wallId === wall.id || o.name === `${wall.label} (scan)`)) : undefined;
+    const roomIds = new Set(proj?.objects.filter((o) => o.generator === 'room-scan').map((o) => o.id));
+    const keep = selectedObjectIds.filter((id) => !roomIds.has(id));
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId
+        ? { ...p, roomLocked: locked, objects: p.objects.map((o) => (o.generator === 'room-scan' ? { ...o, locked } : o)) }
+        : p)),
+      ...(locked
+        ? { selectedObjectIds: keep, selectedObjectId: keep[keep.length - 1] ?? null }
+        : wallPart ? { selectedObjectId: wallPart.id, selectedObjectIds: [wallPart.id], editingGroupId: null, multiSelect: false } : {}),
+    }));
+    saveCurrentProject();
+  },
+
+  deleteBuiltIn: (groupId) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const group = proj?.objects.find((o) => o.id === groupId);
+    if (!proj || !group?.builtIn) return;
+    const id = group.builtIn.id;
+    const objects = proj.objects.filter((o) => o.id !== groupId && o.builtInId !== id && o.parentId !== groupId);
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: state.editingGroupId === groupId ? null : state.editingGroupId,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  createProjectFromScan: (name, room, unit = 'in') => {
+    if (room.walls.length === 0) return false;
+    const stamp = Date.now();
+    const objects: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}` }));
+    const newProj: FurnitureProject = {
+      id: `proj_${stamp}`,
+      name,
+      createdAt: stamp,
+      updatedAt: stamp,
+      unit,
+      objects,
+      snapSettings: defaultSnapSettings(),
+      showFloor: true,
+      floorOpacity: 0.4,
+      scannedRoom: room,
+    };
+    set((state) => ({
+      projects: [...state.projects, newProj],
+      activeProjectId: newProj.id,
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: null,
+      multiSelect: false,
+      historyStack: [[...objects]],
+      historyIndex: 0,
+    }));
+    get().saveCurrentProject();
+    return true;
+  },
+
+  insertTemplate: (templateId) => {
+    const objects = instantiateTemplate(templateId);
+    if (!objects || objects.length === 0) return false;
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return false;
+
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === activeProjectId ? { ...p, objects: [...p.objects, ...objects] } : p
+      ),
+      selectedObjectId: objects[0].id,
+      selectedObjectIds: [objects[0].id],
+      multiSelect: false,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+    return true;
   },
 
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory = false) => {
@@ -648,6 +797,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const minY = objHeight / 2;
       if (updates.position.y < minY) {
         updates = { ...updates, position: { ...updates.position, y: minY } };
+      }
+    }
+
+    // Wall-fitted built-ins slide along their wall, flush and on the floor; no free rotation.
+    const fittedWall = existingObj.builtIn?.wallId
+      ? proj.scannedRoom?.walls.find((w) => w.id === existingObj.builtIn!.wallId)
+      : undefined;
+    if (fittedWall && existingObj.builtIn && (updates.position || updates.rotation)) {
+      const { rotation: _ignored, ...rest } = updates;
+      void _ignored;
+      updates = rest;
+      if (updates.position) {
+        const slid = slideAlongWall(existingObj, fittedWall, updates.position);
+        updates = { ...updates, position: slid.position, builtIn: { ...existingObj.builtIn, center: slid.center } };
       }
     }
 
@@ -703,9 +866,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       });
     }
 
+    const roomEdit = existingObj.generator === 'room-scan';
     set(state => ({
       projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
+        p.id === activeProjectId ? (roomEdit ? withRoomSync(p, updatedObjects) : { ...p, objects: updatedObjects }) : p
       )
     }));
 
@@ -731,11 +895,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const remaining = get().selectedObjectIds.filter(
       (item) => item !== id && updatedObjects.some((object) => object.id === item)
     );
-    const nextSelected = remaining[remaining.length - 1] ?? updatedObjects[0]?.id ?? null;
+    // Never fall back onto a locked scanned wall (it couldn't be acted on).
+    const nextSelected = remaining[remaining.length - 1]
+      ?? updatedObjects.find((o) => !(o.generator === 'room-scan' && proj.roomLocked !== false))?.id
+      ?? null;
 
     set(state => ({
       projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
+        p.id === activeProjectId ? (target?.generator === 'room-scan' ? withRoomSync(p, updatedObjects) : { ...p, objects: updatedObjects }) : p
       ),
       selectedObjectId: nextSelected,
       selectedObjectIds: nextSelected ? (remaining.length ? remaining : [nextSelected]) : [],
@@ -802,53 +969,32 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   toggleDimensions: () => set((state) => ({ showDimensions: !state.showDimensions })),
 
   pushHistoryState: () => {
-    const { projects, activeProjectId, historyStack, historyIndex } = get();
+    const { projects, activeProjectId, historyStack, historyIndex, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
+    const snapshot = JSON.stringify(proj.objects);
+    // A gesture that changed nothing (tap on a handle, no-op edit) is not an undo step.
+    if (historyStack[historyIndex] && JSON.stringify(historyStack[historyIndex]) === snapshot) return;
 
     const newHistory = historyStack.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(proj.objects)));
-
-    if (newHistory.length > 50) newHistory.shift();
+    newHistory.push(JSON.parse(snapshot));
+    while (newHistory.length > HISTORY_LIMIT) newHistory.shift();
 
     set({
       historyStack: newHistory,
       historyIndex: newHistory.length - 1
     });
+    saveCurrentProject();
   },
 
   undo: () => {
-    const { historyIndex, historyStack, activeProjectId, saveCurrentProject } = get();
-    if (historyIndex > 0) {
-      const prevIndex = historyIndex - 1;
-      const prevObjects = JSON.parse(JSON.stringify(historyStack[prevIndex]));
-
-      set(state => ({
-        historyIndex: prevIndex,
-        projects: state.projects.map(p =>
-          p.id === activeProjectId ? { ...p, objects: prevObjects } : p
-        )
-      }));
-
-      saveCurrentProject();
-    }
+    const { historyIndex } = get();
+    if (historyIndex > 0) restoreHistory(historyIndex - 1);
   },
 
   redo: () => {
-    const { historyIndex, historyStack, activeProjectId, saveCurrentProject } = get();
-    if (historyIndex < historyStack.length - 1) {
-      const nextIndex = historyIndex + 1;
-      const nextObjects = JSON.parse(JSON.stringify(historyStack[nextIndex]));
-
-      set(state => ({
-        historyIndex: nextIndex,
-        projects: state.projects.map(p =>
-          p.id === activeProjectId ? { ...p, objects: nextObjects } : p
-        )
-      }));
-
-      saveCurrentProject();
-    }
+    const { historyIndex, historyStack } = get();
+    if (historyIndex < historyStack.length - 1) restoreHistory(historyIndex + 1);
   },
 
   toggleFloor: () => {
@@ -900,4 +1046,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
     saveCurrentProject();
   }
-}));
+};
+});

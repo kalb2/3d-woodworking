@@ -74,7 +74,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#e09f3e' }}>
-                <th style={{ padding: '10px 12px' }}>Component Name</th>
+                <th style={{ padding: '10px 12px' }}>Part</th>
                 <th style={{ padding: '10px 12px' }}>Shape</th>
                 <th style={{ padding: '10px 12px' }}>Length (X)</th>
                 <th style={{ padding: '10px 12px' }}>Width (Z)</th>

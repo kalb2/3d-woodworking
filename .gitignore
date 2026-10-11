@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local dev sync database (Vite middleware)
+.data/
+
+# Wrangler local state (dev D1, caches)
+.wrangler/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

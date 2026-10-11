@@ -71,13 +71,8 @@ export const PartColorSection: React.FC = () => {
                 onClick={() => applyMaterial(materialFromSpecies(option.species, option.label))}
               >
                 <span
-                  className={`finish-swatch finish-swatch-wood${option.species === 'metal_accent' ? ' is-metal' : ''}`}
-                  style={{
-                    backgroundColor: preset.baseColor,
-                    backgroundImage: option.species === 'metal_accent'
-                      ? 'linear-gradient(135deg, rgba(255,255,255,0.45), transparent 42%, rgba(0,0,0,0.18))'
-                      : `repeating-linear-gradient(90deg, ${preset.secondaryColor} 0 1px, transparent 1px 7px)`
-                  }}
+                  className="finish-swatch"
+                  style={{ backgroundColor: preset.baseColor }}
                 >
                   {selected && <Check size={14} color={swatchInk(preset.baseColor)} strokeWidth={3} />}
                 </span>

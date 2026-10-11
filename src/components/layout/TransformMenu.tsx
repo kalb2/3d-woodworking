@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
+import { UndoRedoButtons } from './UndoRedoButtons';
 
 export const TransformMenu: React.FC = () => {
   const {
@@ -28,6 +29,7 @@ export const TransformMenu: React.FC = () => {
   const groupId = selected?.shape === 'group' ? selected.id : editingGroupId;
 
   const openOverlay = useAppStore((state) => state.openOverlay);
+  const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);
   const isPhone = useIsPhone();
   const tap = (action: () => void) => (event: React.SyntheticEvent) => fireReliableTap(event, action);
   const canEditSelection = Boolean(selected);
@@ -38,12 +40,18 @@ export const TransformMenu: React.FC = () => {
     if (selected) deleteObject(selected.id);
   });
   const addPart = useReliableTap(() => {
+    setSidebarPanel('shapes');
     openOverlay('sidebar');
   });
 
   if (isPhone) return null;
 
   return (
+    <>
+    <UndoRedoButtons placement="ipad" />
+    <button type="button" className="add-fab is-ipad" data-testid="toolbar-add" aria-label="Add" title="Add" onClick={addPart} onPointerUp={addPart}>
+      <Plus size={24} strokeWidth={2.2} />
+    </button>
     <div className="transform-menu" data-testid="transform-menu" role="toolbar" aria-label="Move, resize, and rotate">
       <ResizeSizeRow />
       <RotateAngleRow />
@@ -100,15 +108,6 @@ export const TransformMenu: React.FC = () => {
         <Trash2 size={18} />
         <span>Delete</span>
       </button>
-      <button
-        type="button"
-        data-testid="toolbar-add"
-        onClick={addPart}
-        onPointerUp={addPart}
-      >
-        <Plus size={18} />
-        <span>Add</span>
-      </button>
       {selectedObjectIds.length >= 2 && (
         <button
           type="button"
@@ -156,5 +155,6 @@ export const TransformMenu: React.FC = () => {
       )}
       </div>
     </div>
+    </>
   );
 };
