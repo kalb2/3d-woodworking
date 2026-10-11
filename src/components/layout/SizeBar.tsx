@@ -30,6 +30,62 @@ function commitSize(pushHistoryState: () => void, saveCurrentProject: () => void
   saveCurrentProject();
 }
 
+/** Full-height track. The native range thumb is a few pixels tall and loses the touch to the canvas. */
+const FloorDistanceSlider: React.FC<{
+  display: number;
+  maxDisplay: number;
+  step: number;
+  unit: LengthUnit;
+  onChange: (display: number) => void;
+  onCommit: () => void;
+}> = ({ display, maxDisplay, step, unit, onChange, onCommit }) => {
+  const fraction = maxDisplay > 0 ? Math.min(1, Math.max(0, display / maxDisplay)) : 0;
+
+  const valueFromPointer = (clientX: number, track: HTMLElement) => {
+    const rect = track.getBoundingClientRect();
+    const width = rect.width || 1;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / width));
+    const raw = ratio * maxDisplay;
+    const stepped = step > 0 ? Math.round(raw / step) * step : raw;
+    return Math.min(maxDisplay, Math.max(0, stepped));
+  };
+
+  const drag = (event: React.PointerEvent<HTMLDivElement>) => {
+    onChange(valueFromPointer(event.clientX, event.currentTarget));
+  };
+
+  return (
+    <div
+      className="floor-distance-slider"
+      data-testid="floor-distance-drag"
+      role="slider"
+      aria-valuemin={0}
+      aria-valuemax={maxDisplay}
+      aria-valuenow={display}
+      aria-label={`Drag distance from the floor in ${unit}`}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        drag(event);
+      }}
+      onPointerMove={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        drag(event);
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        onCommit();
+      }}
+      onPointerCancel={onCommit}
+    >
+      <div className="floor-distance-track" />
+      <div className="floor-distance-thumb" style={{ left: `${fraction * 100}%` }} />
+    </div>
+  );
+};
+
 /** Distance from the floor while Move is active. Drag or type to raise the part. */
 export const MoveFloorRow: React.FC = () => {
   const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
@@ -78,22 +134,16 @@ export const MoveFloorRow: React.FC = () => {
           if (event.key === 'Enter') commit();
         }}
       />
-      <input
-        type="range"
-        data-testid="floor-distance-drag"
-        min={0}
-        max={maxDisplay}
+      <FloorDistanceSlider
+        display={display}
+        maxDisplay={maxDisplay}
         step={step}
-        value={Math.min(display, maxDisplay)}
-        aria-label={`Drag distance from the floor in ${project.unit}`}
-        style={{ accentColor: GIZMO_AXIS.y }}
-        onPointerDown={(event) => event.stopPropagation()}
-        onChange={(event) => {
+        unit={project.unit}
+        onChange={(next) => {
           setDraft(null);
-          write(Number(event.target.value));
+          write(next);
         }}
-        onPointerUp={() => commitSize(pushHistoryState, saveCurrentProject)}
-        onKeyUp={() => commitSize(pushHistoryState, saveCurrentProject)}
+        onCommit={() => commitSize(pushHistoryState, saveCurrentProject)}
       />
     </div>
   );

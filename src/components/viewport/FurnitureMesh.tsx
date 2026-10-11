@@ -7,6 +7,7 @@ import { createBoardGeometry, defaultBoardOptions } from '../../utils/boardGeome
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
+import { positiveSize } from '../../theme/partSurface';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -29,19 +30,27 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     return createWoodMeshMaterial(material);
   }, [material]);
 
+  const roundPart = shape === 'sphere' || shape === 'cylinder' || shape === 'pole';
+  const length = positiveSize(dimensions.length);
+  const width = positiveSize(dimensions.width);
+  const height = positiveSize(dimensions.height);
+  const meshScale: [number, number, number] = shape === 'sphere'
+    ? [length / 2, height / 2, width / 2]
+    : shape === 'cylinder' || shape === 'pole'
+      ? [length / 2, height, width / 2]
+      : [1, 1, 1];
   const geometry = useMemo(() => {
-    const { length: l, width: w, height: h } = dimensions;
+    const l = positiveSize(dimensions.length);
+    const w = positiveSize(dimensions.width);
+    const h = positiveSize(dimensions.height);
 
     switch (shape) {
       case 'cylinder':
-      case 'pole': {
-        const radius = Math.min(l, w) / 2;
-        return new THREE.CylinderGeometry(radius, radius, h, 32);
-      }
-      case 'sphere': {
-        const radius = Math.min(l, w, h) / 2;
-        return new THREE.SphereGeometry(radius, 32, 32);
-      }
+      case 'pole':
+        // Unit tube. Per-axis scale lives on the mesh so a drag does not rebuild buffers.
+        return new THREE.CylinderGeometry(1, 1, 1, 32);
+      case 'sphere':
+        return new THREE.SphereGeometry(1, 32, 32);
       case 'bevel_top': {
         const shape2D = new THREE.Shape();
         const halfX = l / 2;
@@ -103,7 +112,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       default:
         return new THREE.BoxGeometry(l, h, w);
     }
-  }, [shape, dimensions, object.board]);
+  }, [shape, roundPart, roundPart ? null : `${dimensions.length}|${dimensions.width}|${dimensions.height}`, object.board]);
 
   const groupOutline = useMemo(() => {
     if (shape !== 'group') return null;
@@ -122,6 +131,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     <group position={[position.x, position.y, position.z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
       <mesh
         geometry={geometry}
+        scale={meshScale}
         material={isGroup ? undefined : meshMaterial}
         castShadow={!isGroup}
         receiveShadow={!isGroup}
@@ -132,7 +142,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
           <meshBasicMaterial colorWrite={false} depthWrite={false} toneMapped={false} />
         )}
         {isSelected && !isGroup && shape === 'sphere' && (
-          <SphereOutline radius={Math.min(dimensions.length, dimensions.width, dimensions.height) / 2} />
+          <SphereOutline radius={1} />
         )}
         {isSelected && !isGroup && shape !== 'sphere' && (
           <Edges

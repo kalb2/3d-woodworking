@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Box,
   Cylinder,
@@ -42,6 +42,16 @@ export const SidebarNav: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
+  const lastAddAt = useRef(0);
+  const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
+    fireReliableTap(event, () => {
+      const now = performance.now();
+      if (now - lastAddAt.current < 400) return;
+      lastAddAt.current = now;
+      action();
+      setOverlayOpen('sidebar', false);
+    });
+  };
 
   if (!overlays.sidebar) return null;
 
@@ -118,7 +128,7 @@ export const SidebarNav: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+      <div style={{ flex: isPhone ? 'none' : 1, overflowY: isPhone ? 'visible' : 'auto', padding: 12 }}>
         {/* SHAPES TAB */}
         {activeTab === 'shapes' && (
           <div style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -134,9 +144,10 @@ export const SidebarNav: React.FC = () => {
                 key={type}
                 type="button"
                 data-testid={`shape-${type}`}
+                aria-label={label}
                 className={isPhone ? 'phone-shape-cell' : 'glass-button'}
-                onClick={isPhone ? undefined : () => addObject(type)}
-                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addObject(type)) : undefined}
+                onClick={addPart(() => addObject(type, label))}
+                onPointerUp={addPart(() => addObject(type, label))}
                 style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
@@ -157,7 +168,7 @@ export const SidebarNav: React.FC = () => {
                   <Icon size={isPhone ? 22 : 16} color={isPhone ? '#64748b' : '#e09f3e'} strokeWidth={isPhone ? 1.5 : 2} />
                 </div>
                 {isPhone ? (
-                  <span>{label.replace('Beveled ', '').replace(' / Panel', '').replace(' / Pole', '')}</span>
+                  <span>{label}</span>
                 ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
@@ -186,9 +197,11 @@ export const SidebarNav: React.FC = () => {
               <button
                 key={preset.id}
                 type="button"
+                data-testid={`preset-${preset.id}`}
+                aria-label={preset.label}
                 className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-                onClick={isPhone ? undefined : () => addWoodPreset(preset.id)}
-                onPointerUp={isPhone ? (event) => fireReliableTap(event, () => addWoodPreset(preset.id)) : undefined}
+                onClick={addPart(() => addWoodPreset(preset.id))}
+                onPointerUp={addPart(() => addWoodPreset(preset.id))}
                 style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
@@ -233,7 +246,9 @@ export const SidebarNav: React.FC = () => {
 
             <button
               className="glass-button"
-              onClick={() => addPresetTemplate('table')}
+              data-testid="template-table"
+              onClick={addPart(() => addPresetTemplate('table'))}
+              onPointerUp={addPart(() => addPresetTemplate('table'))}
               style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
             >
               <Table size={20} color="#e09f3e" style={{ marginRight: 10 }} />
@@ -245,7 +260,9 @@ export const SidebarNav: React.FC = () => {
 
             <button
               className="glass-button"
-              onClick={() => addPresetTemplate('chair')}
+              data-testid="template-chair"
+              onClick={addPart(() => addPresetTemplate('chair'))}
+              onPointerUp={addPart(() => addPresetTemplate('chair'))}
               style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
             >
               <Armchair size={20} color="#e09f3e" style={{ marginRight: 10 }} />
@@ -257,7 +274,9 @@ export const SidebarNav: React.FC = () => {
 
             <button
               className="glass-button"
-              onClick={() => addPresetTemplate('bookshelf')}
+              data-testid="template-bookshelf"
+              onClick={addPart(() => addPresetTemplate('bookshelf'))}
+              onPointerUp={addPart(() => addPresetTemplate('bookshelf'))}
               style={{ justifyContent: 'flex-start', width: '100%', padding: '12px' }}
             >
               <BookOpen size={20} color="#e09f3e" style={{ marginRight: 10 }} />

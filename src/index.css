@@ -266,8 +266,12 @@ html, body, #root {
    ============================================ */
 
 .editor-root.is-phone {
-  --phone-sheet-inset: 12px;
-  --phone-sheet-float-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  --phone-sheet-inset: 0px;
+  /* The sheet paints the home-indicator zone. 34px is that inset when the
+     webview reports 0; a larger reported inset still wins. */
+  --phone-sheet-safe-bottom: 34px;
+  --phone-sheet-safe-bottom: max(34px, env(safe-area-inset-bottom, 0px));
+  --phone-sheet-float-bottom: 0px;
   --phone-sheet-collapsed-height: 208px;
   --phone-dock-height: 208px;
   --phone-sheet-max-height: min(52dvh, 440px);
@@ -362,18 +366,22 @@ html, body, #root {
 
 .phone-tool-sheet {
   position: absolute;
-  left: var(--phone-sheet-inset);
-  right: var(--phone-sheet-inset);
-  bottom: var(--phone-sheet-float-bottom);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 50;
   display: flex;
   flex-direction: column;
   max-height: min(62dvh, 520px);
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-bottom: 34px;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-bottom: var(--phone-sheet-safe-bottom, 34px);
   background: #ffffff;
-  border-radius: 24px;
-  box-shadow:
-    0 12px 40px rgba(15, 23, 42, 0.14),
-    0 0 0 1px rgba(15, 23, 42, 0.05);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -10px 32px rgba(15, 23, 42, 0.12);
   overflow: visible;
   pointer-events: auto;
 }
@@ -398,95 +406,9 @@ html, body, #root {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   background: #ffffff;
   border-radius: 20px 20px 0 0;
-}
-
-.phone-selected-part {
-  position: absolute;
-  right: 4px;
-  bottom: calc(100% + 8px);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 70%;
-  margin: 0;
-  padding: 4px 4px 4px 14px;
-  min-height: 40px;
-  background: #ffffff;
-  border-radius: 999px;
-  box-shadow:
-    0 8px 24px rgba(15, 23, 42, 0.12),
-    0 0 0 1px rgba(15, 23, 42, 0.05);
-  overflow: visible;
-  z-index: 2;
-}
-
-.phone-selected-part-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.phone-selected-part-delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  flex-shrink: 0;
-  border: none;
-  background: #fef2f2;
-  color: #dc2626;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
-  padding: 8px 12px;
-  min-height: 36px;
-  border-radius: 999px;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.phone-selected-part-more {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #64748b;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  touch-action: manipulation;
-  flex-shrink: 0;
-}
-
-.phone-selected-part-more.is-open,
-.phone-selected-part-more:active {
-  background: #e2e8f0;
-  color: var(--text-main);
-}
-
-.phone-selected-part-menu {
-  position: absolute;
-  right: 4px;
-  bottom: calc(100% + 8px);
-  min-width: 188px;
-  padding: 6px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow:
-    0 12px 40px rgba(15, 23, 42, 0.16),
-    0 0 0 1px rgba(15, 23, 42, 0.06);
-  z-index: 60;
 }
 
 .phone-sheet-row.is-danger {
@@ -1999,12 +1921,35 @@ html, body, #root {
   flex: none;
 }
 
-.floor-distance input[type='range'] {
+.floor-distance-slider {
+  position: relative;
   flex: 1;
-  min-width: 72px;
-  height: 36px;
-  margin: 0;
+  min-width: 88px;
+  height: 44px;
   touch-action: none;
+  display: flex;
+  align-items: center;
+}
+
+.floor-distance-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  pointer-events: none;
+}
+
+.floor-distance-thumb {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .size-inline {

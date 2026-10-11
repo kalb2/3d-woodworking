@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Camera,
@@ -10,7 +10,6 @@ import {
   Home,
   Layers,
   Menu,
-  Ellipsis,
   Group,
   Move,
   Pencil,
@@ -246,12 +245,7 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
   );
 };
 
-interface PhoneCanvasDockProps {
-  hasSelection: boolean;
-}
-
-export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: React.ReactNode }> = ({
-  hasSelection,
+export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
   children,
 }) => {
   const { overlays, openOverlay } = useAppStore();
@@ -270,16 +264,10 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
     duplicateObject,
     deleteObject,
   } = useProjectStore();
-  const [partMenuOpen, setPartMenuOpen] = useState(false);
-
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
   const groupId = selectedObject?.shape === 'group' ? selectedObject.id : editingGroupId;
-
-  useEffect(() => {
-    setPartMenuOpen(false);
-  }, [selectedObjectId]);
 
   return (
     <div
@@ -291,59 +279,6 @@ export const PhoneBottomSheet: React.FC<PhoneCanvasDockProps & { children?: Reac
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
           <WorkshopSettings />
-        </div>
-      )}
-      {hasSelection && selectedObject && (
-        <div className="phone-selected-part" data-testid="selected-part-chip">
-          <span className="phone-selected-part-name" title={selectedObject.name}>
-            {selectedObject.name}
-          </span>
-          <PhoneTapButton
-            className="phone-selected-part-delete"
-            onTap={() => deleteObject(selectedObject.id)}
-            aria-label={`Delete ${selectedObject.name}`}
-            title="Delete part"
-            data-testid="selected-part-delete"
-          >
-            <Trash2 size={15} strokeWidth={1.8} />
-            <span>Delete</span>
-          </PhoneTapButton>
-          <PhoneTapButton
-            className={`phone-selected-part-more${partMenuOpen ? ' is-open' : ''}`}
-            onTap={() => setPartMenuOpen((open) => !open)}
-            aria-label="Part actions"
-            aria-expanded={partMenuOpen}
-            title="Part actions"
-            data-testid="selected-part-menu"
-          >
-            <Ellipsis size={18} strokeWidth={1.8} />
-          </PhoneTapButton>
-          {partMenuOpen && (
-            <div className="phone-selected-part-menu" role="menu" data-testid="selected-part-menu-list">
-              <PhoneTapButton
-                className="phone-sheet-row"
-                onTap={() => {
-                  duplicateObject(selectedObject.id);
-                  setPartMenuOpen(false);
-                }}
-                data-testid="selected-part-menu-duplicate"
-              >
-                <Copy size={16} />
-                <span>Duplicate</span>
-              </PhoneTapButton>
-              <PhoneTapButton
-                className="phone-sheet-row is-danger"
-                onTap={() => {
-                  deleteObject(selectedObject.id);
-                  setPartMenuOpen(false);
-                }}
-                data-testid="selected-part-menu-delete"
-              >
-                <Trash2 size={16} />
-                <span>Delete</span>
-              </PhoneTapButton>
-            </div>
-          )}
         </div>
       )}
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
