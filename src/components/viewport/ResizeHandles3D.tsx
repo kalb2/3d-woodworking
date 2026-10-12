@@ -44,6 +44,14 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z },
   ];
 
+  // Smaller side of the face each pad sits on (caps the pad on small parts).
+  const faceSizeFor = (axis: HandleAxis) => {
+    const L = extents.hx * 2, H = extents.hy * 2, W = extents.hz * 2;
+    if (axis[1] === 'x') return Math.min(H, W);
+    if (axis[1] === 'y') return Math.min(L, W);
+    return Math.min(L, H);
+  };
+
   const handlePointerDown = (e: any, axis: HandleAxis) => {
     if (!e.point || !Number.isFinite(e.point.x) || !Number.isFinite(e.point.y) || !Number.isFinite(e.point.z)) return;
     e.stopPropagation();
@@ -163,6 +171,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
             <FacePad
               axis={axis}
               color={color}
+              faceSize={faceSizeFor(axis)}
               active={activeAxis === axis}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />

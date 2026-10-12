@@ -13,8 +13,19 @@ import {
   GIZMO_SCALE_MIN,
   ROTATE_SPHERE_RADIUS,
 } from '../../theme/gizmo';
+import { HIT_PX, handleSortDistance, hitScale, padVisualScale, worldPerPixel } from '../../theme/handleSizing';
 
 const _world = new THREE.Vector3();
+const _center = new THREE.Vector3();
+
+/** CSS px → world at a point, for the active camera and canvas. */
+function useWpp() {
+  const { camera, size } = useThree();
+  return (at: THREE.Vector3) => worldPerPixel(camera.position.distanceTo(at), (camera as THREE.PerspectiveCamera).fov ?? 45, size.height);
+}
+
+/** Today's distance-based grip scale. */
+const baseGripScale = (dist: number) => THREE.MathUtils.clamp(dist / GIZMO_DISTANCE_REF, GIZMO_SCALE_MIN, GIZMO_SCALE_MAX);
 
 /** Draw gizmos on top of the scene while still depth-testing themselves — solid, not glass. */
 export const GizmoDepthClear: React.FC = () => (
@@ -34,16 +45,19 @@ export const GizmoDepthClear: React.FC = () => (
  * Scale a grip around its *local* origin (a face or ring point).
  * Do not wrap the whole gizmo in this — that recreates a free-floating center tripod.
  */
-export const GripSize: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const GripSize: React.FC<{ children: React.ReactNode; minHitWorld?: number }> = ({ children, minHitWorld }) => {
   const ref = useRef<THREE.Group>(null);
   const { camera } = useThree();
+  const wpp = useWpp();
 
   useFrame(() => {
     if (!ref.current) return;
     ref.current.getWorldPosition(_world);
     const dist = camera.position.distanceTo(_world);
     // Modest zoom compensation. The cap keeps grips on the part instead of filling the screen.
-    const scale = THREE.MathUtils.clamp(dist / GIZMO_DISTANCE_REF, GIZMO_SCALE_MIN, GIZMO_SCALE_MAX);
+    let scale = baseGripScale(dist);
+    // Zoomed far out: never let the grab shrink below a ~44pt touch target.
+    if (minHitWorld) scale = hitScale(scale, wpp(_world), minHitWorld);
     ref.current.scale.setScalar(scale);
   });
 
@@ -125,8 +139,12 @@ const FACE_OUT: Record<FaceAxis, [number, number, number]> = {
 function raycastInFrontOfSolid(this: THREE.Mesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
   const before = intersects.length;
   THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+  if (intersects.length === before) return;
+  // Overlapping grabs: the one whose center is nearest the finger wins.
+  this.getWorldPosition(_center);
+  const off = raycaster.ray.distanceToPoint(_center);
   for (let i = before; i < intersects.length; i += 1) {
-    intersects[i].distance -= 1e6;
+    intersects[i].distance = handleSortDistance(off);
   }
 }
 
@@ -146,7 +164,7 @@ export const AxisArrow: React.FC<{
 
   return (
     <group position={[0, 0, 0]} rotation={FACE_OUT[axis]}>
-      <GripSize>
+      <GripSize minHitWorld={ARROW_HIT_RADIUS * 2}>
         <mesh position={[0, shaftCenter, 0]} renderOrder={12} frustumCulled={false}>
           <cylinderGeometry args={[SHAFT_RADIUS, SHAFT_RADIUS, SHAFT_LENGTH, 20]} />
           <GizmoMaterial color={color} active={active} />
@@ -202,7 +220,7 @@ export const MoveHub: React.FC<{
   });
 
   return (
-    <GripSize>
+    <GripSize minHitWorld={HUB_HIT_RADIUS * 2}>
       <group ref={faceRef}>
         <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={13} frustumCulled={false}>
           <cylinderGeometry args={[HUB_RADIUS, HUB_RADIUS, HUB_THICKNESS, 32]} />
@@ -261,6 +279,18 @@ function pillPose(radius: number, angle: number) {
   return { position, quaternion };
 }
 
+/** Grows the pill's invisible grab so it's at least a ~44pt target when zoomed out. */
+const PillHit: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const ref = useRef<THREE.Group>(null);
+  const wpp = useWpp();
+  useFrame(() => {
+    if (!ref.current) return;
+    ref.current.getWorldPosition(_world);
+    ref.current.scale.setScalar(hitScale(1, wpp(_world), (PILL_RADIUS + 0.2) * 2));
+  });
+  return <group ref={ref}>{children}</group>;
+};
+
 /** One true circle of the shared rotate sphere, plus the pill you drag. */
 export const RotateRing: React.FC<{
   axis: 'x' | 'y' | 'z';
@@ -291,6 +321,7 @@ export const RotateRing: React.FC<{
           <capsuleGeometry args={[PILL_RADIUS, PILL_LENGTH, 8, 16]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
+        <PillHit>
         <mesh
           scale={[1.05, 1.15, 1.2]}
           renderOrder={22}
@@ -301,6 +332,7 @@ export const RotateRing: React.FC<{
           <capsuleGeometry args={[PILL_RADIUS + 0.2, PILL_LENGTH + 0.15, 6, 10]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
+        </PillHit>
       </group>
     </group>
   );
@@ -315,39 +347,53 @@ const _padNormal = new THREE.Vector3();
 const _padPos = new THREE.Vector3();
 const _padToCam = new THREE.Vector3();
 
-/** Square on the face center. Near faces are full size; far faces shrink as the camera orbits. */
+/**
+ * Square on the face center. Paint is screen-sized (constant-ish on screen,
+ * capped to a share of the face so small parts look as before); the invisible
+ * grab is at least ~44pt. Far faces draw smaller but keep the full grab.
+ */
 export const FacePad: React.FC<{
   axis: FaceAxis;
   color: string;
   active: boolean;
+  /** Smaller side of the face this pad sits on (world inches). */
+  faceSize?: number;
   onPointerDown: (event: any) => void;
-}> = ({ axis, color, active, onPointerDown }) => {
+}> = ({ axis, color, active, faceSize = Infinity, onPointerDown }) => {
   const faceRef = useRef<THREE.Group>(null);
-  const visualRef = useRef<THREE.Mesh>(null);
+  const visualRef = useRef<THREE.Group>(null);
+  const hitRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
+  const wpp = useWpp();
   const side = PAD_SIDE;
   const thick = PAD_THICK;
+  const hitSide = side + 0.55;
 
   useFrame(() => {
     const face = faceRef.current;
     const visual = visualRef.current;
-    if (!face || !visual) return;
+    const hit = hitRef.current;
+    if (!face || !visual || !hit) return;
     face.updateWorldMatrix(true, false);
     _padNormal.set(0, 1, 0).transformDirection(face.matrixWorld);
     face.getWorldPosition(_padPos);
     _padToCam.copy(camera.position).sub(_padPos);
     const near = _padNormal.dot(_padToCam) > 0;
-    // Shrink only the paint. The grab stays full size so the far side of a sphere still hits.
-    visual.scale.setScalar(near ? 1 : FAR_PAD_SCALE);
+    const base = baseGripScale(camera.position.distanceTo(_padPos));
+    const w = wpp(_padPos);
+    visual.scale.setScalar(padVisualScale({ baseScale: base, near, farShrink: FAR_PAD_SCALE, wpp: w, padSide: side, faceSize }));
+    hit.scale.setScalar(hitScale(base, w, hitSide));
   });
 
   return (
     <group ref={faceRef} rotation={FACE_OUT[axis]}>
-      <GripSize>
-        <mesh ref={visualRef} position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false}>
+      <group ref={visualRef}>
+        <mesh position={[0, thick / 2, 0]} renderOrder={12} frustumCulled={false} raycast={() => null}>
           <boxGeometry args={[side, thick, side]} />
           <GizmoMaterial color={color} active={active} />
         </mesh>
+      </group>
+      <group ref={hitRef}>
         <mesh
           position={[0, thick / 2, 0]}
           renderOrder={22}
@@ -358,13 +404,16 @@ export const FacePad: React.FC<{
             onPointerDown(event);
           }}
         >
-          <boxGeometry args={[side + 0.55, thick + 0.5, side + 0.55]} />
+          <boxGeometry args={[hitSide, thick + 0.5, hitSide]} />
           <meshBasicMaterial visible={false} depthTest={false} />
         </mesh>
-      </GripSize>
+      </group>
     </group>
   );
 };
+
+/** Exposed for tests/tuning. */
+export const PAD_HIT_PX = HIT_PX;
 
 function circlePoints(radius: number, axis: 'x' | 'y' | 'z', segments = 64): [number, number, number][] {
   const pts: [number, number, number][] = [];
