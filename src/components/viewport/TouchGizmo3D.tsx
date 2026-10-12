@@ -8,7 +8,7 @@ import { calculateSnappedPosition } from '../../utils/snapUtils';
 import { clearSnapHighlight, useSnapHighlight } from './SnapHighlight';
 import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
 import { RotateDegreePill } from '../layout/SizeBar';
-import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
+import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, RotateRings, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
@@ -311,7 +311,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
         </>
       ) : activeGizmoMode === 'rotate' ? (
-        <>
+        <RotateRings objectRadius={Math.hypot(object.dimensions.length, object.dimensions.height, object.dimensions.width) / 2}>
           <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
           <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
           <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
@@ -328,7 +328,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
               }}
             />
           )}
-        </>
+        </RotateRings>
       ) : null}
     </group>
   );
