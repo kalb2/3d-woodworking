@@ -4,6 +4,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { unitScale } from '../../utils/units';
 import type { Dimensions3D, LengthUnit } from '../../types/furniture';
 import { GIZMO_AXIS } from '../../theme/gizmo';
+import { NumberField } from '../ui/NumberField';
 
 const AXES: { key: keyof Dimensions3D; color: string; testId: string }[] = [
   { key: 'length', color: GIZMO_AXIS.x, testId: 'size-x' },
@@ -89,7 +90,6 @@ const FloorDistanceSlider: React.FC<{
 /** Distance from the floor while Move is active. Drag or type to raise the part. */
 export const MoveFloorRow: React.FC = () => {
   const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
-  const [draft, setDraft] = useState<string | null>(null);
   if (activeGizmoMode !== 'move' || !project || !object) return null;
 
   const scale = unitScale(project.unit);
@@ -106,32 +106,22 @@ export const MoveFloorRow: React.FC = () => {
     }, true);
   };
 
-  const commit = () => {
-    setDraft(null);
-    commitSize(pushHistoryState, saveCurrentProject);
-  };
+  const commit = () => commitSize(pushHistoryState, saveCurrentProject);
 
   return (
     <div className="size-inline floor-distance" data-testid="floor-distance" role="group" aria-label="Distance from the floor">
       <span className="floor-distance-label">Floor</span>
-      <input
+      <NumberField
         className="size-figure"
-        data-testid="floor-distance-input"
-        type="number"
-        inputMode="decimal"
-        step={step}
+        testId="floor-distance-input"
         min={0}
         aria-label={`Distance from the floor in ${project.unit}`}
         style={{ color: GIZMO_AXIS.y, borderBottomColor: GIZMO_AXIS.y }}
-        value={draft ?? formatSize(gapInches, project.unit)}
-        onFocus={() => setDraft(formatSize(gapInches, project.unit))}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          write(Number(event.target.value));
-        }}
-        onBlur={commit}
-        onKeyUp={(event) => {
-          if (event.key === 'Enter') commit();
+        value={display}
+        format={() => formatSize(gapInches, project.unit)}
+        onCommit={(n) => {
+          write(n);
+          commit();
         }}
       />
       <FloorDistanceSlider
@@ -139,10 +129,7 @@ export const MoveFloorRow: React.FC = () => {
         maxDisplay={maxDisplay}
         step={step}
         unit={project.unit}
-        onChange={(next) => {
-          setDraft(null);
-          write(next);
-        }}
+        onChange={(next) => write(next)}
         onCommit={() => commitSize(pushHistoryState, saveCurrentProject)}
       />
     </div>
@@ -156,7 +143,6 @@ export const ResizeSizeRow: React.FC = () => {
   if (activeGizmoMode !== 'resize' || !project || !object || object.shape === 'group') return null;
 
   const scale = unitScale(project.unit);
-  const step = project.unit === 'mm' ? 1 : project.unit === 'ft' ? 0.01 : 0.1;
 
   const write = (key: keyof Dimensions3D, display: number) => {
     if (!Number.isFinite(display)) return;
@@ -178,21 +164,18 @@ export const ResizeSizeRow: React.FC = () => {
   return (
     <div className="size-inline" data-testid="size-bar" role="group" aria-label="Part size">
       {AXES.map((axis) => (
-        <input
+        <NumberField
           key={axis.key}
           className="size-figure"
-          data-testid={axis.testId}
-          type="number"
-          inputMode="decimal"
-          step={step}
+          testId={axis.testId}
           min={0.05 * scale}
           aria-label={`${axis.key} in ${project.unit}`}
           style={{ color: axis.color, borderBottomColor: axis.color }}
-          value={formatSize(object.dimensions[axis.key], project.unit)}
-          onChange={(event) => write(axis.key, Number(event.target.value))}
-          onBlur={() => commitSize(pushHistoryState, saveCurrentProject)}
-          onKeyUp={(event) => {
-            if (event.key === 'Enter') commitSize(pushHistoryState, saveCurrentProject);
+          value={object.dimensions[axis.key] * scale}
+          format={() => formatSize(object.dimensions[axis.key], project.unit)}
+          onCommit={(n) => {
+            write(axis.key, n);
+            commitSize(pushHistoryState, saveCurrentProject);
           }}
         />
       ))}
@@ -235,37 +218,26 @@ function writeRotation(
 /** Red, green, and blue degree fields in the same bar as the transform tools. */
 export const RotateAngleRow: React.FC = () => {
   const { object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
-  const [drafts, setDrafts] = useState<Partial<Record<'x' | 'y' | 'z', string>>>({});
   if (activeGizmoMode !== 'rotate' || !object || object.shape === 'group') return null;
 
-  const commit = () => {
-    setDrafts({});
-    commitSize(pushHistoryState, saveCurrentProject);
-  };
+  const commit = () => commitSize(pushHistoryState, saveCurrentProject);
 
   return (
     <div className="size-inline" data-testid="angle-bar" role="group" aria-label="Rotation in degrees">
       {ROTATION_AXES.map((axis) => (
         <label key={axis.key} className="rotate-angle">
           <span className="rotate-angle-dot" style={{ background: axis.color }} />
-          <input
+          <NumberField
             className="size-figure"
-            data-testid={axis.testId}
-            type="number"
-            inputMode="numeric"
-            step={1}
+            testId={axis.testId}
+            integer
             aria-label={`${axis.label} in degrees`}
             style={{ color: axis.color, borderBottomColor: axis.color }}
-            value={drafts[axis.key] ?? formatDegrees(object.rotation[axis.key])}
-            onFocus={() => setDrafts((current) => ({ ...current, [axis.key]: formatDegrees(object.rotation[axis.key]) }))}
-            onChange={(event) => {
-              const text = event.target.value;
-              setDrafts((current) => ({ ...current, [axis.key]: text }));
-              writeRotation(object.id, object.rotation, axis.key, Number(text), updateObject);
-            }}
-            onBlur={commit}
-            onKeyUp={(event) => {
-              if (event.key === 'Enter') commit();
+            value={object.rotation[axis.key]}
+            format={formatDegrees}
+            onCommit={(n) => {
+              writeRotation(object.id, object.rotation, axis.key, n, updateObject);
+              commit();
             }}
           />
           <span className="rotate-degree-mark" aria-hidden="true">°</span>
@@ -296,34 +268,20 @@ export const RotateDegreePill: React.FC<{
 }> = ({ axis, degrees, onChange, onCommit }) => {
   const color = GIZMO_AXIS[axis];
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const [draft, setDraft] = useState<string | null>(null);
 
   return (
     <div className="rotate-readout" data-testid="angle-pill" style={{ borderColor: color }}>
-      <input
+      <NumberField
         ref={inputRef}
-        data-testid="angle-pill-input"
-        type="number"
-        inputMode="numeric"
-        step={1}
+        testId="angle-pill-input"
+        integer
         aria-label={`${axis.toUpperCase()} rotation in degrees`}
-        value={draft ?? formatDegrees(degrees)}
+        value={degrees}
+        format={formatDegrees}
         onPointerDown={(event) => event.stopPropagation()}
-        onFocus={() => setDraft(formatDegrees(degrees))}
-        onChange={(event) => {
-          const text = event.target.value;
-          setDraft(text);
-          const next = Number(text);
-          if (Number.isFinite(next)) onChange(next);
-        }}
-        onBlur={() => {
-          setDraft(null);
+        onCommit={(n) => {
+          onChange(n);
           onCommit();
-        }}
-        onKeyUp={(event) => {
-          if (event.key === 'Enter') {
-            inputRef.current?.blur();
-          }
         }}
       />
       <span className="rotate-readout-diamond" style={{ background: color }} />

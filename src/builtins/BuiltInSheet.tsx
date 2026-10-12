@@ -1,3 +1,4 @@
+import { NumberField } from '../components/ui/NumberField';
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, LockOpen, MoreHorizontal, X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
@@ -51,7 +52,7 @@ const MediaWallForm: React.FC<{ wall?: RoomWall; existing?: FurnitureObject; onD
   const field = (label: string, value: number, set: (n: number) => void, testId: string) => (
     <label style={fieldStyle}>
       <span>{label}</span>
-      <input type="number" inputMode="decimal" data-testid={testId} value={value} onChange={(e) => set(Number(e.target.value))} style={inputStyle} />
+      <NumberField testId={testId} value={value} min={0} onCommit={set} style={inputStyle} />
     </label>
   );
   return (
