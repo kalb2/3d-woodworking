@@ -18,6 +18,7 @@ import { createDevIdentityToken } from '../sync/identity.ts';
 import {
   claimStarterProjectId,
   projectsFromRecords,
+  keepInFlightEdits,
   recordsFromProjects,
   tombstonesFromRecords,
 } from '../sync/merge.ts';
@@ -133,9 +134,15 @@ function rememberRemoteTombstones(accountId: string, records: SyncRecord[]) {
   saveTombstones(buckets);
 }
 
-function applyRecords(accountId: string, records: SyncRecord[]) {
+function applyRecords(accountId: string, records: SyncRecord[], sent?: Map<string, string>) {
   rememberRemoteTombstones(accountId, records);
-  const projects = projectsFromRecords(records);
+  let projects = projectsFromRecords(records);
+  if (sent) {
+    const merged = keepInFlightEdits(sent, useProjectStore.getState().projects, projects);
+    projects = merged.projects;
+    // Local edits won: push them on the next tick.
+    if (merged.keptLocal) setTimeout(() => scheduleSync(), 0);
+  }
   useProjectStore.getState().replaceAllProjects(projects);
   if (projects.length === 0 && useAppStore.getState().currentView === 'editor') {
     useAppStore.getState().openHome('projects');
@@ -148,9 +155,13 @@ async function pushLocal(token: string, accountId: string) {
   const idsChanged = claimed.some((project, index) => project.id !== projectStore.projects[index]?.id);
   if (idsChanged) projectStore.replaceAllProjects(claimed);
   const projects = useProjectStore.getState().projects;
+  // Remember exactly what we sent: edits made while the request is in flight
+  // (e.g. the first move right after opening the app) must not be overwritten
+  // by the server's echo of the older copy.
+  const sent = new Map(projects.map((p) => [p.id, JSON.stringify(p)]));
   const records = recordsFromProjects(projects, mergedTombstones(accountId, loadTombstones()));
   const response = await pushRecords(token, records);
-  applyRecords(accountId, response.records);
+  applyRecords(accountId, response.records, sent);
 }
 
 let syncTimer: number | null = null;

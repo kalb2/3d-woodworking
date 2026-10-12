@@ -286,8 +286,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const selected = active?.objects.find((object) => object.id === get().selectedObjectId)?.id
       ?? active?.objects[0]?.id
       ?? null;
+    // Sync usually echoes what we already have: keep history, selection and
+    // the opened group then, so a sync never resets the editor mid-session.
+    const prevActive = get().projects.find((p) => p.id === previousId);
+    const sameActive = Boolean(active && prevActive && active.id === prevActive.id
+      && JSON.stringify(active.objects) === JSON.stringify(prevActive.objects));
     persistSuppressed = true;
     try {
+      if (sameActive) {
+        set({ projects });
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+        return;
+      }
       set({
         projects,
         activeProjectId: active?.id ?? '',
