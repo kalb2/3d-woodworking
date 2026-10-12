@@ -217,33 +217,27 @@ function writeRotation(
 }
 
 /** Red, green, and blue degree fields in the same bar as the transform tools. */
-const TURN_AXES: { key: 'x' | 'y' | 'z'; color: string; label: string; aria: string }[] = [
-  { key: 'y', color: GIZMO_AXIS.y, label: 'Flat (Y)', aria: 'Turn 90° flat on the floor, around Y' },
-  { key: 'x', color: GIZMO_AXIS.x, label: 'X', aria: 'Turn 90° around X' },
-  { key: 'z', color: GIZMO_AXIS.z, label: 'Z', aria: 'Turn 90° around Z' },
-];
+const TURN_AXES = ROTATION_AXES.map((a) => ({ key: a.key, color: a.color, label: a.key.toUpperCase(), aria: `Turn 90° around ${a.key.toUpperCase()}` }));
 
-/** "Turn 90°" segmented control: one tap = +90° about that axis, through the selection's center. */
+/**
+ * "Turn 90°" row: one tap = +90° about that axis, through the selection's center.
+ * Built from the same column parts as the degree fields above so X/Y/Z line up.
+ */
 export const TurnNinetyRow: React.FC = () => {
   const turn = useProjectStore((s) => s.turnSelection90);
   return (
-    <div className="turn90" data-testid="turn90" role="group" aria-label="Turn 90 degrees">
-      <span className="turn90-label">Turn 90°</span>
-      <div className="turn90-seg">
-        {TURN_AXES.map((a, i) => (
-          <button
-            key={a.key}
-            type="button"
-            className={i === 0 ? 'turn90-btn is-primary' : 'turn90-btn'}
-            data-testid={`turn90-${a.key}`}
-            aria-label={a.aria}
-            onClick={() => turn(a.key)}
-          >
+    <div className="size-inline turn90" data-testid="turn90" role="group" aria-label="Turn 90 degrees">
+      <span className="turn90-cols">
+        <span className="turn90-label">Turn 90°</span>
+        {TURN_AXES.map((a) => (
+          <button key={a.key} type="button" className="rotate-angle turn90-btn" data-testid={`turn90-${a.key}`} aria-label={a.aria} onClick={() => turn(a.key)}>
             <span className="rotate-angle-dot" style={{ background: a.color }} />
-            {a.label}
+            <span className="size-figure turn90-figure" style={{ color: a.color, borderColor: a.color }}>{a.label}</span>
+            <span className="rotate-degree-mark" aria-hidden="true" style={{ visibility: 'hidden' }}>°</span>
           </button>
         ))}
-      </div>
+      </span>
+      <span className="size-link" aria-hidden="true" style={{ visibility: 'hidden' }} />
     </div>
   );
 };

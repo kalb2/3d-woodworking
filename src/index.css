@@ -3063,41 +3063,37 @@ html, body, #root {
 .settings-step-options { display: flex; gap: 6px; }
 .settings-step-options .glass-button { min-width: 48px; min-height: 34px; padding: 0 12px; }
 
-/* Turn 90° segmented control (rotate bar) */
-.turn90 {
-  display: flex;
+/* Turn 90° row: same columns as the degree fields above */
+.turn90 { padding-top: 0; }
+.turn90-cols {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 12px 8px;
+  gap: 18px;
 }
 .turn90-label {
+  position: absolute;
+  right: calc(100% + 10px);
+  white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
   color: #64748b;
 }
-.turn90-seg {
-  display: inline-flex;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #fff;
-}
 .turn90-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 12px;
   border: none;
-  border-left: 1px solid #e2e8f0;
   background: transparent;
+  padding: 0;
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: #334155;
   touch-action: manipulation;
 }
-.turn90-btn:first-child { border-left: none; }
-.turn90-btn.is-primary { background: #f1f5f9; color: #0f172a; padding: 0 16px; }
-.turn90-btn:active { background: #e2e8f0; }
+.turn90-figure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 10px;
+  min-height: 36px;
+  font-size: 16px;
+}
+.turn90-btn:active .turn90-figure { background: #f1f5f9; }
