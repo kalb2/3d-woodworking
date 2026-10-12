@@ -143,6 +143,8 @@ export interface SnapSettings {
   gridSnap: boolean;
   gridSize: number; // Inches, e.g. 0.5, 1.0
   floorCollision: boolean; // Enables floor barrier at y >= 0
+  /** Drag-resize step in inches (default 0.25). */
+  resizeStep?: number;
 }
 
 export interface ScannedOpening {

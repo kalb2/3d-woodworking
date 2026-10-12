@@ -3050,3 +3050,15 @@ html, body, #root {
   pointer-events: none;
   z-index: 5;
 }
+
+.settings-step-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px 6px 46px;
+  font-size: 13px;
+  color: #475569;
+}
+.settings-step-options { display: flex; gap: 6px; }
+.settings-step-options .glass-button { min-width: 48px; min-height: 34px; padding: 0 12px; }

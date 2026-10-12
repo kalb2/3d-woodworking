@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
+import { clearSnapHighlight, useSnapHighlight } from './SnapHighlight';
 import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
 import { RotateDegreePill } from '../layout/SizeBar';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
@@ -201,10 +202,12 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           const snapResult = calculateSnappedPosition(
             object,
             newPos,
-            currentProject.objects,
+            // Snap to parts, not group boxes (a part's own group would trap it).
+            currentProject.objects.filter((o) => o.shape !== 'group'),
             currentProject.snapSettings
           );
           updateObject(object.id, { position: snapResult.position }, true);
+          useSnapHighlight.getState().set(object.id, snapResult.contacts);
         } else {
           updateObject(object.id, { position: newPos }, true);
         }
@@ -249,6 +252,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     };
 
     const handlePointerUp = () => {
+      clearSnapHighlight();
       dragRef.current = null;
       setActiveAxis(null);
 

@@ -14,6 +14,7 @@ import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
+import { SnapHighlight } from './SnapHighlight';
 
 /** Soft contact blob. Hidden with Floor off, and whenever the camera is under the ground. */
 const GroundContactShadow: React.FC = () => {
@@ -288,6 +289,7 @@ export const FurnitureCanvas: React.FC = () => {
 
         <CameraFocus />
         <ProjectorBridge />
+        <SnapHighlight />
         <TrackTarget />
         <AutoFrame projectId={currentProject.id} />
 

@@ -6,6 +6,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
+import { DEFAULT_RESIZE_STEP, snapSize } from '../../utils/resizeRules';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -111,6 +112,16 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
         else if (session.axis === '+z') newDim.width = resized(session.startDimensions.width, localDelta.z * 2);
         else if (session.axis === '-z') newDim.width = resized(session.startDimensions.width, -localDelta.z * 2);
 
+        // Dragging snaps sizes to the project's step (¼" default); Magnet off = free.
+        const st = useProjectStore.getState();
+        const proj = st.projects.find((p) => p.id === st.activeProjectId);
+        if (proj?.snapSettings.enabled !== false) {
+          const step = proj?.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP;
+          const unit = proj?.unit ?? 'in';
+          newDim.length = snapSize(newDim.length, step, unit);
+          newDim.width = snapSize(newDim.width, step, unit);
+          newDim.height = snapSize(newDim.height, step, unit);
+        }
         updateObject(object.id, { dimensions: newDim }, true);
       }
     };

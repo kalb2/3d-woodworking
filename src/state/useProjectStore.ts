@@ -4,11 +4,12 @@ import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
+import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
-import { ancestorIds, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
+import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
 
 const normalizeProjects = (ps: FurnitureProject[]) => ps.map((p) => { const objects = normalizeTree(p.objects ?? []); return objects === p.objects ? p : { ...p, objects }; });
 
@@ -548,9 +549,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     // Keep everything above the floor when floor collision is on.
     let dy = delta.y;
     if (proj.snapSettings.floorCollision && dy < 0) {
-      for (const o of proj.objects) if (moving.has(o.id) && o.shape !== 'group') {
-        dy = Math.max(dy, o.dimensions.height / 2 - o.position.y);
-      }
+      dy = floorSafeDy(proj.objects.filter((o) => moving.has(o.id) && o.shape !== 'group' && o.generator !== 'room-scan'), dy);
     }
     const parents = new Set(selectedObjectIds.map((id) => proj.objects.find((o) => o.id === id)?.parentId).filter(Boolean) as string[]);
     let objects = proj.objects.map((o) => moving.has(o.id)
@@ -850,6 +849,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       if (updates.position.y < minY) {
         updates = { ...updates, position: { ...updates.position, y: minY } };
       }
+    }
+
+    // Floor on: resizing keeps a resting part's bottom fixed (grows up) and nothing dips below the floor.
+    const floorOn = proj.showFloor && proj.snapSettings.floorCollision !== false && existingObj.generator !== 'room-scan';
+    if (floorOn && existingObj.shape !== 'group' && (updates.dimensions || updates.rotation) && !updates.position) {
+      const after = { ...existingObj, ...updates } as FurnitureObject;
+      const y = floorSafeY(existingObj, after);
+      if (Math.abs(y - existingObj.position.y) > 1e-6) updates = { ...updates, position: { ...existingObj.position, y } };
+    }
+    if (floorOn && existingObj.shape === 'group' && updates.position) {
+      const dy = floorSafeDy(leavesOf(proj.objects, id), updates.position.y - existingObj.position.y);
+      updates = { ...updates, position: { ...updates.position, y: existingObj.position.y + dy } };
     }
 
     // Wall-fitted built-ins slide along their wall, flush and on the floor; no free rotation.

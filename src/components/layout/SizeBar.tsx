@@ -16,7 +16,8 @@ function formatSize(inches: number, unit: LengthUnit) {
   const value = inches * unitScale(unit);
   if (unit === 'mm') return String(Math.round(value));
   if (unit === 'ft') return value.toFixed(2);
-  return value.toFixed(1);
+  // Clean inches/cm: 44, 44.25, 0.75 (no trailing zeros).
+  return String(Math.round(value * 100) / 100);
 }
 
 function useSelectedPart() {
