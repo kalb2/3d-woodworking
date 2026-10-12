@@ -5,6 +5,7 @@ import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
 import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
+import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
@@ -164,6 +165,8 @@ interface ProjectState {
   duplicateSelected: () => void;
   /** Move every selected item (and everything inside) by a delta. */
   translateSelection: (delta: { x: number; y: number; z: number }, skipHistory?: boolean) => void;
+  /** Turn the selection 90° about a world axis through its center (one undo step). */
+  turnSelection90: (axis: TurnAxis, sign?: 1 | -1) => void;
   addObject: (shape: ShapeType, name?: string) => void;
   addWoodPreset: (presetId: string) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
@@ -546,6 +549,21 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectIds: result.topIds,
       selectedObjectId: result.topIds[result.topIds.length - 1] ?? null,
     }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  turnSelection90: (axis, sign = 1) => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || !selectedObjectIds.length) return;
+    // Wall-fitted built-ins don't rotate freely.
+    if (selectedObjectIds.some((id) => { const o = proj.objects.find((x) => x.id === id); return !!o?.builtIn?.wallId && !o.parentId; })) return;
+    const floorOn = proj.showFloor && proj.snapSettings.floorCollision !== false;
+    let objects = turnObjects(proj.objects, selectedObjectIds, axis, { floorOn, sign });
+    if (objects === proj.objects) return;
+    objects = refitGroups(objects, groupsToRefit(proj.objects, selectedObjectIds));
+    set((state) => ({ projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)) }));
     pushHistoryState();
     saveCurrentProject();
   },

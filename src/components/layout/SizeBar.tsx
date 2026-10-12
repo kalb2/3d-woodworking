@@ -217,13 +217,47 @@ function writeRotation(
 }
 
 /** Red, green, and blue degree fields in the same bar as the transform tools. */
+const TURN_AXES: { key: 'x' | 'y' | 'z'; color: string; label: string; aria: string }[] = [
+  { key: 'y', color: GIZMO_AXIS.y, label: 'Flat (Y)', aria: 'Turn 90° flat on the floor, around Y' },
+  { key: 'x', color: GIZMO_AXIS.x, label: 'X', aria: 'Turn 90° around X' },
+  { key: 'z', color: GIZMO_AXIS.z, label: 'Z', aria: 'Turn 90° around Z' },
+];
+
+/** "Turn 90°" segmented control: one tap = +90° about that axis, through the selection's center. */
+export const TurnNinetyRow: React.FC = () => {
+  const turn = useProjectStore((s) => s.turnSelection90);
+  return (
+    <div className="turn90" data-testid="turn90" role="group" aria-label="Turn 90 degrees">
+      <span className="turn90-label">Turn 90°</span>
+      <div className="turn90-seg">
+        {TURN_AXES.map((a, i) => (
+          <button
+            key={a.key}
+            type="button"
+            className={i === 0 ? 'turn90-btn is-primary' : 'turn90-btn'}
+            data-testid={`turn90-${a.key}`}
+            aria-label={a.aria}
+            onClick={() => turn(a.key)}
+          >
+            <span className="rotate-angle-dot" style={{ background: a.color }} />
+            {a.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const RotateAngleRow: React.FC = () => {
-  const { object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
-  if (activeGizmoMode !== 'rotate' || !object || object.shape === 'group') return null;
+  const { object, activeGizmoMode, selectedObjectIds, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
+  if (activeGizmoMode !== 'rotate' || !object) return null;
+  // Groups and multi-selections get only the 90° turns (no per-part angle fields).
+  if (object.shape === 'group' || selectedObjectIds.length > 1) return <TurnNinetyRow />;
 
   const commit = () => commitSize(pushHistoryState, saveCurrentProject);
 
   return (
+    <>
     <div className="size-inline" data-testid="angle-bar" role="group" aria-label="Rotation in degrees">
       {ROTATION_AXES.map((axis) => (
         <label key={axis.key} className="rotate-angle">
@@ -257,6 +291,8 @@ export const RotateAngleRow: React.FC = () => {
         <RotateCcw size={16} />
       </button>
     </div>
+      <TurnNinetyRow />
+    </>
   );
 };
 
