@@ -3064,20 +3064,12 @@ html, body, #root {
 .settings-step-options .glass-button { min-width: 48px; min-height: 34px; padding: 0 12px; }
 
 /* Turn 90° row: same columns as the degree fields above */
-.turn90 { padding-top: 0; }
+.turn90 { padding-top: 0; padding-bottom: 6px; min-height: 0; margin-top: -4px; }
 .turn90-cols {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 18px;
-}
-.turn90-label {
-  position: absolute;
-  right: calc(100% + 10px);
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
 }
 .turn90-btn {
   border: none;
@@ -3091,9 +3083,10 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  width: 56px; /* = degree input's 52px content + 2px side padding */
   border: 1.5px solid currentColor;
   border-radius: 10px;
-  min-height: 36px;
-  font-size: 16px;
+  min-height: 28px;
+  font-size: 14px;
 }
 .turn90-btn:active .turn90-figure { background: #f1f5f9; }

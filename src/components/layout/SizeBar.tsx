@@ -228,11 +228,10 @@ export const TurnNinetyRow: React.FC = () => {
   return (
     <div className="size-inline turn90" data-testid="turn90" role="group" aria-label="Turn 90 degrees">
       <span className="turn90-cols">
-        <span className="turn90-label">Turn 90°</span>
         {TURN_AXES.map((a) => (
           <button key={a.key} type="button" className="rotate-angle turn90-btn" data-testid={`turn90-${a.key}`} aria-label={a.aria} onClick={() => turn(a.key)}>
-            <span className="rotate-angle-dot" style={{ background: a.color }} />
-            <span className="size-figure turn90-figure" style={{ color: a.color, borderColor: a.color }}>{a.label}</span>
+            <span className="rotate-angle-dot" aria-hidden="true" style={{ visibility: 'hidden' }} />
+            <span className="size-figure turn90-figure" style={{ color: a.color, borderColor: a.color }}>90°</span>
             <span className="rotate-degree-mark" aria-hidden="true" style={{ visibility: 'hidden' }}>°</span>
           </button>
         ))}
