@@ -3,6 +3,7 @@ import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalo
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
+import { squareUpRoom } from '../generators/squareRoom';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
@@ -174,6 +175,8 @@ interface ProjectState {
   insertUserTemplate: (template: UserTemplate, place: { at?: { x: number; z: number }; wallId?: string | null }) => boolean;
   /** Put a scanned room into the current project, replacing only an earlier room scan. */
   addScannedRoom: (room: ScannedRoom) => boolean;
+  /** Align the scanned room to the grid and square near-right corners; wall-fitted built-ins follow. */
+  squareUpWalls: () => boolean;
   /** Lock/unlock the scanned room's walls for editing (per project). */
   /** When unlocking with `selectWallId`, that wall's part becomes the selection (ready for Move/Delete). */
   setRoomLocked: (locked: boolean, selectWallId?: string | null) => void;
@@ -716,6 +719,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       editingGroupId: null,
     }));
     pushHistoryState();
+    return true;
+  },
+
+  squareUpWalls: () => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj?.scannedRoom?.walls.length) return false;
+    const room = squareUpRoom(proj.scannedRoom);
+    const stamp = Date.now();
+    const locked = proj.roomLocked !== false;
+    const roomParts: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}`, ...(locked ? {} : { locked: false }) }));
+    let objects = [...roomParts, ...proj.objects.filter((o) => o.generator !== 'room-scan')];
+    // Re-fit built-ins that sit on a scanned wall so they stay flush.
+    for (const g of proj.objects) {
+      const bi = g.builtIn;
+      if (g.shape !== 'group' || !bi?.wallId || !room.walls.some((w) => w.id === bi.wallId)) continue;
+      const width = typeof bi.input.wallWidth === 'number' ? bi.input.wallWidth : undefined;
+      const placed = placeBuiltIn(objects, room, { template: bi.template, input: bi.input, wallId: bi.wallId, center: bi.center, width, editId: bi.id }, g.material);
+      if (placed) objects = placed.objects;
+    }
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, scannedRoom: room } : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+    }));
+    pushHistoryState();
+    saveCurrentProject();
     return true;
   },
 

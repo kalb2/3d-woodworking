@@ -15,6 +15,7 @@ import {
   Share2,
   SlidersHorizontal,
   BoxSelect,
+  SquareDashed,
   TextCursorInput,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
@@ -115,6 +116,11 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onClose();
   });
   const canRename = Boolean(selectedObj && !(selectedObj.generator === 'room-scan'));
+  const squareUp = useReliableTap(() => {
+    if (!window.confirm('Square up walls? Lines the room up with the grid and squares near-right corners. Built-ins on walls follow; other parts stay put.')) return;
+    if (useProjectStore.getState().squareUpWalls()) useBuiltInFlow.getState().requestFrame();
+    onClose();
+  });
   const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
   const roomLocked = currentProject?.roomLocked !== false;
   const toggleRoomLock = useReliableTap(() => {
@@ -215,6 +221,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
             <span>Lock scanned walls</span>
           </span>
           <span className={`menu-switch${roomLocked ? ' is-on' : ''}`} aria-hidden="true"><span /></span>
+        </button>
+      )}
+      {hasRoom && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-square-walls" onClick={squareUp} onPointerUp={squareUp}>
+          <SquareDashed size={18} />
+          <span>Square up walls</span>
         </button>
       )}
       <button type="button" className="phone-sheet-row" data-testid="tool-settings" onClick={settings} onPointerUp={settings}>
