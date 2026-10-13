@@ -50,6 +50,16 @@ export const SnapHighlight: React.FC = () => {
       {contacts.map((c, i) => {
         const target = objects.find((o) => o.id === c.targetId);
         if (!target) return null;
+        if (c.yaw !== undefined) {
+          // Turned target (scanned wall/opening): draw in its own frame.
+          const T = target.dimensions;
+          const local = new THREE.Box3(new THREE.Vector3(-T.length / 2, -T.height / 2, -T.width / 2), new THREE.Vector3(T.length / 2, T.height / 2, T.width / 2));
+          return (
+            <group key={`${c.targetId}-${c.axis}-${i}`} position={[target.position.x, target.position.y, target.position.z]} rotation={[0, (c.yaw * Math.PI) / 180, 0]}>
+              <FaceQuad box={local} axis={c.axis} value={c.value + (c.side === 'max' ? 0.03 : -0.03)} opacity={0.38} />
+            </group>
+          );
+        }
         return (
           <React.Fragment key={`${c.targetId}-${c.axis}-${i}`}>
             <FaceQuad box={getBoundingBox(target)} axis={c.axis} value={c.value} opacity={0.38} />
