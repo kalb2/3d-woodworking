@@ -1,3 +1,4 @@
+import { DEFAULT_RESIZE_STEP, RESIZE_STEPS } from '../../utils/resizeRules';
 import React from 'react';
 import { Grid, Magnet } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
@@ -77,6 +78,20 @@ export const WorkshopSettings: React.FC = () => {
         on={magnetOn}
         onToggle={() => updateSnapSettings({ enabled: !magnetOn })}
       />
+      {magnetOn && (currentProject.unit === 'in' || currentProject.unit === 'ft') && (
+        <div className="settings-step-row" data-testid="resize-step">
+          <span>Resize step</span>
+          <div className="settings-step-options">
+            {RESIZE_STEPS.map((step) => (
+              <button key={step} type="button" data-testid={`resize-step-${step}`}
+                className={`glass-button${(currentProject.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP) === step ? ' active' : ''}`}
+                onClick={() => updateSnapSettings({ resizeStep: step })}>
+                {step === 0.25 ? '¼″' : '½″'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 

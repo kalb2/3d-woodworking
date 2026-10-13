@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
+import { clearSnapHighlight, useSnapHighlight } from './SnapHighlight';
 import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
 import { RotateDegreePill } from '../layout/SizeBar';
-import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, type FaceAxis } from './gizmoLook';
+import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, RotateRings, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
   object: FurnitureObject;
@@ -73,7 +74,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     pushHistoryState,
     saveCurrentProject,
     projects,
-    activeProjectId
+    activeProjectId,
+    selectedObjectIds,
   } = useProjectStore();
 
   const { camera, raycaster, gl, controls } = useThree() as any;
@@ -189,14 +191,23 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           }
         }
 
-        if (currentProject) {
+        // Several things selected: they all move together by the same delta.
+        const multi = useProjectStore.getState().selectedObjectIds.length > 1;
+        if (multi) {
+          const cur = useProjectStore.getState().projects.find((p) => p.id === activeProjectId)?.objects.find((o) => o.id === object.id);
+          if (cur) {
+            useProjectStore.getState().translateSelection({ x: newPos.x - cur.position.x, y: newPos.y - cur.position.y, z: newPos.z - cur.position.z }, true);
+          }
+        } else if (currentProject) {
           const snapResult = calculateSnappedPosition(
             object,
             newPos,
-            currentProject.objects,
+            // Snap to parts, not group boxes (a part's own group would trap it).
+            currentProject.objects.filter((o) => o.shape !== 'group'),
             currentProject.snapSettings
           );
           updateObject(object.id, { position: snapResult.position }, true);
+          useSnapHighlight.getState().set(object.id, snapResult.contacts);
         } else {
           updateObject(object.id, { position: newPos }, true);
         }
@@ -241,6 +252,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     };
 
     const handlePointerUp = () => {
+      clearSnapHighlight();
       dragRef.current = null;
       setActiveAxis(null);
 
@@ -266,6 +278,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   }, [activeAxis, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
 
   if (activeGizmoMode === 'resize') return null;
+  // Rotating a multi-selection isn't supported (each would spin alone): Group first.
+  if (!isMove && selectedObjectIds.length > 1) return null;
 
   const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
     if (axis === 'x' || axis === 'y' || axis === 'z') setReadoutAxis(axis);
@@ -297,7 +311,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           <MoveHub active={activeAxis === 'xz'} onPointerDown={beginAxis('xz')} />
         </>
       ) : activeGizmoMode === 'rotate' ? (
-        <>
+        <RotateRings objectRadius={Math.hypot(object.dimensions.length, object.dimensions.height, object.dimensions.width) / 2}>
           <RotateRing axis="x" color={GIZMO_AXIS.x} active={activeAxis === 'x'} onPointerDown={beginAxis('x')} />
           <RotateRing axis="y" color={GIZMO_AXIS.y} active={activeAxis === 'y'} onPointerDown={beginAxis('y')} />
           <RotateRing axis="z" color={GIZMO_AXIS.z} active={activeAxis === 'z'} onPointerDown={beginAxis('z')} />
@@ -314,7 +328,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
               }}
             />
           )}
-        </>
+        </RotateRings>
       ) : null}
     </group>
   );

@@ -17,6 +17,7 @@ import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { BuiltInSheet } from './builtins/BuiltInSheet';
+import { GroupBar } from './components/layout/GroupBar';
 import { HoleModeBar } from './components/layout/HoleModeBar';
 import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
 import { HomeScreen } from './components/home/HomeScreen';
@@ -143,6 +144,7 @@ export const App: React.FC = () => {
       <TransformMenu />
 
       <BuiltInSheet />
+      <GroupBar />
       <HoleModeBar />
 
       <CutListDrawer

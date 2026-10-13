@@ -6,6 +6,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
+import { DEFAULT_RESIZE_STEP, snapSize } from '../../utils/resizeRules';
 
 interface ResizeHandles3DProps {
   object: FurnitureObject;
@@ -42,6 +43,14 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
     { axis: '+z', pos: gripAnchor('+z', extents), color: GIZMO_AXIS.z },
     { axis: '-z', pos: gripAnchor('-z', extents), color: GIZMO_AXIS.z },
   ];
+
+  // Smaller side of the face each pad sits on (caps the pad on small parts).
+  const faceSizeFor = (axis: HandleAxis) => {
+    const L = extents.hx * 2, H = extents.hy * 2, W = extents.hz * 2;
+    if (axis[1] === 'x') return Math.min(H, W);
+    if (axis[1] === 'y') return Math.min(L, W);
+    return Math.min(L, H);
+  };
 
   const handlePointerDown = (e: any, axis: HandleAxis) => {
     if (!e.point || !Number.isFinite(e.point.x) || !Number.isFinite(e.point.y) || !Number.isFinite(e.point.z)) return;
@@ -111,6 +120,16 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
         else if (session.axis === '+z') newDim.width = resized(session.startDimensions.width, localDelta.z * 2);
         else if (session.axis === '-z') newDim.width = resized(session.startDimensions.width, -localDelta.z * 2);
 
+        // Dragging snaps sizes to the project's step (¼" default); Magnet off = free.
+        const st = useProjectStore.getState();
+        const proj = st.projects.find((p) => p.id === st.activeProjectId);
+        if (proj?.snapSettings.enabled !== false) {
+          const step = proj?.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP;
+          const unit = proj?.unit ?? 'in';
+          newDim.length = snapSize(newDim.length, step, unit);
+          newDim.width = snapSize(newDim.width, step, unit);
+          newDim.height = snapSize(newDim.height, step, unit);
+        }
         updateObject(object.id, { dimensions: newDim }, true);
       }
     };
@@ -152,6 +171,7 @@ export const ResizeHandles3D: React.FC<ResizeHandles3DProps> = ({ object }) => {
             <FacePad
               axis={axis}
               color={color}
+              faceSize={faceSizeFor(axis)}
               active={activeAxis === axis}
               onPointerDown={(e) => handlePointerDown(e, axis)}
             />

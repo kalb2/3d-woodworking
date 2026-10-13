@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
+import { areaSelect, pathTo, topUnder, type ScreenRect } from '../../state/groupTree';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { cameraDir, cameraTarget } from '../../templates/userTemplates';
@@ -13,6 +14,7 @@ import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
+import { SnapHighlight } from './SnapHighlight';
 
 /** Soft contact blob. Hidden with Floor off, and whenever the camera is under the ground. */
 const GroundContactShadow: React.FC = () => {
@@ -104,6 +106,24 @@ const AutoFrame: React.FC<{ projectId: string }> = ({ projectId }) => {
   return null;
 };
 
+/** Screen projector for area select, fed from inside the Canvas. */
+const projector: { current: ((p: { x: number; y: number; z: number }) => { x: number; y: number } | null) | null } = { current: null };
+
+const ProjectorBridge: React.FC = () => {
+  const { camera, gl } = useThree();
+  React.useEffect(() => {
+    const v = new THREE.Vector3();
+    projector.current = (p) => {
+      v.set(p.x, p.y, p.z).project(camera);
+      if (v.z > 1) return null;
+      const r = gl.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    };
+    return () => { projector.current = null; };
+  }, [camera, gl]);
+  return null;
+};
+
 export const FurnitureCanvas: React.FC = () => {
   const {
     projects,
@@ -115,7 +135,10 @@ export const FurnitureCanvas: React.FC = () => {
     enterGroup,
     exitGroup,
     activeGizmoMode,
+    multiSelect,
   } = useProjectStore();
+  const [dragRect, setDragRect] = useState<ScreenRect | null>(null);
+  const dragStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const lastTap = useRef<{ id: string; time: number } | null>(null);
   const focusWallId = useBuiltInFlow((s) => s.focusWallId);
   const holeEdit = useHoleFocus();
@@ -128,13 +151,38 @@ export const FurnitureCanvas: React.FC = () => {
   if (!currentProject) return null;
 
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
+  // Groups on the opened path don't catch taps (their members do).
+  const openPath = new Set(pathTo(currentProject.objects, editingGroupId));
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const clearSelection = () => {
     if (useHoleFocus.getState().editing) { useHoleFocus.getState().exit(); return; }
     if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
+    // Select mode: empty taps never change level.
+    if (useProjectStore.getState().multiSelect) return;
+    // Inside a group, empty space goes up one level.
     if (editingGroupId) exitGroup();
     else selectObject(null);
+  };
+
+  // Area select (select mode): one-finger drag draws a rectangle.
+  const onAreaDown = (e: React.PointerEvent) => {
+    if (!multiSelect || !e.isPrimary) return;
+    dragStart.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  };
+  const onAreaMove = (e: React.PointerEvent) => {
+    const st = dragStart.current;
+    if (!st || e.pointerId !== st.id) return;
+    if (!dragRect && Math.hypot(e.clientX - st.x, e.clientY - st.y) < 8) return;
+    setDragRect({ x0: st.x, y0: st.y, x1: e.clientX, y1: e.clientY });
+  };
+  const onAreaUp = () => {
+    const rect = dragRect;
+    dragStart.current = null;
+    setDragRect(null);
+    if (!rect || !projector.current) return;
+    const hits = areaSelect(currentProject.objects, editingGroupId, rect, projector.current, currentProject.roomLocked !== false);
+    useProjectStore.getState().selectMany(hits);
   };
 
   const handleCanvasClick = (e: any) => {
@@ -160,39 +208,40 @@ export const FurnitureCanvas: React.FC = () => {
     const additive = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
     const now = performance.now();
     const previous = lastTap.current;
-    const doubleTap = Boolean(previous && previous.id === obj.id && now - previous.time < 420);
-    lastTap.current = { id: obj.id, time: now };
 
-    const parent = obj.parentId
-      ? currentProject.objects.find((item) => item.id === obj.parentId && item.shape === 'group')
-      : undefined;
-
-    if (editingGroupId) {
-      if (obj.parentId === editingGroupId) {
-        selectObject(obj.id, { additive });
-        return;
-      }
-      exitGroup();
-      selectObject(obj.shape === 'group' ? obj.id : (parent?.id ?? obj.id), { additive });
+    // A tap picks the top-most item at the current group level.
+    let context = editingGroupId;
+    let target = topUnder(currentProject.objects, obj.id, context);
+    if (!target) {
+      // Tapped outside the opened group: back to the top level.
+      context = null;
+      useProjectStore.getState().setGroupContext(null);
+      target = topUnder(currentProject.objects, obj.id, null);
+    }
+    if (!target) return;
+    const targetObj = currentProject.objects.find((o) => o.id === target);
+    const isDouble = Boolean(previous && previous.id === target && now - previous.time < 420);
+    lastTap.current = { id: target, time: now };
+    if (isDouble && targetObj?.shape === 'group' && !multiSelect) {
+      enterGroup(target);
       return;
     }
-    const groupTarget = obj.shape === 'group' ? obj : parent;
-    if (groupTarget && doubleTap) {
-      enterGroup(groupTarget.id);
-      return;
-    }
-    if (groupTarget && obj.shape !== 'group') {
-      selectObject(groupTarget.id, { additive });
-      return;
-    }
-    selectObject(obj.id, { additive });
+    selectObject(target, { additive });
   };
 
   return (
     <div
       style={{ width: '100%', height: '100%', position: 'relative', touchAction: 'none', backgroundColor: bgColor }}
       onClick={handleCanvasClick}
+      onPointerDownCapture={onAreaDown}
+      onPointerMoveCapture={onAreaMove}
+      onPointerUpCapture={onAreaUp}
+      onPointerCancelCapture={onAreaUp}
     >
+      {dragRect && (() => {
+        const r = { x0: Math.min(dragRect.x0, dragRect.x1), y0: Math.min(dragRect.y0, dragRect.y1), x1: Math.max(dragRect.x0, dragRect.x1), y1: Math.max(dragRect.y0, dragRect.y1) };
+        return <div className="area-select-rect" style={{ position: 'fixed', left: r.x0, top: r.y0, width: r.x1 - r.x0, height: r.y1 - r.y0 }} />;
+      })()}
       <Canvas
         shadows="percentage"
         /* far stays past the grid fade so the horizon dissolves instead of clipping */
@@ -223,6 +272,7 @@ export const FurnitureCanvas: React.FC = () => {
         <OrbitControls
           ref={orbitControlsRef}
           makeDefault
+          enabled={!multiSelect}
           enableDamping
           dampingFactor={0.08}
           minDistance={10}
@@ -238,6 +288,8 @@ export const FurnitureCanvas: React.FC = () => {
         {currentProject.showFloor && <GroundContactShadow />}
 
         <CameraFocus />
+        <ProjectorBridge />
+        <SnapHighlight />
         <TrackTarget />
         <AutoFrame projectId={currentProject.id} />
 
@@ -258,7 +310,7 @@ export const FurnitureCanvas: React.FC = () => {
             key={obj.id}
             object={obj}
             isSelected={selectedObjectIds.includes(obj.id)}
-            pickGroup={editingGroupId !== obj.id}
+            pickGroup={!openPath.has(obj.id)}
             onPointerDown={(e) => handlePartPointerDown(e, obj.id)}
           />
         ))}
@@ -272,7 +324,7 @@ export const FurnitureCanvas: React.FC = () => {
         })()}
 
         {/* Active Selected Object Controls */}
-        {selectedObject && !holeEdit.editing && (
+        {selectedObject && !holeEdit.editing && !multiSelect && (
           <>
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (

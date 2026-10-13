@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { FurnitureObject, RoomWall, WoodMaterial } from '../types/furniture';
 import { wallFrame, wallToWorld } from '../generators/roomScan';
+import { leavesOf } from '../state/groupTree';
 
 export type TemplatePart = Omit<FurnitureObject, 'id' | 'parentId'>;
 
@@ -28,7 +29,7 @@ function strip(o: FurnitureObject): TemplatePart {
 export function partsFromSelection(objects: FurnitureObject[], selectedId: string): TemplatePart[] {
   const sel = objects.find((o) => o.id === selectedId);
   if (!sel) return [];
-  const members = sel.shape === 'group' ? objects.filter((o) => o.parentId === sel.id && o.shape !== 'group') : [sel];
+  const members = leavesOf(objects, sel.id);
   const usable = members.filter((o) => o.generator !== 'room-scan' && !o.reference);
   if (usable.length === 0) return [];
   const yaw = sel.shape === 'group' ? sel.rotation.y : 0;

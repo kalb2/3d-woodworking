@@ -1,3 +1,4 @@
+import { NumberField } from '../ui/NumberField';
 import React from 'react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -85,18 +86,13 @@ export const ObjectInspector: React.FC = () => {
           <span className="part-properties-kicker">Board ({unit})</span>
           <label>
             Corner radius
-            <input
-              type="number"
+            <NumberField
               className="glass-input"
-              data-testid="board-corner-radius"
+              testId="board-corner-radius"
               min={0}
-              step="0.25"
-              value={formatMeasure(board.cornerRadius, scale)}
-              onChange={(event) => {
-                const num = parseFloat(event.target.value);
-                if (Number.isNaN(num) || num < 0) return;
-                updateObject(object.id, { board: { ...board, cornerRadius: num / scale } });
-              }}
+              value={board.cornerRadius * scale}
+              format={() => formatMeasure(board.cornerRadius, scale)}
+              onCommit={(num) => updateObject(object.id, { board: { ...board, cornerRadius: num / scale } })}
             />
           </label>
           <div className="part-properties-edge-row">
@@ -115,19 +111,14 @@ export const ObjectInspector: React.FC = () => {
               ))}
             </div>
             {board.edge !== 'none' && (
-              <input
-                type="number"
+              <NumberField
                 className="glass-input part-properties-edge-size"
-                data-testid="board-edge-size"
+                testId="board-edge-size"
                 aria-label="Edge size"
-                min={0}
-                step="0.0625"
-                value={formatMeasure(board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22), scale)}
-                onChange={(event) => {
-                  const num = parseFloat(event.target.value);
-                  if (Number.isNaN(num) || num <= 0) return;
-                  updateObject(object.id, { board: { ...board, edgeSize: num / scale } });
-                }}
+                min={0.01}
+                value={(board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22)) * scale}
+                format={() => formatMeasure(board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22), scale)}
+                onCommit={(num) => updateObject(object.id, { board: { ...board, edgeSize: num / scale } })}
               />
             )}
           </div>

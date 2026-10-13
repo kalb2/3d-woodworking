@@ -1,3 +1,4 @@
+import { NumberField } from '../components/ui/NumberField';
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, LockOpen, MoreHorizontal, X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
@@ -12,12 +13,6 @@ import { useBuiltInFlow } from './useBuiltInFlow';
 
 const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 };
 const inputStyle: React.CSSProperties = { width: 72, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(148,163,184,0.5)', fontSize: 14, textAlign: 'right', background: 'transparent', color: 'inherit' };
-const chipStyle: React.CSSProperties = {
-  position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 'calc(env(safe-area-inset-top, 0px) + 64px)', zIndex: 230,
-  display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, border: 'none',
-  background: 'rgba(15,23,42,0.82)', color: '#fff', fontSize: 13, fontWeight: 600,
-};
-
 const Row: React.FC<{ onTap: () => void; children: React.ReactNode; testId?: string }> = ({ onTap, children, testId }) => {
   const tap = useReliableTap(onTap);
   return (
@@ -57,7 +52,7 @@ const MediaWallForm: React.FC<{ wall?: RoomWall; existing?: FurnitureObject; onD
   const field = (label: string, value: number, set: (n: number) => void, testId: string) => (
     <label style={fieldStyle}>
       <span>{label}</span>
-      <input type="number" inputMode="decimal" data-testid={testId} value={value} onChange={(e) => set(Number(e.target.value))} style={inputStyle} />
+      <NumberField testId={testId} value={value} min={0} onCommit={set} style={inputStyle} />
     </label>
   );
   return (
@@ -123,10 +118,7 @@ const BuiltInRow: React.FC<{ group: FurnitureObject; label: string; onClose: () 
 export const BuiltInSheet: React.FC = () => {
   const flow = useBuiltInFlow();
   const project = useProject();
-  const editingGroupId = useProjectStore((s) => s.editingGroupId);
-  const exitGroup = useProjectStore((s) => s.exitGroup);
   const room = project?.scannedRoom;
-  const exitTap = useReliableTap(exitGroup);
   const dismissWall = useReliableTap(() => flow.focusWall(null));
   const setRoomLocked = useProjectStore((s) => s.setRoomLocked);
   const roomLocked = project?.roomLocked !== false;
@@ -176,15 +168,8 @@ export const BuiltInSheet: React.FC = () => {
     );
   }
 
-  if (!flow.mode) {
-    const g = editingGroupId ? project.objects.find((o) => o.id === editingGroupId) : undefined;
-    if (!g?.builtIn) return null;
-    return (
-      <button type="button" style={chipStyle} data-testid="builtin-breadcrumb" onClick={exitTap} onPointerUp={exitTap}>
-        {findBuiltInTemplate(g.builtIn.template)?.name ?? g.name} <ChevronRight size={14} />
-      </button>
-    );
-  }
+  // Breadcrumb for opened groups lives in GroupBar.
+  if (!flow.mode) return null;
 
   const existing = flow.editGroupId ? project.objects.find((o) => o.id === flow.editGroupId) : undefined;
   const wall = flow.wallId ? room?.walls.find((w) => w.id === flow.wallId) : undefined;

@@ -4,25 +4,16 @@ import type { BoardHole } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { clampHole, getHoles, holesUpdate, useHoleFocus } from '../../utils/holes';
 import { unitScale } from '../../utils/units';
+import { NumberField } from '../ui/NumberField';
 
 const clean = (v: number) => String(Math.round(v * 100) / 100);
 const STEP = 0.125;
 
 /** Number that commits on blur/Enter (one undo step), not per keystroke. */
-const CommitField: React.FC<{ value: number; scale: number; onCommit: (inches: number) => void; label: string; min?: number; testId?: string }> = ({ value, scale, onCommit, label, min, testId }) => {
-  const [draft, setDraft] = useState(clean(value * scale));
-  useEffect(() => { setDraft(clean(value * scale)); }, [value, scale]);
-  const commit = () => {
-    const n = parseFloat(draft);
-    if (Number.isNaN(n) || (min !== undefined && n < min)) { setDraft(clean(value * scale)); return; }
-    if (Math.abs(n / scale - value) > 1e-6) onCommit(n / scale);
-  };
-  return (
-    <input className="hole-bar-input" type="number" inputMode="decimal" aria-label={label} data-testid={testId} value={draft}
-      onChange={(e) => setDraft(e.target.value)} onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
-  );
-};
+const CommitField: React.FC<{ value: number | undefined; scale: number; onCommit: (inches: number) => void; label: string; min?: number; testId?: string }> = ({ value, scale, onCommit, label, min, testId }) => (
+  <NumberField className="hole-bar-input" aria-label={label} testId={testId} min={min} value={(value ?? 0) * scale}
+    format={(v) => clean(v)} onCommit={(n) => onCommit(n / scale)} />
+);
 
 /** Bottom bar shown in hole mode. Dragging on the part moves the hole. */
 export const HoleModeBar: React.FC = () => {

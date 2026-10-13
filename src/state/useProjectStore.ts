@@ -3,10 +3,16 @@ import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalo
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
+import { squareUpRoom } from '../generators/squareRoom';
+import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
+import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
+import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
+
+const normalizeProjects = (ps: FurnitureProject[]) => ps.map((p) => { const objects = normalizeTree(p.objects ?? []); return objects === p.objects ? p : { ...p, objects }; });
 
 export interface WoodPreset {
   id: string;
@@ -149,7 +155,18 @@ interface ProjectState {
   groupSelected: () => void;
   ungroup: (id: string) => void;
   enterGroup: (id: string) => void;
+  /** Exit one level (to the opened group's parent). */
   exitGroup: () => void;
+  /** Jump to a group context (breadcrumb); null = top level. */
+  setGroupContext: (id: string | null) => void;
+  /** Replace the selection (area select). */
+  selectMany: (ids: string[]) => void;
+  deleteSelected: () => void;
+  duplicateSelected: () => void;
+  /** Move every selected item (and everything inside) by a delta. */
+  translateSelection: (delta: { x: number; y: number; z: number }, skipHistory?: boolean) => void;
+  /** Turn the selection 90° about a world axis through its center (one undo step). */
+  turnSelection90: (axis: TurnAxis, sign?: 1 | -1) => void;
   addObject: (shape: ShapeType, name?: string) => void;
   addWoodPreset: (presetId: string) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
@@ -162,6 +179,8 @@ interface ProjectState {
   insertUserTemplate: (template: UserTemplate, place: { at?: { x: number; z: number }; wallId?: string | null }) => boolean;
   /** Put a scanned room into the current project, replacing only an earlier room scan. */
   addScannedRoom: (room: ScannedRoom) => boolean;
+  /** Align the scanned room to the grid and square near-right corners; wall-fitted built-ins follow. */
+  squareUpWalls: () => boolean;
   /** Lock/unlock the scanned room's walls for editing (per project). */
   /** When unlocking with `selectWallId`, that wall's part becomes the selection (ready for Move/Delete). */
   setRoomLocked: (locked: boolean, selectWallId?: string | null) => void;
@@ -226,7 +245,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const projects = migrateLegacyLabels(withLightStartingWood(parsed));
+          const projects = normalizeProjects(migrateLegacyLabels(withLightStartingWood(parsed)));
           const firstId = projects[0].objects[0]?.id ?? null;
           set({
             projects,
@@ -263,14 +282,25 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     }
   },
 
-  replaceAllProjects: (projects) => {
+  replaceAllProjects: (incoming) => {
+    const projects = normalizeProjects(incoming);
     const previousId = get().activeProjectId;
     const active = projects.find((project) => project.id === previousId) ?? projects[0] ?? null;
     const selected = active?.objects.find((object) => object.id === get().selectedObjectId)?.id
       ?? active?.objects[0]?.id
       ?? null;
+    // Sync usually echoes what we already have: keep history, selection and
+    // the opened group then, so a sync never resets the editor mid-session.
+    const prevActive = get().projects.find((p) => p.id === previousId);
+    const sameActive = Boolean(active && prevActive && active.id === prevActive.id
+      && JSON.stringify(active.objects) === JSON.stringify(prevActive.objects));
     persistSuppressed = true;
     try {
+      if (sameActive) {
+        set({ projects });
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+        return;
+      }
       set({
         projects,
         activeProjectId: active?.id ?? '',
@@ -397,7 +427,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     });
   },
 
-  importProject: (project: FurnitureProject) => {
+  importProject: (raw: FurnitureProject) => {
+    const project = { ...raw, objects: normalizeTree(raw.objects ?? []) };
     set(state => ({
       projects: [...state.projects, project],
       activeProjectId: project.id,
@@ -432,111 +463,132 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   toggleMultiSelect: () => set((state) => ({ multiSelect: !state.multiSelect })),
 
   groupSelected: () => {
-    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const { projects, activeProjectId, selectedObjectIds, editingGroupId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return;
-
-    const members = proj.objects.filter((object) =>
-      selectedObjectIds.includes(object.id) && object.shape !== 'group' && !object.parentId
-    );
-    if (members.length < 2) return;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let minZ = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let maxZ = -Infinity;
-    for (const object of members) {
-      const hx = object.dimensions.length / 2;
-      const hy = object.dimensions.height / 2;
-      const hz = object.dimensions.width / 2;
-      minX = Math.min(minX, object.position.x - hx);
-      maxX = Math.max(maxX, object.position.x + hx);
-      minY = Math.min(minY, object.position.y - hy);
-      maxY = Math.max(maxY, object.position.y + hy);
-      minZ = Math.min(minZ, object.position.z - hz);
-      maxZ = Math.max(maxZ, object.position.z + hz);
-    }
-
-    const group: FurnitureObject = {
-      id: `grp_${Date.now()}`,
-      name: 'Group',
-      shape: 'group',
-      dimensions: {
-        length: Math.max(maxX - minX, 0.5),
-        height: Math.max(maxY - minY, 0.5),
-        width: Math.max(maxZ - minZ, 0.5),
-      },
-      position: {
-        x: (minX + maxX) / 2,
-        y: (minY + maxY) / 2,
-        z: (minZ + maxZ) / 2,
-      },
-      rotation: { x: 0, y: 0, z: 0 },
-      material: LIGHT_STARTING_WOOD,
-      visible: true,
-    };
-
-    const memberIds = new Set(members.map((object) => object.id));
-    const objects = proj.objects.map((object) =>
-      memberIds.has(object.id) ? { ...object, parentId: group.id } : object
-    );
-
+    const result = groupIds(proj.objects, selectedObjectIds, editingGroupId, LIGHT_STARTING_WOOD);
+    if (!result) return;
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === activeProjectId ? { ...p, objects: [...objects, group] } : p
-      ),
-      selectedObjectId: group.id,
-      selectedObjectIds: [group.id],
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectId: result.groupId,
+      selectedObjectIds: [result.groupId],
       multiSelect: false,
-      editingGroupId: null,
     }));
     pushHistoryState();
     saveCurrentProject();
   },
 
   ungroup: (id) => {
-    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const { projects, activeProjectId, editingGroupId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return;
-    const group = proj.objects.find((object) => object.id === id && object.shape === 'group');
-    if (!group) return;
-    const children = proj.objects.filter((object) => object.parentId === id);
-    const objects = proj.objects
-      .filter((object) => object.id !== id)
-      .map((object) => (object.parentId === id ? { ...object, parentId: undefined } : object));
-    const nextId = children[0]?.id ?? objects[0]?.id ?? null;
+    const result = ungroupOne(proj.objects, id);
+    if (!result) return;
+    const group = proj.objects.find((o) => o.id === id);
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === activeProjectId ? { ...p, objects } : p
-      ),
-      selectedObjectId: nextId,
-      selectedObjectIds: nextId ? [nextId] : [],
-      editingGroupId: state.editingGroupId === id ? null : state.editingGroupId,
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectId: result.childIds[result.childIds.length - 1] ?? null,
+      selectedObjectIds: result.childIds,
+      editingGroupId: editingGroupId === id ? (group?.parentId ?? null) : editingGroupId,
     }));
     pushHistoryState();
     saveCurrentProject();
   },
 
   enterGroup: (id) => {
-    const proj = get().projects.find((p) => p.id === get().activeProjectId);
-    const child = proj?.objects.find((object) => object.parentId === id);
-    set({
-      editingGroupId: id,
-      multiSelect: false,
-      selectedObjectId: child?.id ?? id,
-      selectedObjectIds: child ? [child.id] : [id],
-    });
+    set({ editingGroupId: id, multiSelect: false, selectedObjectId: null, selectedObjectIds: [] });
   },
 
   exitGroup: () => {
     const id = get().editingGroupId;
-    set({
-      editingGroupId: null,
-      selectedObjectId: id,
-      selectedObjectIds: id ? [id] : [],
-    });
+    const proj = get().projects.find((p) => p.id === get().activeProjectId);
+    const parent = id ? proj?.objects.find((o) => o.id === id)?.parentId ?? null : null;
+    set({ editingGroupId: parent, selectedObjectId: id, selectedObjectIds: id ? [id] : [] });
+  },
+
+  setGroupContext: (target) => {
+    const { editingGroupId, projects, activeProjectId } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    // Select the crumb we came up from, so the user keeps their place.
+    let from: string | null = null;
+    if (proj && editingGroupId) {
+      const chain = [editingGroupId, ...ancestorIds(proj.objects, editingGroupId)];
+      const i = target ? chain.indexOf(target) : chain.length;
+      from = i > 0 ? chain[i - 1] : null;
+    }
+    set({ editingGroupId: target, selectedObjectId: from, selectedObjectIds: from ? [from] : [] });
+  },
+
+  selectMany: (ids) => set({ selectedObjectIds: ids, selectedObjectId: ids[ids.length - 1] ?? null }),
+
+  deleteSelected: () => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || !selectedObjectIds.length) return;
+    const room = proj.objects.some((o) => selectedObjectIds.includes(o.id) && o.generator === 'room-scan');
+    const objects = deleteCascade(proj.objects, selectedObjectIds);
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? (room ? withRoomSync(p, objects) : { ...p, objects }) : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      editingGroupId: state.editingGroupId && objects.some((o) => o.id === state.editingGroupId) ? state.editingGroupId : null,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  duplicateSelected: () => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const ids = selectedObjectIds.filter((id) => proj.objects.find((o) => o.id === id)?.generator !== 'room-scan');
+    if (!ids.length) return;
+    const result = deepDuplicate(proj.objects, ids);
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectIds: result.topIds,
+      selectedObjectId: result.topIds[result.topIds.length - 1] ?? null,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  turnSelection90: (axis, sign = 1) => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || !selectedObjectIds.length) return;
+    // Wall-fitted built-ins don't rotate freely.
+    if (selectedObjectIds.some((id) => { const o = proj.objects.find((x) => x.id === id); return !!o?.builtIn?.wallId && !o.parentId; })) return;
+    const floorOn = proj.showFloor && proj.snapSettings.floorCollision !== false;
+    let objects = turnObjects(proj.objects, selectedObjectIds, axis, { floorOn, sign });
+    if (objects === proj.objects) return;
+    objects = refitGroups(objects, groupsToRefit(proj.objects, selectedObjectIds));
+    set((state) => ({ projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)) }));
+    pushHistoryState();
+    saveCurrentProject();
+  },
+
+  translateSelection: (delta, skipHistory = false) => {
+    const { projects, activeProjectId, selectedObjectIds, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj || !selectedObjectIds.length) return;
+    const moving = new Set<string>();
+    for (const id of selectedObjectIds) for (const m of moveSet(proj.objects, id)) moving.add(m);
+    // Keep everything above the floor when floor collision is on.
+    let dy = delta.y;
+    if (proj.snapSettings.floorCollision && dy < 0) {
+      dy = floorSafeDy(proj.objects.filter((o) => moving.has(o.id) && o.shape !== 'group' && o.generator !== 'room-scan'), dy);
+    }
+    const parents = new Set(selectedObjectIds.map((id) => proj.objects.find((o) => o.id === id)?.parentId).filter(Boolean) as string[]);
+    let objects = proj.objects.map((o) => moving.has(o.id)
+      ? { ...o, position: { x: o.position.x + delta.x, y: o.position.y + dy, z: o.position.z + delta.z } }
+      : o);
+    objects = refitGroups(objects, parents);
+    set((state) => ({ projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)) }));
+    if (!skipHistory) {
+      pushHistoryState();
+      saveCurrentProject();
+    }
   },
 
   addObject: (shape: ShapeType, customName?: string) => {
@@ -697,6 +749,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     return true;
   },
 
+  squareUpWalls: () => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj?.scannedRoom?.walls.length) return false;
+    const room = squareUpRoom(proj.scannedRoom);
+    const stamp = Date.now();
+    const locked = proj.roomLocked !== false;
+    const roomParts: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}`, ...(locked ? {} : { locked: false }) }));
+    let objects = [...roomParts, ...proj.objects.filter((o) => o.generator !== 'room-scan')];
+    // Re-fit built-ins that sit on a scanned wall so they stay flush.
+    for (const g of proj.objects) {
+      const bi = g.builtIn;
+      if (g.shape !== 'group' || !bi?.wallId || !room.walls.some((w) => w.id === bi.wallId)) continue;
+      const width = typeof bi.input.wallWidth === 'number' ? bi.input.wallWidth : undefined;
+      const placed = placeBuiltIn(objects, room, { template: bi.template, input: bi.input, wallId: bi.wallId, center: bi.center, width, editId: bi.id }, g.material);
+      if (placed) objects = placed.objects;
+    }
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, scannedRoom: room } : p)),
+      selectedObjectId: null,
+      selectedObjectIds: [],
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+    return true;
+  },
+
   setRoomLocked: (locked, selectWallId) => {
     const { activeProjectId, saveCurrentProject, projects, selectedObjectIds } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
@@ -722,7 +801,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const group = proj?.objects.find((o) => o.id === groupId);
     if (!proj || !group?.builtIn) return;
     const id = group.builtIn.id;
-    const objects = proj.objects.filter((o) => o.id !== groupId && o.builtInId !== id && o.parentId !== groupId);
+    const objects = deleteCascade(proj.objects.filter((o) => o.builtInId !== id || o.parentId), [groupId]);
     set((state) => ({
       projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)),
       selectedObjectId: null,
@@ -800,11 +879,23 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }
     }
 
+    // Floor on: resizing keeps a resting part's bottom fixed (grows up) and nothing dips below the floor.
+    const floorOn = proj.showFloor && proj.snapSettings.floorCollision !== false && existingObj.generator !== 'room-scan';
+    if (floorOn && existingObj.shape !== 'group' && (updates.dimensions || updates.rotation) && !updates.position) {
+      const after = { ...existingObj, ...updates } as FurnitureObject;
+      const y = floorSafeY(existingObj, after);
+      if (Math.abs(y - existingObj.position.y) > 1e-6) updates = { ...updates, position: { ...existingObj.position, y } };
+    }
+    if (floorOn && existingObj.shape === 'group' && updates.position) {
+      const dy = floorSafeDy(leavesOf(proj.objects, id), updates.position.y - existingObj.position.y);
+      updates = { ...updates, position: { ...updates.position, y: existingObj.position.y + dy } };
+    }
+
     // Wall-fitted built-ins slide along their wall, flush and on the floor; no free rotation.
     const fittedWall = existingObj.builtIn?.wallId
       ? proj.scannedRoom?.walls.find((w) => w.id === existingObj.builtIn!.wallId)
       : undefined;
-    if (fittedWall && existingObj.builtIn && (updates.position || updates.rotation)) {
+    if (fittedWall && existingObj.builtIn && !existingObj.parentId && (updates.position || updates.rotation)) {
       const { rotation: _ignored, ...rest } = updates;
       void _ignored;
       updates = rest;
@@ -825,8 +916,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       const drz = (updates.rotation?.z ?? existingObj.rotation.z) - existingObj.rotation.z;
       const pivot = existingObj.position;
       const rad = (deg: number) => (deg * Math.PI) / 180;
+      const below = new Set(moveSet(proj.objects, id));
+      below.delete(id);
       updatedObjects = updatedObjects.map((object) => {
-        if (object.parentId !== id) return object;
+        if (!below.has(object.id)) return object;
         let x = object.position.x - pivot.x;
         let y = object.position.y - pivot.y;
         let z = object.position.z - pivot.z;
@@ -866,6 +959,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       });
     }
 
+    // A member changed shape or place: its group boxes follow.
+    if (existingObj.parentId && (updates.position || updates.rotation || updates.dimensions)) {
+      updatedObjects = refitGroups(updatedObjects, [existingObj.parentId]);
+    }
+
     const roomEdit = existingObj.generator === 'room-scan';
     set(state => ({
       projects: state.projects.map(p =>
@@ -885,12 +983,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!proj) return;
 
     const target = proj.objects.find(o => o.id === id);
-    let updatedObjects = proj.objects.filter(o => o.id !== id);
-    if (target?.shape === 'group') {
-      updatedObjects = updatedObjects.map(o =>
-        o.parentId === id ? { ...o, parentId: undefined } : o
-      );
-    }
+    // Deleting a group deletes everything inside it.
+    const updatedObjects = deleteCascade(proj.objects, [id]);
 
     const remaining = get().selectedObjectIds.filter(
       (item) => item !== id && updatedObjects.some((object) => object.id === item)
@@ -906,7 +1000,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       ),
       selectedObjectId: nextSelected,
       selectedObjectIds: nextSelected ? (remaining.length ? remaining : [nextSelected]) : [],
-      editingGroupId: state.editingGroupId === id ? null : state.editingGroupId,
+      editingGroupId: state.editingGroupId && updatedObjects.some((o) => o.id === state.editingGroupId) ? state.editingGroupId : null,
     }));
 
     pushHistoryState();
@@ -916,50 +1010,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   duplicateObject: (id: string) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
-    if (!proj) return;
-
-    const source = proj.objects.find(o => o.id === id);
-    if (!source) return;
-
-    const dupId = `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-    const dup: FurnitureObject = {
-      ...source,
-      id: dupId,
-      name: `${source.name} Copy`,
-      position: {
-        x: source.position.x + 4,
-        y: source.position.y,
-        z: source.position.z + 4
-      }
-    };
-
-    const copies: FurnitureObject[] = [dup];
-    if (source.shape === 'group') {
-      proj.objects.filter((object) => object.parentId === source.id).forEach((child, index) => {
-        copies.push({
-          ...child,
-          id: `${dupId}_c${index}`,
-          parentId: dupId,
-          position: {
-            x: child.position.x + 4,
-            y: child.position.y,
-            z: child.position.z + 4,
-          },
-        });
-      });
-    }
-
-    const updatedObjects = [...proj.objects, ...copies];
-
+    if (!proj || !proj.objects.some((o) => o.id === id)) return;
+    const result = deepDuplicate(proj.objects, [id]);
+    const dupId = result.topIds[0];
     set(state => ({
-      projects: state.projects.map(p =>
-        p.id === activeProjectId ? { ...p, objects: updatedObjects } : p
-      ),
-      selectedObjectId: dup.id,
-      selectedObjectIds: [dup.id],
-      multiSelect: false,
+      projects: state.projects.map(p => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      selectedObjectId: dupId,
+      selectedObjectIds: [dupId],
     }));
-
     pushHistoryState();
     saveCurrentProject();
   },

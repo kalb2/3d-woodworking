@@ -1,6 +1,7 @@
 import type { FurnitureObject, RoomWall, ScannedOpening, ScannedRoom, WoodMaterial } from '../types/furniture';
 import type { WallScanResult } from '../native/wallScan';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
+import { squareUpRoom } from './squareRoom';
 
 /** Tag on every part created from a room scan. */
 export const ROOM_SCAN_TAG = 'room-scan';
@@ -69,7 +70,8 @@ export function roomFromScan(result: WallScanResult): ScannedRoom {
     }));
     return { id: w.id, label: `Wall ${i + 1}`, width: r1(w.width), height: r1(w.height), x: r1(x), z: r1(z), yaw: r1(yaw), openings };
   });
-  return { walls };
+  // Line the room up with the grid and square near-right corners.
+  return squareUpRoom({ walls });
 }
 
 interface Seg { ax: number; az: number; bx: number; bz: number }

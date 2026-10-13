@@ -14,6 +14,9 @@ import {
   Settings,
   Share2,
   SlidersHorizontal,
+  BoxSelect,
+  SquareDashed,
+  TextCursorInput,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -98,6 +101,26 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     useUserTemplates.getState().save(name, parts);
     onClose();
   });
+  const selectArea = useReliableTap(() => {
+    const st = useProjectStore.getState();
+    if (!st.multiSelect) st.toggleMultiSelect();
+    onClose();
+  });
+  const renameSelection = useReliableTap(() => {
+    const st = useProjectStore.getState();
+    const proj = st.projects.find((p) => p.id === st.activeProjectId);
+    const sel = proj?.objects.find((o) => o.id === st.selectedObjectId);
+    if (!sel) return;
+    const name = window.prompt('Rename', sel.name)?.trim();
+    if (name && name !== sel.name) st.updateObject(sel.id, { name });
+    onClose();
+  });
+  const canRename = Boolean(selectedObj && !(selectedObj.generator === 'room-scan'));
+  const squareUp = useReliableTap(() => {
+    if (!window.confirm('Square up walls? Lines the room up with the grid and squares near-right corners. Built-ins on walls follow; other parts stay put.')) return;
+    if (useProjectStore.getState().squareUpWalls()) useBuiltInFlow.getState().requestFrame();
+    onClose();
+  });
   const hasRoom = Boolean(currentProject?.scannedRoom?.walls.length);
   const roomLocked = currentProject?.roomLocked !== false;
   const toggleRoomLock = useReliableTap(() => {
@@ -168,6 +191,16 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
           <span>Built-ins</span>
         </button>
       )}
+      <button type="button" className="phone-sheet-row" data-testid="menu-select-area" onClick={selectArea} onPointerUp={selectArea}>
+        <BoxSelect size={18} />
+        <span>Select area</span>
+      </button>
+      {canRename && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-rename-selection" onClick={renameSelection} onPointerUp={renameSelection}>
+          <TextCursorInput size={18} />
+          <span>Rename {selectedObj?.shape === 'group' ? 'group' : 'part'}</span>
+        </button>
+      )}
       {canSaveTemplate && (
         <button type="button" className="phone-sheet-row" data-testid="menu-save-template" onClick={saveTemplate} onPointerUp={saveTemplate}>
           <BookmarkPlus size={18} />
@@ -188,6 +221,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
             <span>Lock scanned walls</span>
           </span>
           <span className={`menu-switch${roomLocked ? ' is-on' : ''}`} aria-hidden="true"><span /></span>
+        </button>
+      )}
+      {hasRoom && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-square-walls" onClick={squareUp} onPointerUp={squareUp}>
+          <SquareDashed size={18} />
+          <span>Square up walls</span>
         </button>
       )}
       <button type="button" className="phone-sheet-row" data-testid="tool-settings" onClick={settings} onPointerUp={settings}>
