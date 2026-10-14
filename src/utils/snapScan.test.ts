@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FurnitureObject, SnapSettings } from '../types/furniture';
 import { calculateSnappedPosition } from './snapUtils';
 import { roomScanParts } from '../generators/roomScan';
-import { wallOpacityFor, WALL_OPACITY_INSIDE, WALL_OPACITY_THROUGH } from '../components/viewport/RoomScanMesh';
+import { WALL_MATERIAL_PROPS } from '../components/viewport/RoomScanMesh';
 
 const mat = { id: 'oak', name: 'Oak', species: 'oak', baseColor: '#000', secondaryColor: '#000', grainIntensity: 0, grainScale: 1, roughness: 1, metalness: 0, varnishSheen: 'matte' } as FurnitureObject['material'];
 const snap: SnapSettings = { enabled: true, faceSnap: true, gridSnap: false, gridSize: 0.5, floorCollision: true };
@@ -51,9 +51,7 @@ describe('snap against scanned room parts', () => {
 });
 
 describe('scanned walls do not tint parts behind them', () => {
-  it('a wall the camera looks through from outside becomes see-through', () => {
-    expect(wallOpacityFor(50, 4)).toBe(WALL_OPACITY_INSIDE);
-    expect(wallOpacityFor(-50, 4)).toBe(WALL_OPACITY_THROUGH);
-    expect(WALL_OPACITY_THROUGH).toBeLessThan(0.2);
+  it('walls are opaque and write depth, the same from every side (no view-dependent fade)', () => {
+    expect(WALL_MATERIAL_PROPS).toEqual({ transparent: false, opacity: 1, depthWrite: true });
   });
 });

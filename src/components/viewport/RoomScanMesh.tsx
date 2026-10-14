@@ -73,18 +73,12 @@ const WallLabel: React.FC<{ text: string; y: number; z: number; unlocked?: boole
   );
 };
 
-/** Wall opacity when the camera looks at its inside face vs. through it from outside the room. */
-export const WALL_OPACITY_INSIDE = 0.92;
-export const WALL_OPACITY_THROUGH = 0.12;
-
 /**
- * A wall between the camera and the room must not paint everything behind it
- * in wall color: from outside (camera behind the wall's interior face) it
- * becomes a faint see-through pane and stops writing depth.
+ * Scanned walls are solid and look the same from every side: opaque, writing
+ * depth, so parts behind a wall are simply hidden (or seen through a
+ * window/opening) instead of being washed in wall color.
  */
-export function wallOpacityFor(cameraLocalZ: number, wallThickness: number): number {
-  return cameraLocalZ < -wallThickness / 2 ? WALL_OPACITY_THROUGH : WALL_OPACITY_INSIDE;
-}
+export const WALL_MATERIAL_PROPS = { transparent: false, opacity: 1, depthWrite: true } as const;
 
 /** Scanned room part (wall / window / door / opening). Reference only: no wood, no part outline. */
 export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean; unlocked?: boolean; onPointerDown?: (e: any) => void }> = ({ object, focused, unlocked, onPointerDown }) => {
@@ -100,27 +94,14 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
     t.repeat.set(d.length / 16, d.height / 16);
     return t;
   }, [kind, d.length, d.height]);
-  const groupRef = useRef<THREE.Group>(null);
-  const wallMat = useRef<THREE.MeshStandardMaterial>(null);
-  const local = useMemo(() => new THREE.Vector3(), []);
-  useFrame(({ camera }) => {
-    if (kind !== 'wall' || !groupRef.current || !wallMat.current) return;
-    local.copy(camera.position);
-    groupRef.current.worldToLocal(local);
-    const o = wallOpacityFor(local.z, d.width);
-    if (wallMat.current.opacity !== o) {
-      wallMat.current.opacity = o;
-      wallMat.current.depthWrite = o >= WALL_OPACITY_INSIDE;
-    }
-  });
   if (object.visible === false) return null;
 
   const rot: [number, number, number] = [r.x * Math.PI / 180, r.y * Math.PI / 180, r.z * Math.PI / 180];
   const accent = '#e09f3e';
   return (
-    <group ref={groupRef} position={[p.x, p.y, p.z]} rotation={rot}>
+    <group position={[p.x, p.y, p.z]} rotation={rot}>
       <mesh geometry={geometry} onClick={unlocked ? undefined : onPointerDown} onPointerDown={unlocked ? onPointerDown : undefined} receiveShadow={kind === 'wall'} renderOrder={kind === 'wall' ? 0 : 1}>
-        {kind === 'wall' && <meshStandardMaterial ref={wallMat} map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} transparent opacity={WALL_OPACITY_INSIDE} />}
+        {kind === 'wall' && <meshStandardMaterial map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} {...WALL_MATERIAL_PROPS} />}
         {kind === 'window' && <meshStandardMaterial color="#bfe1ff" roughness={0.08} metalness={0.1} transparent opacity={0.45} depthWrite={false} />}
         {kind === 'door' && <meshStandardMaterial color="#e2e8f0" roughness={1} transparent opacity={0.3} depthWrite={false} />}
         {kind === 'opening' && <meshBasicMaterial color="#ffffff" transparent opacity={0.05} depthWrite={false} />}
