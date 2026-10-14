@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bookmark, MoreHorizontal, Tv, X } from 'lucide-react';
+import { Archive, Armchair, Bookmark, BookOpen, MoreHorizontal, PanelTop, Tv, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { BUILT_IN_TEMPLATES } from '../../builtins/builtIns';
@@ -78,7 +78,7 @@ export const TemplatesTab: React.FC<Props> = ({ isPhone, onDone }) => {
         </div>
       )}
       {BUILT_IN_TEMPLATES.map((t) => (
-        <BuiltInRow key={t.id} name={t.name} description={t.description} isPhone={isPhone} onTap={() => openBuiltIn(t.id)} testId={`builtin-${t.id}`} />
+        <BuiltInRow key={t.id} name={t.name} description={t.description} isPhone={isPhone} onTap={() => openBuiltIn(t.id)} testId={`builtin-${t.id}`} icon={t.id} />
       ))}
       <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 10, padding: '0 4px' }}>
         My templates
@@ -90,11 +90,14 @@ export const TemplatesTab: React.FC<Props> = ({ isPhone, onDone }) => {
   );
 };
 
-const BuiltInRow: React.FC<{ name: string; description: string; isPhone: boolean; onTap: () => void; testId: string }> = ({ name, description, isPhone, onTap, testId }) => {
+const ICONS = { 'media-wall': Tv, 'base-cabinet': Archive, 'upper-cabinet': PanelTop, bookshelf: BookOpen, 'window-bench': Armchair } as const;
+
+const BuiltInRow: React.FC<{ name: string; description: string; isPhone: boolean; onTap: () => void; testId: string; icon: keyof typeof ICONS }> = ({ name, description, isPhone, onTap, testId, icon }) => {
+  const Icon = ICONS[icon] ?? Tv;
   const tap = useReliableTap(onTap);
   return (
     <button type="button" className={isPhone ? 'phone-sheet-row' : 'glass-button'} data-testid={testId} onClick={tap} onPointerUp={tap} style={rowStyle(isPhone)}>
-      <Tv size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
+      <Icon size={18} color={isPhone ? '#64748b' : '#e09f3e'} style={{ marginRight: 10, flexShrink: 0 }} />
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
         <span style={{ fontSize: 14, fontWeight: 600 }}>{name}</span>
         <span style={{ fontSize: 11, color: '#9ca3af', textAlign: 'left' }}>{description}</span>

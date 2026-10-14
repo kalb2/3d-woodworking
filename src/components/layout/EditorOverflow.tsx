@@ -128,6 +128,17 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     useProjectStore.getState().setRoomLocked(!roomLocked, roomLocked ? flow.focusWallId : null);
     if (roomLocked && flow.focusWallId) { flow.focusWall(null); onClose(); }
   });
+  // The selected built-in (or the built-in the selected part belongs to): reopen its sizes.
+  const editTarget = (() => {
+    let o = selectedObj;
+    while (o && !o.builtIn) o = o.parentId ? currentProject?.objects.find((x) => x.id === o!.parentId) : undefined;
+    return o?.builtIn ? o : undefined;
+  })();
+  const editTemplate = useReliableTap(() => {
+    if (!editTarget?.builtIn) return;
+    onClose();
+    useBuiltInFlow.getState().startEdit(editTarget.id, editTarget.builtIn.template, editTarget.builtIn.wallId);
+  });
   const hasBuiltIns = Boolean(currentProject?.objects.some((o) => o.shape === 'group' && o.builtIn));
   const builtIns = useReliableTap(() => {
     onClose();
@@ -185,6 +196,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Layers size={18} />
         <span>Cut list</span>
       </button>
+      {editTarget && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-edit-template" onClick={editTemplate} onPointerUp={editTemplate}>
+          <SlidersHorizontal size={18} />
+          <span>Edit template</span>
+        </button>
+      )}
       {hasBuiltIns && (
         <button type="button" className="phone-sheet-row" data-testid="menu-builtins" onClick={builtIns} onPointerUp={builtIns}>
           <Tv size={18} />

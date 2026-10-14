@@ -124,7 +124,7 @@ export interface FurnitureObject {
   openingId?: string;
 }
 
-export type BuiltInTemplateId = 'media-wall';
+export type BuiltInTemplateId = 'media-wall' | 'base-cabinet' | 'upper-cabinet' | 'bookshelf' | 'window-bench';
 
 export interface BuiltInInfo {
   id: string;

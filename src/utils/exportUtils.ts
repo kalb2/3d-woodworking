@@ -1,6 +1,7 @@
 import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
 import { buildSharePayload } from './share';
+import { unitScale } from './units';
 
 export interface CutListItem {
   id: string;
@@ -13,35 +14,72 @@ export interface CutListItem {
   quantity: number;
 }
 
+const BOX_SHAPES = new Set(['board', 'cube', 'cushion', 'bevel_top', 'wedge']);
+
+/** Stored inches shown in the project unit: clean decimals (0.75, 23.25, 19.05 cm). */
+export function formatCutSize(inches: number, unit: FurnitureProject['unit']): string {
+  const v = inches * unitScale(unit);
+  const digits = unit === 'mm' ? 0 : unit === 'ft' ? 3 : unit === 'cm' ? 1 : 3;
+  const n = Number(v.toFixed(digits));
+  return `${n} ${unit}`;
+}
+
+/**
+ * Stock to cut: every visible part (boards, sheets, blocks; parts inside
+ * nested groups included, groups themselves skipped), excluding scanned room
+ * and reference parts. Box parts are listed as length × width × thickness
+ * (largest to smallest, so a board lying flat or standing on edge merges).
+ * Identical parts merge with a quantity; sorted by material, then size.
+ */
 export function generateCutList(project: FurnitureProject): CutListItem[] {
-  const map = new Map<string, CutListItem>();
+  const map = new Map<string, CutListItem & { sortKey: number[] }>();
+  const unit = project.unit;
 
   for (const obj of project.objects) {
-    if (!obj.visible) continue;
+    if (obj.visible === false) continue;
     if (obj.shape === 'group') continue; // a group is a container, not stock
     if (obj.reference || obj.generator === 'room-scan') continue; // scanned room / reference walls
 
-    const unit = project.unit;
-    const key = `${obj.shape}_${obj.dimensions.length}_${obj.dimensions.width}_${obj.dimensions.height}_${obj.material.name}`;
+    const d = obj.dimensions;
+    const r4 = (n: number) => Math.round(n * 10000) / 10000;
+    const [a, b, c] = BOX_SHAPES.has(obj.shape)
+      ? [d.length, d.width, d.height].map(r4).sort((x, y) => y - x)
+      : [d.length, d.width, d.height].map(r4);
+    const materialName = obj.material?.name ?? 'Unknown';
+    const key = `${obj.shape}_${a}_${b}_${c}_${materialName}`;
 
-    if (map.has(key)) {
-      const item = map.get(key)!;
-      item.quantity += 1;
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += 1;
     } else {
       map.set(key, {
         id: obj.id,
         name: obj.name,
         shape: shapeLabel(obj.shape),
-        length: `${obj.dimensions.length.toFixed(1)} ${unit}`,
-        width: `${obj.dimensions.width.toFixed(1)} ${unit}`,
-        height: `${obj.dimensions.height.toFixed(1)} ${unit}`,
-        material: obj.material.name,
-        quantity: 1
+        length: formatCutSize(a, unit),
+        width: formatCutSize(b, unit),
+        height: formatCutSize(c, unit),
+        material: materialName,
+        quantity: 1,
+        sortKey: [a, b, c],
       });
     }
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values())
+    .sort((x, y) => x.material.localeCompare(y.material) || y.sortKey[2] - x.sortKey[2] || y.sortKey[0] - x.sortKey[0] || y.sortKey[1] - x.sortKey[1])
+    .map(({ sortKey: _s, ...item }) => item);
+}
+
+/** Cut list rows grouped by material, in list order. */
+export function cutListByMaterial(items: CutListItem[]): { material: string; items: CutListItem[] }[] {
+  const out: { material: string; items: CutListItem[] }[] = [];
+  for (const it of items) {
+    const last = out[out.length - 1];
+    if (last && last.material === it.material) last.items.push(it);
+    else out.push({ material: it.material, items: [it] });
+  }
+  return out;
 }
 
 export function downloadFile(filename: string, content: string, contentType: string) {
@@ -58,7 +96,7 @@ export function downloadFile(filename: string, content: string, contentType: str
 
 export function exportCutListCSV(project: FurnitureProject) {
   const items = generateCutList(project);
-  let csv = 'Name,Shape,Length,Width,Height,Material,Quantity\n';
+  let csv = 'Name,Shape,Length,Width,Thickness,Material,Quantity\n';
   
   for (const item of items) {
     csv += `"${item.name}","${item.shape}","${item.length}","${item.width}","${item.height}","${item.material}",${item.quantity}\n`;
