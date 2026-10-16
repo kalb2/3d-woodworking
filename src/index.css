@@ -3090,3 +3090,21 @@ html, body, #root {
   font-size: 14px;
 }
 .turn90-btn:active .turn90-figure { background: #f1f5f9; }
+
+.pushpull-readout { padding: 4px 12px; }
+.pushpull-unit { font-size: 13px; font-weight: 600; color: #64748b; }
+
+.dim-label {
+  padding: 2px 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+}
+.dim-label.is-selected { background: #fff7ed; }

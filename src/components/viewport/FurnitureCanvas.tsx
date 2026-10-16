@@ -15,6 +15,9 @@ import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
 import { SnapHighlight } from './SnapHighlight';
+import { MeasureLayer } from '../../measure/MeasureLayer';
+import { useMeasure } from '../../measure/useMeasure';
+import { snapMeasurePoint } from '../../utils/measure';
 
 /** Soft contact blob. Hidden with Floor off, and whenever the camera is under the ground. */
 const GroundContactShadow: React.FC = () => {
@@ -148,6 +151,7 @@ export const FurnitureCanvas: React.FC = () => {
   const orbitControlsRef = useRef<any>(null);
   const currentProject = projects.find(p => p.id === activeProjectId);
 
+  const measuring = useMeasure((m) => m.active);
   if (!currentProject) return null;
 
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
@@ -189,7 +193,20 @@ export const FurnitureCanvas: React.FC = () => {
     if (e.target === e.currentTarget) clearSelection();
   };
 
-  const handleRoomWallPick = (event: any, obj: { wallId?: string; name: string }) => {
+  /** Tape measure: a tap on a part (or scanned wall) records a snapped point. */
+  const measureTap = (event: any, objId: string): boolean => {
+    if (!useMeasure.getState().active) return false;
+    event.stopPropagation();
+    if (!event.point) return true;
+    const part = currentProject.objects.find((o) => o.id === objId);
+    // Snap radius grows with distance so it feels the same on screen (~5% of view depth).
+    const tol = Math.max(0.4, (event.distance ?? 50) * 0.05);
+    useMeasure.getState().tap(snapMeasurePoint(event.point, part && part.shape !== 'group' ? part : undefined, tol));
+    return true;
+  };
+
+  const handleRoomWallPick = (event: any, obj: { id?: string; wallId?: string; name: string }) => {
+    if (obj.id && measureTap(event, obj.id)) return;
     event.stopPropagation();
     const walls = currentProject.scannedRoom?.walls ?? [];
     const wall = walls.find((w) => w.id === obj.wallId) ?? walls.find((w) => `${w.label} (scan)` === obj.name);
@@ -201,7 +218,9 @@ export const FurnitureCanvas: React.FC = () => {
   };
 
   const handlePartPointerDown = (event: any, objId: string) => {
+    if (measureTap(event, objId)) return;
     event.stopPropagation();
+    if (useMeasure.getState().selectedId) useMeasure.getState().select(null);
     if (useBuiltInFlow.getState().focusWallId) useBuiltInFlow.getState().focusWall(null);
     const obj = currentProject.objects.find((item) => item.id === objId);
     if (!obj) return;
@@ -290,6 +309,7 @@ export const FurnitureCanvas: React.FC = () => {
         <CameraFocus />
         <ProjectorBridge />
         <SnapHighlight />
+        <MeasureLayer />
         <TrackTarget />
         <AutoFrame projectId={currentProject.id} />
 
@@ -324,7 +344,7 @@ export const FurnitureCanvas: React.FC = () => {
         })()}
 
         {/* Active Selected Object Controls */}
-        {selectedObject && !holeEdit.editing && !multiSelect && (
+        {selectedObject && !holeEdit.editing && !multiSelect && !measuring && (
           <>
             {/* Direct 3D grab & drag resize handles */}
             {activeGizmoMode === 'resize' && (

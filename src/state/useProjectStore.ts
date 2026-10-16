@@ -7,7 +7,7 @@ import { squareUpRoom } from '../generators/squareRoom';
 import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
-import type { FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import type { Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
@@ -184,6 +184,9 @@ interface ProjectState {
   /** Lock/unlock the scanned room's walls for editing (per project). */
   /** When unlocking with `selectWallId`, that wall's part becomes the selection (ready for Move/Delete). */
   setRoomLocked: (locked: boolean, selectWallId?: string | null) => void;
+  /** Pin a tape-measure dimension line in the active project. Returns its id. */
+  addMeasurement: (a: Position3D, b: Position3D) => string | null;
+  removeMeasurement: (id: string) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -774,6 +777,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     pushHistoryState();
     saveCurrentProject();
     return true;
+  },
+
+  addMeasurement: (a, b) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    if (!activeProjectId) return null;
+    const id = `dim_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, measurements: [...(p.measurements ?? []), { id, a: { ...a }, b: { ...b } }] } : p)) }));
+    saveCurrentProject();
+    return id;
+  },
+  removeMeasurement: (id) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, measurements: (p.measurements ?? []).filter((m) => m.id !== id) } : p)) }));
+    saveCurrentProject();
   },
 
   setRoomLocked: (locked, selectWallId) => {

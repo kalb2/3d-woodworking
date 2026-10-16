@@ -193,6 +193,14 @@ export interface FurnitureProject {
   scannedRoom?: ScannedRoom;
   /** Scanned walls are locked (not selectable) unless this is explicitly false. */
   roomLocked?: boolean;
+  /** Pinned tape-measure dimension lines (world inches). */
+  measurements?: PinnedMeasurement[];
+}
+
+export interface PinnedMeasurement {
+  id: string;
+  a: Position3D;
+  b: Position3D;
 }
 
 export type TemplateCategory = 'Blocks' | 'Boards' | 'Rounds' | 'Layouts';

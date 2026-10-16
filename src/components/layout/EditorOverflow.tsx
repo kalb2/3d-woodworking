@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   BoxSelect,
   SquareDashed,
+  Ruler,
   TextCursorInput,
 } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
@@ -23,6 +24,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { useMeasure } from '../../measure/useMeasure';
 import { isWallScanSupported, scanWalls } from '../../native/wallScan';
 import { roomFromScan } from '../../generators/roomScan';
 import { partsFromSelection, useUserTemplates } from '../../templates/userTemplates';
@@ -100,6 +102,11 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     if (name === null) return;
     useUserTemplates.getState().save(name, parts);
     onClose();
+  });
+  const measure = useReliableTap(() => {
+    onClose();
+    useProjectStore.getState().selectObject(null);
+    useMeasure.getState().start();
   });
   const selectArea = useReliableTap(() => {
     const st = useProjectStore.getState();
@@ -208,6 +215,10 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
           <span>Built-ins</span>
         </button>
       )}
+      <button type="button" className="phone-sheet-row" data-testid="menu-measure" onClick={measure} onPointerUp={measure}>
+        <Ruler size={18} />
+        <span>Measure</span>
+      </button>
       <button type="button" className="phone-sheet-row" data-testid="menu-select-area" onClick={selectArea} onPointerUp={selectArea}>
         <BoxSelect size={18} />
         <span>Select area</span>
