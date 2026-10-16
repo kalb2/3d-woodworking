@@ -3108,3 +3108,15 @@ html, body, #root {
   pointer-events: auto;
 }
 .dim-label.is-selected { background: #fff7ed; }
+
+/* Tape measure: big, screen-space markers and labels */
+.dim-end { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(15,23,42,0.35); }
+.dim-label { font-size: 15px !important; min-height: 44px; min-width: 44px; padding: 0 14px !important; display: inline-flex; align-items: center; justify-content: center; border-width: 2px !important; background: #fff; }
+.snap-marker-wrap { position: relative; width: 26px; height: 26px; }
+.snap-marker { position: absolute; inset: 0; box-sizing: border-box; border: 3px solid #f97316; background: rgba(249,115,22,0.18); }
+.snap-marker.is-vertex { border-radius: 3px; }
+.snap-marker.is-midpoint { transform: rotate(45deg) scale(0.85); border-radius: 2px; }
+.snap-marker.is-face { border-radius: 50%; }
+.snap-marker.is-surface, .snap-marker.is-floor { border-radius: 50%; inset: 7px; border-width: 2px; }
+.snap-chip { position: absolute; left: 32px; top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 3px 8px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 12px; font-weight: 700; }
+.measure-tip { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; max-width: 520px; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(15,23,42,0.12); font-size: 13px; color: #334155; line-height: 1.35; }

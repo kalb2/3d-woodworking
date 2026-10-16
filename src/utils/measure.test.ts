@@ -29,3 +29,18 @@ describe('tape measure', () => {
     expect(formatLength(24, 'mm')).toBe('610 mm');
   });
 });
+
+describe('tape measure guidance', async () => {
+  const { measureStepText, snapFloorPoint, SNAP_LABEL } = await import('./measure');
+  it('step text walks through 1 of 2, 2 of 2, then the distance', () => {
+    const a = { x: 0, y: 0, z: 0, kind: 'vertex' as const };
+    const b = { x: 23.25, y: 0, z: 0, kind: 'face' as const };
+    expect(measureStepText(null, null, 'in')).toBe('Step 1 of 2: Tap where to measure from');
+    expect(measureStepText(a, null, 'in')).toBe('Step 2 of 2: Tap where to measure to');
+    expect(measureStepText(a, b, 'in')).toBe('Distance 23 1/4 in');
+  });
+  it('empty floor snaps to the grid at y = 0; snap labels', () => {
+    expect(snapFloorPoint({ x: 3.2, z: -7.8 }, 0.5)).toEqual({ x: 3, y: 0, z: -8, kind: 'floor' });
+    expect([SNAP_LABEL.vertex, SNAP_LABEL.midpoint, SNAP_LABEL.face]).toEqual(['Corner', 'Edge middle', 'Face center']);
+  });
+});

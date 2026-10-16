@@ -1,7 +1,7 @@
 import type { FurnitureObject, Position3D } from '../types/furniture';
 import { boxCorners } from '../state/groupTree';
 
-export type SnapKind = 'vertex' | 'midpoint' | 'face' | 'surface';
+export type SnapKind = 'vertex' | 'midpoint' | 'face' | 'surface' | 'floor';
 export interface MeasurePoint extends Position3D { kind: SnapKind }
 
 /** Corners, edge midpoints and face centers of a box part (world). */
@@ -30,7 +30,7 @@ const dist = (a: Position3D, b: Position3D) => Math.hypot(a.x - b.x, a.y - b.y, 
  */
 export function snapMeasurePoint(hit: Position3D, part: FurnitureObject | undefined, tol: number): MeasurePoint {
   if (!part) return { ...hit, kind: 'surface' };
-  const rank: Record<SnapKind, number> = { vertex: 0, midpoint: 1, face: 2, surface: 3 };
+  const rank: Record<SnapKind, number> = { vertex: 0, midpoint: 1, face: 2, surface: 3, floor: 4 };
   let best: MeasurePoint | null = null;
   let bestScore = Infinity;
   for (const c of snapCandidates(part)) {
@@ -58,4 +58,20 @@ export function formatLength(inches: number, unit: 'in' | 'ft' | 'cm' | 'mm'): s
     return `${ft ? `${ft}' ` : ''}${inch || !ft || frac ? `${inch}${frac ? ` ${frac}` : ''}"` : ''}`.trim();
   }
   return `${whole || !frac ? whole : ''}${whole && frac ? ' ' : ''}${frac} in`;
+}
+
+/** A point on the empty floor (y = 0), snapped to the grid step. */
+export function snapFloorPoint(p: { x: number; z: number }, step: number): MeasurePoint {
+  const s = step > 0 ? step : 0.5;
+  const r = (n: number) => { const v = Math.round(n / s) * s; return Math.round(v * 10000) / 10000 || 0; };
+  return { x: r(p.x), y: 0, z: r(p.z), kind: 'floor' };
+}
+
+export const SNAP_LABEL: Record<SnapKind, string> = { vertex: 'Corner', midpoint: 'Edge middle', face: 'Face center', surface: 'Surface', floor: 'Floor' };
+
+/** Top-bar text for each step of the tape measure. */
+export function measureStepText(a: MeasurePoint | null, b: MeasurePoint | null, unit: 'in' | 'ft' | 'cm' | 'mm'): string {
+  if (!a) return 'Step 1 of 2: Tap where to measure from';
+  if (!b) return 'Step 2 of 2: Tap where to measure to';
+  return `Distance ${formatLength(dist(a, b), unit)}`;
 }
