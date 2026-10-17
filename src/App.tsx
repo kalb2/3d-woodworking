@@ -25,6 +25,7 @@ import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
 import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { ShareSheet } from './components/share/ShareSheet';
+import { JoinSheet } from './joinery/JoinSheet';
 
 export const App: React.FC = () => {
   useUndoShortcuts();
@@ -146,6 +147,7 @@ export const App: React.FC = () => {
       <TransformMenu />
 
       <BuiltInSheet />
+      <JoinSheet />
       <MeasureOrGroupBar />
       <HoleModeBar />
 
