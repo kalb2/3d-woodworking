@@ -2,6 +2,8 @@ import type { BuiltInInfo, BuiltInTemplateId, FurnitureObject, RoomWall, Scanned
 import { generateMediaWall, MEDIA_WALL_DEFAULTS, MEDIA_WALL_TAG, type MediaWallInput, type MediaWallPart } from '../generators/mediaWall';
 import { fitMediaWall } from '../generators/fitMediaWall';
 import { wallFrame, wallToWorld } from '../generators/roomScan';
+import { fitModule, generateModule, MODULES, type ModuleField, type ModuleId } from '../generators/modules';
+import type { Span } from '../generators/fitMediaWall';
 
 type Part = Omit<FurnitureObject, 'id'>;
 type Input = Record<string, number | string>;
@@ -13,9 +15,12 @@ export interface BuiltInTemplate {
   tag: string;
   defaults: Input;
   /** Parts in wall-local coords plus the fitted center/width. */
-  fit: (input: Input, wall: RoomWall, opts: { width?: number; center?: number }) => { parts: Part[]; center: number; width: number };
+  fit: (input: Input, wall: RoomWall, opts: { width?: number; center?: number; occupied?: Span[] }) => { parts: Part[]; center: number; width: number; input?: Input };
   /** Free-standing parts at the origin (manual flow). */
   free: (input: Input) => Part[];
+  /** Parametric modules: generic form fields, and the row they line up in on a wall. */
+  fields?: ModuleField[];
+  tier?: 'base' | 'upper';
 }
 
 /** Registry: add new built-in templates here. */
@@ -29,6 +34,17 @@ export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
     fit: (input, wall, opts) => fitMediaWall(input as unknown as MediaWallInput, wall, opts),
     free: (input) => generateMediaWall(input as unknown as MediaWallInput) as MediaWallPart[],
   },
+  ...MODULES.map((m): BuiltInTemplate => ({
+    id: m.id,
+    name: m.name,
+    description: m.description,
+    tag: m.id,
+    defaults: { ...m.defaults },
+    fields: m.fields,
+    tier: m.tier,
+    fit: (input, wall, opts) => fitModule(m.id as ModuleId, input, wall, { center: opts.center, occupied: opts.occupied }),
+    free: (input) => generateModule(m.id as ModuleId, input),
+  })),
 ];
 
 export const findBuiltInTemplate = (id: BuiltInTemplateId) => BUILT_IN_TEMPLATES.find((t) => t.id === id);
@@ -79,14 +95,18 @@ export function placeBuiltIn(
   let size: { length: number; height: number; width: number };
   let info: BuiltInInfo;
   if (wall) {
-    const fit = template.fit(req.input, wall, { width: req.width, center: req.center });
+    // Modules line up after same-tier modules already on this wall.
+    const occupied: Span[] = template.tier ? objects.filter((g) => g.shape === 'group' && g.builtIn?.wallId === wall.id && g.builtIn.id !== req.editId
+      && findBuiltInTemplate(g.builtIn.template)?.tier === template.tier && typeof g.builtIn.center === 'number')
+      .map((g) => { const w = Number(g.builtIn!.input.wallWidth ?? g.builtIn!.input.width ?? g.dimensions.length); return { x0: g.builtIn!.center! - w / 2, x1: g.builtIn!.center! + w / 2 }; }) : [];
+    const fit = template.fit(req.input, wall, { width: req.width, center: req.center, occupied });
     if (fit.parts.length === 0) return null;
     const b = bounds(fit.parts);
     size = b.size;
     groupPos = wallToWorld(wall, b.center);
     groupRotY = wall.yaw;
     parts = fit.parts.map((p) => ({ ...p, position: wallToWorld(wall, p.position), rotation: { ...p.rotation, y: p.rotation.y + wall.yaw } }));
-    info = { id, template: template.id, wallId: wall.id, center: fit.center, input: { ...req.input, wallWidth: fit.width } };
+    info = { id, template: template.id, wallId: wall.id, center: fit.center, input: { ...(fit.input ?? req.input), wallWidth: fit.width } };
   } else {
     parts = template.free(req.input);
     if (parts.length === 0) return null;

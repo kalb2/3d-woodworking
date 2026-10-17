@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { generateCutList, exportCutListCSV } from '../../utils/exportUtils';
+import { generateCutList, exportCutListCSV, cutListByMaterial } from '../../utils/exportUtils';
 
 interface CutListDrawerProps {
   isOpen: boolean;
@@ -76,9 +76,9 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#e09f3e' }}>
                 <th style={{ padding: '10px 12px' }}>Part</th>
                 <th style={{ padding: '10px 12px' }}>Shape</th>
-                <th style={{ padding: '10px 12px' }}>Length (X)</th>
-                <th style={{ padding: '10px 12px' }}>Width (Z)</th>
-                <th style={{ padding: '10px 12px' }}>Thickness (Y)</th>
+                <th style={{ padding: '10px 12px' }}>Length</th>
+                <th style={{ padding: '10px 12px' }}>Width</th>
+                <th style={{ padding: '10px 12px' }}>Thickness</th>
                 <th style={{ padding: '10px 12px' }}>Material Finish</th>
                 <th style={{ padding: '10px 12px' }}>Qty</th>
               </tr>
@@ -91,16 +91,25 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
                   </td>
                 </tr>
               ) : (
-                cutList.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{item.name}</td>
-                    <td style={{ padding: '10px 12px', color: '#9ca3af' }}>{item.shape}</td>
-                    <td style={{ padding: '10px 12px', color: '#ef4444' }}>{item.length}</td>
-                    <td style={{ padding: '10px 12px', color: '#3b82f6' }}>{item.width}</td>
-                    <td style={{ padding: '10px 12px', color: '#10b981' }}>{item.height}</td>
-                    <td style={{ padding: '10px 12px' }}>{item.material}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#e09f3e' }}>{item.quantity}</td>
-                  </tr>
+                cutListByMaterial(cutList).map((g) => (
+                  <React.Fragment key={g.material}>
+                    <tr data-testid="cut-material-row">
+                      <td colSpan={7} style={{ padding: '14px 12px 6px', fontWeight: 700, color: '#e09f3e' }}>
+                        {g.material} · {g.items.reduce((n, it) => n + it.quantity, 0)} pcs
+                      </td>
+                    </tr>
+                    {g.items.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{item.name}</td>
+                        <td style={{ padding: '10px 12px', color: '#9ca3af' }}>{item.shape}</td>
+                        <td style={{ padding: '10px 12px' }}>{item.length}</td>
+                        <td style={{ padding: '10px 12px' }}>{item.width}</td>
+                        <td style={{ padding: '10px 12px' }}>{item.height}</td>
+                        <td style={{ padding: '10px 12px' }}>{item.material}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#e09f3e' }}>{item.quantity}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))
               )}
             </tbody>

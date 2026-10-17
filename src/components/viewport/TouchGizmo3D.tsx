@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { calculateSnappedPosition } from '../../utils/snapUtils';
+import { moveSet } from '../../state/groupTree';
 import { clearSnapHighlight, useSnapHighlight } from './SnapHighlight';
 import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
 import { RotateDegreePill } from '../layout/SizeBar';
@@ -203,7 +204,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
             object,
             newPos,
             // Snap to parts, not group boxes (a part's own group would trap it).
-            currentProject.objects.filter((o) => o.shape !== 'group'),
+            // ...and never to the mover's own contents (moving a whole module).
+            (() => { const own = moveSet(currentProject.objects, object.id); return currentProject.objects.filter((o) => o.shape !== 'group' && !own.has(o.id)); })(),
             currentProject.snapSettings
           );
           updateObject(object.id, { position: snapResult.position }, true);
