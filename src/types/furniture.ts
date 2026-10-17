@@ -195,6 +195,8 @@ export interface FurnitureProject {
   roomLocked?: boolean;
   /** Pinned tape-measure dimension lines (world inches). */
   measurements?: PinnedMeasurement[];
+  /** Joinery between two parts (receiver gets the cut). */
+  joints?: Joint[];
 }
 
 export interface PinnedMeasurement {
@@ -214,4 +216,24 @@ export interface PresetTemplate {
   featured?: boolean;
   author?: string;
   objects: Omit<FurnitureObject, 'id'>[];
+}
+
+export type JointType = 'butt' | 'dado' | 'rabbet' | 'pocket' | 'dowel';
+
+/** A joint between two touching box parts, stored as a relation. */
+export interface Joint {
+  id: string;
+  type: JointType;
+  /** Part whose face the other part meets (gets the groove / face dowel holes). */
+  receiverId: string;
+  /** Part that meets it with an end or edge (gets pocket holes, grows into a groove). */
+  materId: string;
+  /** Receiver's local face that is touched ('+x' … '-z'). */
+  face: '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
+  /** Groove depth (dado/rabbet). */
+  depth: number;
+  /** How far the mating part was lengthened into the groove (undone on edit/remove). */
+  extended: number;
+  /** Pocket screw / dowel spacing (inches). */
+  spacing?: number;
 }

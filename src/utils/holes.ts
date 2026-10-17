@@ -228,3 +228,35 @@ export function describeHole(h: BoardHole, unit: string, scale: number): string 
     : `Round Ø ${c(h.diameter)} ${unit}`;
   return `${size} · ${face[0].toUpperCase() + face.slice(1)}${h.depth !== undefined ? ` · ${c(h.depth)} deep` : ''}`;
 }
+
+/** Subtract joinery cutters (grooves, dowel/pocket holes) given in part-local space. */
+export function cutSolids(base: THREE.BufferGeometry, cutters: import('../joinery/joints').Cutter[]): THREE.BufferGeometry {
+  if (!cutters.length) return base;
+  try {
+    evaluator ??= new Evaluator();
+    evaluator.attributes = ['position', 'normal', 'uv'];
+    evaluator.useGroups = false;
+    const src = base.index ? base.toNonIndexed() : base.clone();
+    if (!src.getAttribute('uv')) {
+      src.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(src.getAttribute('position').count * 2), 2));
+    }
+    let result = new Brush(src);
+    result.updateMatrixWorld(true);
+    for (const c of cutters) {
+      const g = c.kind === 'box'
+        ? new THREE.BoxGeometry(...c.size)
+        : new THREE.CylinderGeometry(c.radius, c.radius, c.depth, 24);
+      const brush = new Brush(g.index ? g.toNonIndexed() : g);
+      brush.position.set(...c.center);
+      if (c.kind === 'cyl') brush.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...c.axis).normalize());
+      brush.updateMatrixWorld(true);
+      result = evaluator.evaluate(result, brush, SUBTRACTION);
+    }
+    const out = result.geometry;
+    out.computeVertexNormals();
+    return out;
+  } catch (err) {
+    console.warn('Joint cut failed', err);
+    return base;
+  }
+}

@@ -6,6 +6,8 @@ import { findBuiltInTemplate } from '../../builtins/builtIns';
 import { pathTo } from '../../state/groupTree';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
+import { pairContact } from '../../joinery/joints';
+import { useJoinFlow } from '../../joinery/useJoinFlow';
 
 const groupLabel = (g: FurnitureObject) => (g.builtIn ? findBuiltInTemplate(g.builtIn.template)?.name ?? g.name : g.name);
 
@@ -41,12 +43,18 @@ export const GroupBar: React.FC = () => {
   const count = s.selectedObjectIds.length;
   const selected = s.selectedObjectId ? byId.get(s.selectedObjectId) : undefined;
 
+  // Exactly two touching boards: offer Join (dado, rabbet, pocket screws, dowels).
+  const pair = count === 2 ? s.selectedObjectIds.map((id) => byId.get(id)) : [];
+  const canJoin = count === 2 && Boolean(pairContact(pair[0], pair[1]));
+  const join = () => useJoinFlow.getState().start(s.selectedObjectIds[0], s.selectedObjectIds[1]);
+
   let bar: React.ReactNode = null;
   if (s.multiSelect) {
     bar = (
       <div className="group-bar" data-testid="select-bar">
         <span className="group-bar-label">{count ? `${count} selected` : 'Drag to select'}</span>
         {count >= 2 && <Btn label="Group" testId="select-group" tone="primary" onTap={s.groupSelected} />}
+        {canJoin && <Btn label="Join" testId="select-join" onTap={join} />}
         {count > 0 && <Btn label="Duplicate" testId="select-duplicate" onTap={s.duplicateSelected} />}
         {count > 0 && <Btn label="Delete" testId="select-delete" tone="danger" onTap={s.deleteSelected} />}
         <Btn label="Done" testId="select-done" onTap={s.toggleMultiSelect} />
@@ -57,6 +65,7 @@ export const GroupBar: React.FC = () => {
       <div className="group-bar" data-testid="multi-bar">
         <span className="group-bar-label">{count} selected</span>
         <Btn label="Group" testId="multi-group" tone="primary" onTap={s.groupSelected} />
+        {canJoin && <Btn label="Join" testId="multi-join" onTap={join} />}
         <Btn label="Clear" testId="multi-clear" onTap={() => s.selectObject(null)} />
       </div>
     );

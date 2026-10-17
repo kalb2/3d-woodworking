@@ -18,7 +18,10 @@ import {
   SquareDashed,
   Ruler,
   TextCursorInput,
+  Link2,
 } from 'lucide-react';
+import { jointsOf } from '../../joinery/joints';
+import { useJoinFlow } from '../../joinery/useJoinFlow';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
@@ -151,6 +154,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onClose();
     useBuiltInFlow.getState().openList();
   });
+  const jointCount = jointsOf(currentProject, selectedObjectId).length;
+  const joints = useReliableTap(() => {
+    if (!selectedObjectId) return;
+    onClose();
+    useJoinFlow.getState().list(selectedObjectId);
+  });
   const properties = useReliableTap(() => {
     if (!useProjectStore.getState().selectedObjectId) return;
     openOverlay('inspector', true);
@@ -262,6 +271,12 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Settings size={18} />
         <span>Settings</span>
       </button>
+      {jointCount > 0 && (
+        <button type="button" className="phone-sheet-row" data-testid="menu-joints" onClick={joints} onPointerUp={joints}>
+          <Link2 size={18} />
+          <span>Joints ({jointCount})</span>
+        </button>
+      )}
       <button type="button" className="phone-sheet-row" data-testid="overlay-launch-properties" disabled={!selectedObjectId} onClick={properties} onPointerUp={properties}>
         <SlidersHorizontal size={18} />
         <span>Properties</span>

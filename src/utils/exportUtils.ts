@@ -2,6 +2,8 @@ import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
 import { buildSharePayload } from './share';
 import { unitScale } from './units';
+import { jointHardware, jointNotes } from '../joinery/joints';
+export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
   id: string;
@@ -12,6 +14,8 @@ export interface CutListItem {
   height: string;
   material: string;
   quantity: number;
+  /** Joinery on this part, e.g. 'dado 3/4 x 1/4 @ 12"'. */
+  notes?: string;
 }
 
 const BOX_SHAPES = new Set(['board', 'cube', 'cushion', 'bevel_top', 'wedge']);
@@ -34,6 +38,7 @@ export function formatCutSize(inches: number, unit: FurnitureProject['unit']): s
 export function generateCutList(project: FurnitureProject): CutListItem[] {
   const map = new Map<string, CutListItem & { sortKey: number[] }>();
   const unit = project.unit;
+  const notesById = jointNotes(project);
 
   for (const obj of project.objects) {
     if (obj.visible === false) continue;
@@ -46,7 +51,8 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
       ? [d.length, d.width, d.height].map(r4).sort((x, y) => y - x)
       : [d.length, d.width, d.height].map(r4);
     const materialName = obj.material?.name ?? 'Unknown';
-    const key = `${obj.shape}_${a}_${b}_${c}_${materialName}`;
+    const notes = (notesById.get(obj.id) ?? []).join('; ');
+    const key = `${obj.shape}_${a}_${b}_${c}_${materialName}_${notes}`;
 
     const existing = map.get(key);
     if (existing) {
@@ -61,6 +67,7 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
         height: formatCutSize(c, unit),
         material: materialName,
         quantity: 1,
+        ...(notes ? { notes } : {}),
         sortKey: [a, b, c],
       });
     }
@@ -96,10 +103,15 @@ export function downloadFile(filename: string, content: string, contentType: str
 
 export function exportCutListCSV(project: FurnitureProject) {
   const items = generateCutList(project);
-  let csv = 'Name,Shape,Length,Width,Thickness,Material,Quantity\n';
-  
+  const q = (t: string) => `"${t.replace(/"/g, '""')}"`;
+  let csv = 'Name,Shape,Length,Width,Thickness,Material,Quantity,Joinery\n';
   for (const item of items) {
-    csv += `"${item.name}","${item.shape}","${item.length}","${item.width}","${item.height}","${item.material}",${item.quantity}\n`;
+    csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${item.quantity},${q(item.notes ?? '')}\n`;
+  }
+  const hardware = jointHardware(project);
+  if (hardware.length) {
+    csv += '\nHardware,,,,,,Quantity\n';
+    for (const h of hardware) csv += `${q(h.name)},,,,,,${h.quantity}\n`;
   }
 
   downloadFile(`${project.name.toLowerCase().replace(/\s+/g, '_')}_cut_list.csv`, csv, 'text/csv');
