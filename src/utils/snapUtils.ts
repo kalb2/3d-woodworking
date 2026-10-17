@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { FurnitureObject, Position3D, SnapSettings } from '../types/furniture';
+import { boxCorners } from '../state/groupTree';
 
 export function getBoundingBox(obj: FurnitureObject): THREE.Box3 {
   const halfX = obj.dimensions.length / 2;
@@ -30,7 +31,68 @@ export interface SnapResult {
 }
 
 /** The `side` face of `targetId`'s box on `axis` (plane at `value`); the mover touches it with its opposite face. */
-export interface SnapContact { targetId: string; axis: 'x' | 'y' | 'z'; side: 'min' | 'max'; value: number }
+export interface SnapContact {
+  targetId: string;
+  axis: 'x' | 'y' | 'z';
+  side: 'min' | 'max';
+  value: number;
+  /** Set for turned targets (e.g. scanned walls): axis/value are in the target's own frame (yaw degrees about its center). */
+  yaw?: number;
+}
+
+const SNAP_DIST = 1.2;
+const isScan = (o: FurnitureObject) => o.generator === 'room-scan';
+const near0 = (d: number) => Math.abs(((d % 360) + 360) % 360) < 1e-6 || Math.abs((((d % 360) + 360) % 360) - 360) < 1e-6;
+
+/**
+ * Snap against a target in its own (yaw-turned) frame: scanned walls and
+ * openings, or any part turned about Y. Scanned targets only pull when the
+ * mover actually overlaps them along the face (a wall is a big plane; it must
+ * not grab parts across the room).
+ */
+function snapToTurned(
+  mover: FurnitureObject,
+  pos: Position3D,
+  target: FurnitureObject,
+  found: Partial<Record<'x' | 'y' | 'z', SnapContact>>,
+): Position3D | null {
+  const yaw = target.rotation.y;
+  const t = (yaw * Math.PI) / 180;
+  const c = Math.cos(t), sn = Math.sin(t);
+  // world -> local: rotate by -yaw about Y (three.js: x' = x cos + z sin? use R^T of Ry)
+  // Ry = [[c,0,s],[0,1,0],[-s,0,c]]; R^T = [[c,0,-s],[0,1,0],[s,0,c]]
+  const toLocal = (x: number, y: number, z: number) => ({ x: c * x - sn * z, y, z: sn * x + c * z });
+  const toWorld = (x: number, y: number, z: number) => ({ x: c * x + sn * z, y, z: -sn * x + c * z });
+  const tp = target.position;
+  const lc = toLocal(pos.x - tp.x, pos.y - tp.y, pos.z - tp.z);
+  // Mover's half extents along the target's axes (works for any mover rotation).
+  const corners = boxCorners({ ...mover, position: { x: 0, y: 0, z: 0 } }).map((k) => toLocal(k.x, k.y, k.z));
+  const h = {
+    x: Math.max(...corners.map((k) => Math.abs(k.x))),
+    y: Math.max(...corners.map((k) => Math.abs(k.y))),
+    z: Math.max(...corners.map((k) => Math.abs(k.z))),
+  };
+  const T = { x: target.dimensions.length / 2, y: target.dimensions.height / 2, z: target.dimensions.width / 2 };
+  const gate = isScan(target);
+  const overlaps = (a: 'x' | 'y' | 'z') => Math.abs(lc[a]) < T[a] + h[a] + SNAP_DIST;
+  let hit = false;
+  for (const a of ['y', 'x', 'z'] as const) {
+    if (gate && !(['x', 'y', 'z'] as const).filter((b) => b !== a).every(overlaps)) continue;
+    if (Math.abs(lc[a] - h[a] - T[a]) < SNAP_DIST) {
+      lc[a] = T[a] + h[a];
+      found[a] = { targetId: target.id, axis: a, side: 'max', value: T[a], yaw };
+      hit = true;
+    } else if (!(gate && a === 'y') && Math.abs(lc[a] + h[a] + T[a]) < SNAP_DIST) {
+      // (never pull a part under a scanned wall/opening: that's below the floor or inside the wall)
+      lc[a] = -T[a] - h[a];
+      found[a] = { targetId: target.id, axis: a, side: 'min', value: -T[a], yaw };
+      hit = true;
+    }
+  }
+  if (!hit) return null;
+  const w = toWorld(lc.x, lc.y, lc.z);
+  return { x: w.x + tp.x, y: w.y + tp.y, z: w.z + tp.z };
+}
 
 export function calculateSnappedPosition(
   activeObj: FurnitureObject,
@@ -61,10 +123,21 @@ export function calculateSnappedPosition(
     const activeHalfY = activeObj.dimensions.height / 2;
     const activeHalfZ = activeObj.dimensions.width / 2;
 
-    const snapDistanceThreshold = 1.2;
+    const snapDistanceThreshold = SNAP_DIST;
 
     for (const other of otherObjects) {
-      if (other.id === activeObj.id || !other.visible) continue;
+      if (other.id === activeObj.id || other.visible === false) continue;
+      const r = other.rotation;
+      if (isScan(other) || (!near0(r.y) && near0(r.x) && near0(r.z))) {
+        if (!near0(r.x) || !near0(r.z)) continue;
+        const next = snapToTurned(activeObj, pos, other, found);
+        if (next) {
+          pos = next;
+          isSnapped = true;
+          snapFace = 'front';
+        }
+        continue;
+      }
 
       const otherBox = getBoundingBox(other);
 

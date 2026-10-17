@@ -32,8 +32,25 @@ export const PartColorSection: React.FC = () => {
   const object = currentProject?.objects.find(o => o.id === selectedObjectId);
   if (!object) return null;
 
-  const applyMaterial = (material: WoodMaterial, skipHistory = false) => {
-    updateObject(object.id, { material }, skipHistory);
+  // Scanned walls/openings keep their fixed reference look; no finish editing.
+  if (object.generator === 'room-scan') return null;
+  return <PartColorBody key={object.id} objectId={object.id} material={object.material} updateObject={updateObject} />;
+};
+
+/**
+ * Keyed by part id: a native color picker left open while the selection
+ * changes (iOS fires a late input/change when it closes) must never paint the
+ * newly selected part with the previous part's color.
+ */
+const PartColorBody: React.FC<{
+  objectId: string;
+  material: WoodMaterial;
+  updateObject: (id: string, patch: { material: WoodMaterial }, skipHistory?: boolean) => void;
+}> = ({ objectId, material, updateObject }) => {
+  const object = { id: objectId, material };
+  const applyMaterial = (next: WoodMaterial, skipHistory = false) => {
+    if (useProjectStore.getState().selectedObjectId !== objectId) return;
+    updateObject(objectId, { material: next }, skipHistory);
   };
 
   const paintHex = normalizePaintHex(object.material.baseColor);

@@ -73,6 +73,13 @@ const WallLabel: React.FC<{ text: string; y: number; z: number; unlocked?: boole
   );
 };
 
+/**
+ * Scanned walls are solid and look the same from every side: opaque, writing
+ * depth, so parts behind a wall are simply hidden (or seen through a
+ * window/opening) instead of being washed in wall color.
+ */
+export const WALL_MATERIAL_PROPS = { transparent: false, opacity: 1, depthWrite: true } as const;
+
 /** Scanned room part (wall / window / door / opening). Reference only: no wood, no part outline. */
 export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean; unlocked?: boolean; onPointerDown?: (e: any) => void }> = ({ object, focused, unlocked, onPointerDown }) => {
   const { dimensions: d, position: p, rotation: r } = object;
@@ -94,7 +101,7 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
   return (
     <group position={[p.x, p.y, p.z]} rotation={rot}>
       <mesh geometry={geometry} onClick={unlocked ? undefined : onPointerDown} onPointerDown={unlocked ? onPointerDown : undefined} receiveShadow={kind === 'wall'} renderOrder={kind === 'wall' ? 0 : 1}>
-        {kind === 'wall' && <meshStandardMaterial map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} transparent opacity={0.92} />}
+        {kind === 'wall' && <meshStandardMaterial map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} {...WALL_MATERIAL_PROPS} />}
         {kind === 'window' && <meshStandardMaterial color="#bfe1ff" roughness={0.08} metalness={0.1} transparent opacity={0.45} depthWrite={false} />}
         {kind === 'door' && <meshStandardMaterial color="#e2e8f0" roughness={1} transparent opacity={0.3} depthWrite={false} />}
         {kind === 'opening' && <meshBasicMaterial color="#ffffff" transparent opacity={0.05} depthWrite={false} />}
