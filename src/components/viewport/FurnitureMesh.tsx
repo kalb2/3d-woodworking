@@ -8,6 +8,9 @@ import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
 import { positiveSize } from '../../theme/partSurface';
+import { useAppStore } from '../../state/useAppStore';
+import { useProjectStore } from '../../state/useProjectStore';
+import { grainUVs } from '../../utils/grainUV';
 import { cutHoles, faceAxes, faceThickness, footprint, getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 
 interface FurnitureMeshProps {
@@ -27,9 +30,12 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const { shape, dimensions, position, rotation, material } = object;
   const isGroup = shape === 'group';
 
+  const style = useAppStore((s) => s.preferences.viewStyle ?? 'realistic');
+  // Lots of parts: drop per-part outlines in Realistic to keep the frame rate up.
+  const busy = useProjectStore((s) => (s.projects.find((p) => p.id === s.activeProjectId)?.objects.length ?? 0) > 200);
   const meshMaterial = useMemo(() => {
-    return createWoodMeshMaterial(material);
-  }, [material]);
+    return createWoodMeshMaterial(material, style);
+  }, [material, style]);
 
   const roundPart = shape === 'sphere' || shape === 'cylinder' || shape === 'pole';
   const length = positiveSize(dimensions.length);
@@ -116,8 +122,13 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         return new THREE.BoxGeometry(l, h, w);
     }
   }, [shape, roundPart, roundPart ? null : `${dimensions.length}|${dimensions.width}|${dimensions.height}`, object.board]);
+  const grainShape = !roundPart && shape !== 'group';
   const geometry = useMemo(
-    () => (holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry),
+    () => {
+      const g = holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry;
+      // Grain runs along the part's longest dimension (box-like parts).
+      return grainShape ? grainUVs(g, { x: length, y: height, z: width }) : g;
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseGeometry, holesKey],
   );
@@ -155,8 +166,8 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         geometry={geometry}
         scale={meshScale}
         material={isGroup ? undefined : meshMaterial}
-        castShadow={!isGroup}
-        receiveShadow={!isGroup}
+        castShadow={!isGroup && style === 'realistic'}
+        receiveShadow={!isGroup && style === 'realistic'}
         raycast={isGroup && !pickGroup ? () => undefined : undefined}
         onPointerDown={onPointerDown}
       >
@@ -165,6 +176,10 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         )}
         {isSelected && !isGroup && shape === 'sphere' && (
           <SphereOutline radius={1} />
+        )}
+        {!isSelected && !isGroup && shape !== 'sphere' && (style === 'clean' || !busy) && (
+          // Crisp SketchUp-style outline, constant screen width.
+          <Edges threshold={24} color={style === 'clean' ? '#1f2937' : '#475569'} lineWidth={style === 'clean' ? 1.4 : 1} transparent opacity={style === 'clean' ? 0.9 : 0.55} />
         )}
         {isSelected && !isGroup && shape !== 'sphere' && (
           <Edges

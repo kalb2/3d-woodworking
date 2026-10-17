@@ -85,11 +85,11 @@ describe('snap contacts', () => {
   it('reports the target face (outer vs inner) it snapped to', () => {
     const other = { ...part(5, 10), id: 'o' }; // x from -5 to 5
     const mover = { ...part(5, 10), id: 'm' };
-    const outer = calculateSnappedPosition(mover, { x: 10.5, y: 5, z: 30 }, [other], settings);
+    const outer = calculateSnappedPosition(mover, { x: 10.5, y: 5, z: 0.3 }, [other], settings);
     expect(outer.position.x).toBe(10);
     expect(outer.contacts).toContainEqual({ targetId: 'o', axis: 'x', side: 'max', value: 5 });
     // Approaching from the other side hits the opposite face of the same part.
-    const far = calculateSnappedPosition(mover, { x: -10.4, y: 5, z: 30 }, [other], settings);
+    const far = calculateSnappedPosition(mover, { x: -10.4, y: 5, z: 0.3 }, [other], settings);
     expect(far.position.x).toBe(-10);
     expect(far.contacts).toContainEqual({ targetId: 'o', axis: 'x', side: 'min', value: -5 });
     const none = calculateSnappedPosition(mover, { x: 40, y: 50, z: 40 }, [other], { ...settings, gridSnap: false });

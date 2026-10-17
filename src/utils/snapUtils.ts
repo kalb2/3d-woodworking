@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { FurnitureObject, Position3D, SnapSettings } from '../types/furniture';
 import { boxCorners } from '../state/groupTree';
+import { alignmentHint, inferAlignments, type Alignment } from './snapInfer';
 
 export function getBoundingBox(obj: FurnitureObject): THREE.Box3 {
   const halfX = obj.dimensions.length / 2;
@@ -28,6 +29,10 @@ export interface SnapResult {
   snapFace?: 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back' | 'grid' | 'floor';
   /** Faces of other parts the moving part snapped against (for highlighting). */
   contacts: SnapContact[];
+  /** Inferred edge / middle / inset alignments (dashed guides). */
+  alignments?: Alignment[];
+  /** Chip text near the finger: 'Flush', 'Centered', 'Inset 3/4"', 'Against wall'. */
+  hint?: string | null;
 }
 
 /** The `side` face of `targetId`'s box on `axis` (plane at `value`); the mover touches it with its opposite face. */
@@ -140,38 +145,44 @@ export function calculateSnappedPosition(
       }
 
       const otherBox = getBoundingBox(other);
+      // Only faces the mover is actually beside (overlapping on the other two axes) pull it.
+      const beside = (a: 'x' | 'y' | 'z') => {
+        const h = a === 'x' ? activeHalfX : a === 'y' ? activeHalfY : activeHalfZ;
+        return pos[a] + h > otherBox.min[a] - snapDistanceThreshold && pos[a] - h < otherBox.max[a] + snapDistanceThreshold;
+      };
+      const canX = beside('y') && beside('z'), canY = beside('x') && beside('z'), canZ = beside('x') && beside('y');
 
-      if (Math.abs((pos.y - activeHalfY) - otherBox.max.y) < snapDistanceThreshold) {
+      if (canY && Math.abs((pos.y - activeHalfY) - otherBox.max.y) < snapDistanceThreshold) {
         pos.y = otherBox.max.y + activeHalfY;
         found.y = { targetId: other.id, axis: 'y', side: 'max', value: otherBox.max.y };
         isSnapped = true;
         snapFace = 'bottom';
       }
-      else if (Math.abs((pos.y + activeHalfY) - otherBox.min.y) < snapDistanceThreshold) {
+      else if (canY && Math.abs((pos.y + activeHalfY) - otherBox.min.y) < snapDistanceThreshold) {
         pos.y = otherBox.min.y - activeHalfY;
         found.y = { targetId: other.id, axis: 'y', side: 'min', value: otherBox.min.y };
         isSnapped = true;
         snapFace = 'top';
       }
 
-      if (Math.abs((pos.x - activeHalfX) - otherBox.max.x) < snapDistanceThreshold) {
+      if (canX && Math.abs((pos.x - activeHalfX) - otherBox.max.x) < snapDistanceThreshold) {
         pos.x = otherBox.max.x + activeHalfX;
         found.x = { targetId: other.id, axis: 'x', side: 'max', value: otherBox.max.x };
         isSnapped = true;
         snapFace = 'left';
-      } else if (Math.abs((pos.x + activeHalfX) - otherBox.min.x) < snapDistanceThreshold) {
+      } else if (canX && Math.abs((pos.x + activeHalfX) - otherBox.min.x) < snapDistanceThreshold) {
         pos.x = otherBox.min.x - activeHalfX;
         found.x = { targetId: other.id, axis: 'x', side: 'min', value: otherBox.min.x };
         isSnapped = true;
         snapFace = 'right';
       }
 
-      if (Math.abs((pos.z - activeHalfZ) - otherBox.max.z) < snapDistanceThreshold) {
+      if (canZ && Math.abs((pos.z - activeHalfZ) - otherBox.max.z) < snapDistanceThreshold) {
         pos.z = otherBox.max.z + activeHalfZ;
         found.z = { targetId: other.id, axis: 'z', side: 'max', value: otherBox.max.z };
         isSnapped = true;
         snapFace = 'back';
-      } else if (Math.abs((pos.z + activeHalfZ) - otherBox.min.z) < snapDistanceThreshold) {
+      } else if (canZ && Math.abs((pos.z + activeHalfZ) - otherBox.min.z) < snapDistanceThreshold) {
         pos.z = otherBox.min.z - activeHalfZ;
         found.z = { targetId: other.id, axis: 'z', side: 'min', value: otherBox.min.z };
         isSnapped = true;
@@ -182,6 +193,24 @@ export function calculateSnappedPosition(
 
   const contacts = Object.values(found) as SnapContact[];
 
+  // Smart inference on axes without a face contact: Flush / Centered / Inset.
+  let alignments: Alignment[] = [];
+  if (snapSettings.faceSnap && otherObjects.length > 0) {
+    const inf = inferAlignments(activeObj, pos, otherObjects.filter((o) => !isScan(o)), found);
+    const hy = activeObj.dimensions.height / 2;
+    if (snapSettings.floorCollision && inf.position.y - hy < -1e-6) {
+      inf.position.y = pos.y;
+      inf.alignments = inf.alignments.filter((a) => a.axis !== 'y');
+    }
+    if (inf.alignments.length) {
+      pos = inf.position;
+      alignments = inf.alignments;
+      isSnapped = true;
+    }
+  }
+  const againstWall = contacts.some((c) => otherObjects.find((o) => o.id === c.targetId && isScan(o)));
+  const hint = alignmentHint(alignments, againstWall);
+
   if (snapSettings.gridSnap && !isSnapped && snapSettings.gridSize > 0) {
     const step = snapSettings.gridSize;
     pos.x = Math.round(pos.x / step) * step;
@@ -190,5 +219,5 @@ export function calculateSnappedPosition(
     snapFace = 'grid';
   }
 
-  return { position: pos, isSnapped, snapFace, contacts };
+  return { position: pos, isSnapped, snapFace, contacts, alignments, hint };
 }

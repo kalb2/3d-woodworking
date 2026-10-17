@@ -156,6 +156,9 @@ export const FurnitureCanvas: React.FC = () => {
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
   // Groups on the opened path don't catch taps (their members do).
   const openPath = new Set(pathTo(currentProject.objects, editingGroupId));
+  const realistic = (preferences.viewStyle ?? 'realistic') === 'realistic';
+  // Phones get a smaller shadow map (keeps 60fps).
+  const shadowRes = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 600 ? 1024 : 2048;
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';
 
   const clearSelection = () => {
@@ -265,18 +268,25 @@ export const FurnitureCanvas: React.FC = () => {
         {/* Customizable canvas background color */}
         <color attach="background" args={[bgColor]} />
         {/* Soft Studio Lighting setup tuned for realistic wood textures */}
-        <hemisphereLight args={['#fff8f1', '#d5dee8', 0.62]} />
-        <ambientLight intensity={0.28} />
+        <hemisphereLight args={['#fff8f1', '#d5dee8', realistic ? 0.62 : 0.9]} />
+        <ambientLight intensity={realistic ? 0.26 : 0.45} />
         <directionalLight
           position={[80, 120, 46]}
-          intensity={1.55}
+          intensity={realistic ? 1.5 : 1.1}
           color="#fffaf3"
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
+          castShadow={realistic}
+          shadow-mapSize-width={shadowRes}
+          shadow-mapSize-height={shadowRes}
           shadow-bias={-0.00015}
+          shadow-normalBias={0.04}
+          shadow-camera-left={-240}
+          shadow-camera-right={240}
+          shadow-camera-top={240}
+          shadow-camera-bottom={-240}
+          shadow-camera-far={800}
         />
-        <directionalLight position={[-55, 36, -28]} intensity={0.32} color="#e8eef6" />
+        <directionalLight position={[-55, 36, -28]} intensity={realistic ? 0.34 : 0.5} color="#e8eef6" />
+        <directionalLight position={[10, 30, 90]} intensity={realistic ? 0.18 : 0.3} color="#ffffff" />
 
         {/* Orbit Camera controls for iPad.
             Default touch gestures: 1-finger = orbit, 2-finger = dolly+pan.
@@ -301,7 +311,7 @@ export const FurnitureCanvas: React.FC = () => {
           visible={currentProject.showFloor}
           opacity={currentProject.floorOpacity}
         />
-        {currentProject.showFloor && <GroundContactShadow />}
+        {currentProject.showFloor && realistic && <GroundContactShadow />}
 
         <CameraFocus />
         <ProjectorBridge />

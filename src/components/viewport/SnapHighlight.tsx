@@ -2,14 +2,35 @@ import React from 'react';
 import { create } from 'zustand';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
+import { Html, Line } from '@react-three/drei';
 import { getBoundingBox, type SnapContact } from '../../utils/snapUtils';
+import type { Alignment } from '../../utils/snapInfer';
+import { GIZMO_AXIS } from '../../theme/gizmo';
 
 /** Live snap contacts while dragging; empty when not snapping. */
-export const useSnapHighlight = create<{ moverId: string | null; contacts: SnapContact[]; set: (moverId: string | null, contacts: SnapContact[]) => void }>((set) => ({
+export const useSnapHighlight = create<{
+  moverId: string | null;
+  contacts: SnapContact[];
+  alignments: Alignment[];
+  hint: string | null;
+  set: (moverId: string | null, contacts: SnapContact[], extra?: { alignments?: Alignment[]; hint?: string | null }) => void;
+}>((set) => ({
   moverId: null,
   contacts: [],
-  set: (moverId, contacts) => set((s) => (sameContacts(s.contacts, contacts) && s.moverId === moverId ? s : { moverId, contacts })),
+  alignments: [],
+  hint: null,
+  set: (moverId, contacts, extra) => set((s) => {
+    const alignments = extra?.alignments ?? [];
+    const hint = extra?.hint ?? null;
+    if (sameContacts(s.contacts, contacts) && s.moverId === moverId && hint === s.hint && sameAlign(s.alignments, alignments)) return s;
+    return { moverId, contacts, alignments, hint };
+  }),
 }));
+
+function sameAlign(a: Alignment[], b: Alignment[]) {
+  return a.length === b.length && a.every((x, i) => x.axis === b[i].axis && x.kind === b[i].kind && x.targetId === b[i].targetId && Math.abs(x.value - b[i].value) < 1e-6
+    && Math.abs(x.from.x - b[i].from.x) + Math.abs(x.from.y - b[i].from.y) + Math.abs(x.from.z - b[i].from.z) < 1e-3);
+}
 
 function sameContacts(a: SnapContact[], b: SnapContact[]) {
   return a.length === b.length && a.every((c, i) => c.targetId === b[i].targetId && c.axis === b[i].axis && c.side === b[i].side && Math.abs(c.value - b[i].value) < 1e-6);
@@ -41,12 +62,24 @@ function FaceQuad({ box, axis, value, opacity }: { box: THREE.Box3; axis: 'x' | 
 
 /** Highlights the face being snapped to (strong) and the mover's touching face (faint). */
 export const SnapHighlight: React.FC = () => {
-  const { moverId, contacts } = useSnapHighlight();
+  const { moverId, contacts, alignments, hint } = useSnapHighlight();
   const objects = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.objects);
-  if (!moverId || !contacts.length || !objects) return null;
+  if (!moverId || (!contacts.length && !alignments.length && !hint) || !objects) return null;
   const mover = objects.find((o) => o.id === moverId);
+  const mb = mover ? getBoundingBox(mover) : null;
   return (
     <group>
+      {alignments.map((al, i) => (
+        <Line key={`al-${i}`} points={[[al.from.x, al.from.y, al.from.z], [al.to.x, al.to.y, al.to.z]]} color={GIZMO_AXIS[al.axis]}
+          lineWidth={1.5} dashed dashSize={1} gapSize={0.7} depthTest={false} renderOrder={22} />
+      ))}
+      {hint && mb && (
+        <group position={[(mb.min.x + mb.max.x) / 2, mb.max.y, (mb.min.z + mb.max.z) / 2]}>
+          <Html center zIndexRange={[29, 0]} style={{ pointerEvents: 'none' }}>
+            <span className="snap-hint" data-testid="snap-hint">{hint}</span>
+          </Html>
+        </group>
+      )}
       {contacts.map((c, i) => {
         const target = objects.find((o) => o.id === c.targetId);
         if (!target) return null;
