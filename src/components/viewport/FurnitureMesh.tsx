@@ -150,7 +150,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   if (object.visible === false) return null;
 
   return (
-    <group position={[position.x, position.y, position.z]} rotation={[rotRadX, rotRadY, rotRadZ]}>
+    <group position={[position.x, position.y, position.z]} rotation={[rotRadX, rotRadY, rotRadZ]} userData={{ objectId: object.id }}>
       <mesh
         geometry={geometry}
         scale={meshScale}

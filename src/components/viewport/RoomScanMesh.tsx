@@ -99,7 +99,7 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
   const rot: [number, number, number] = [r.x * Math.PI / 180, r.y * Math.PI / 180, r.z * Math.PI / 180];
   const accent = '#e09f3e';
   return (
-    <group position={[p.x, p.y, p.z]} rotation={rot}>
+    <group position={[p.x, p.y, p.z]} rotation={rot} userData={{ objectId: object.id }}>
       <mesh geometry={geometry} onClick={unlocked ? undefined : onPointerDown} onPointerDown={unlocked ? onPointerDown : undefined} receiveShadow={kind === 'wall'} renderOrder={kind === 'wall' ? 0 : 1}>
         {kind === 'wall' && <meshStandardMaterial map={map ?? undefined} color="#ffffff" roughness={1} metalness={0} {...WALL_MATERIAL_PROPS} />}
         {kind === 'window' && <meshStandardMaterial color="#bfe1ff" roughness={0.08} metalness={0.1} transparent opacity={0.45} depthWrite={false} />}
