@@ -209,7 +209,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
             currentProject.snapSettings
           );
           updateObject(object.id, { position: snapResult.position }, true);
-          useSnapHighlight.getState().set(object.id, snapResult.contacts);
+          useSnapHighlight.getState().set(object.id, snapResult.contacts, { alignments: snapResult.alignments, hint: snapResult.hint });
         } else {
           updateObject(object.id, { position: newPos }, true);
         }

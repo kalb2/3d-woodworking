@@ -215,6 +215,7 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
           <span>Built-ins</span>
         </button>
       )}
+      <ViewStyleRow />
       <button type="button" className="phone-sheet-row" data-testid="menu-measure" onClick={measure} onPointerUp={measure}>
         <Ruler size={18} />
         <span>Measure</span>
@@ -318,6 +319,23 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
         <Share2 size={18} />
         <span>{copied ? 'Copied' : 'Copy JSON'}</span>
       </button>
+    </div>
+  );
+};
+
+/** ••• › Style: Clean (flat colors + outlines) / Realistic (grain + shadows). */
+const ViewStyleRow: React.FC = () => {
+  const style = useAppStore((s) => s.preferences.viewStyle ?? 'realistic');
+  const update = useAppStore((s) => s.updatePreferences);
+  const clean = useReliableTap(() => update({ viewStyle: 'clean' }));
+  const real = useReliableTap(() => update({ viewStyle: 'realistic' }));
+  return (
+    <div className="phone-sheet-row view-style-row" data-testid="menu-view-style" role="group" aria-label="Style">
+      <span>Style</span>
+      <span className="view-style-seg">
+        <button type="button" className={style === 'clean' ? 'is-on' : ''} data-testid="style-clean" aria-pressed={style === 'clean'} onClick={clean} onPointerUp={clean}>Clean</button>
+        <button type="button" className={style === 'realistic' ? 'is-on' : ''} data-testid="style-realistic" aria-pressed={style === 'realistic'} onClick={real} onPointerUp={real}>Realistic</button>
+      </span>
     </div>
   );
 };

@@ -28,6 +28,8 @@ export interface AppPreferences {
   defaultFloorOpacity: number;
   backgroundColor: string;
   accentColor: string;
+  /** Clean = flat colors + outlines; Realistic = grain + shadows. */
+  viewStyle: 'clean' | 'realistic';
 }
 
 const DEFAULT_PREFS: AppPreferences = {
@@ -37,6 +39,7 @@ const DEFAULT_PREFS: AppPreferences = {
   defaultFloorOpacity: 0.4,
   backgroundColor: '#f8fafc',
   accentColor: '#d97706',
+  viewStyle: 'realistic',
 };
 
 function hexToRgba(hex: string, alpha: number): string {

@@ -340,9 +340,11 @@ function solidSurface(params: THREE.MeshStandardMaterialParameters): THREE.MeshS
   return material;
 }
 
-export function createWoodMeshMaterial(mat: WoodMaterial): THREE.MeshStandardMaterial {
-  // Paint is a flat opaque color. Sheen and stain are not applied.
-  if (isSolidPaint(mat)) {
+export type ViewStyle = 'clean' | 'realistic';
+
+export function createWoodMeshMaterial(mat: WoodMaterial, style: ViewStyle = 'realistic'): THREE.MeshStandardMaterial {
+  // Paint is a flat opaque color (and Clean style draws every part flat).
+  if (style === 'clean' || isSolidPaint(mat)) {
     return solidSurface({
       color: mat.baseColor,
       roughness: 1,
