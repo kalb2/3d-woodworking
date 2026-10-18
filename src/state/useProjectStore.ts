@@ -4,10 +4,12 @@ import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
-import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
+import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater } from '../joinery/joints';
+import { stretchObjects } from '../utils/groupStretch';
+import type { Face } from '../utils/pushPull';
 import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
@@ -191,6 +193,11 @@ interface ProjectState {
   /** Add or edit a joint; dado/rabbet can lengthen the mating part into the groove. */
   saveJoint: (j: Omit<Joint, 'id' | 'extended'> & { id?: string }, extend: boolean) => string | null;
   removeJoint: (id: string) => void;
+  /**
+   * Push/pull a group or multi-selection on one face to a new size (from `base`
+   * objects when given, e.g. the drag start). No undo step; the caller commits.
+   */
+  stretchSelection: (rootIds: string[], face: Face, size: number, base?: FurnitureObject[], exact?: boolean) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -836,6 +843,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, joints: (p.joints ?? []).filter((x) => x.id !== id) } : p)) }));
     pushHistoryState();
     saveCurrentProject();
+  },
+
+  stretchSelection: (rootIds, face, size, base, exact = false) => {
+    const { activeProjectId, projects } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const floorOn = Boolean(proj.showFloor && proj.snapSettings.floorCollision !== false);
+    const objects = stretchObjects(base ?? proj.objects, rootIds, face, size, {
+      snap: !exact && proj.snapSettings.enabled !== false, step: proj.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP, unit: proj.unit, floorOn,
+    });
+    if (objects === (base ?? proj.objects)) return;
+    set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)) }));
   },
 
   setRoomLocked: (locked, selectWallId) => {
