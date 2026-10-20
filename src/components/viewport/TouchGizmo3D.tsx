@@ -206,7 +206,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
             // Snap to parts, not group boxes (a part's own group would trap it).
             // ...and never to the mover's own contents (moving a whole module).
             (() => { const own = moveSet(currentProject.objects, object.id); return currentProject.objects.filter((o) => o.shape !== 'group' && !own.has(o.id)); })(),
-            currentProject.snapSettings
+            currentProject.snapSettings,
+            { dragAxis: session.axis === 'xz' ? 'xz' : (session.axisDir ? (Math.abs(session.axisDir.y) > 0.9 ? 'y' : 'x') : 'xz') }
           );
           updateObject(object.id, { position: snapResult.position }, true);
           useSnapHighlight.getState().set(object.id, snapResult.contacts, { alignments: snapResult.alignments, hint: snapResult.hint });
