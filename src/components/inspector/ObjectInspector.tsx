@@ -64,7 +64,7 @@ export const ObjectInspector: React.FC = () => {
     >
       <div className="part-properties-head">
         <span>Properties</span>
-        <OverlayDismissButton onDismiss={() => setOverlayOpen('inspector', false)} />
+        <OverlayDismissButton showLabel onDismiss={() => setOverlayOpen('inspector', false)} />
       </div>
 
       <div className="part-properties-title-row">

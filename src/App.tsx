@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, SlidersHorizontal } from 'lucide-react';
+import { Box } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
 import { useAccountStore } from './state/useAccountStore';
 import { useAppStore } from './state/useAppStore';
@@ -66,7 +66,6 @@ export const App: React.FC = () => {
     return <HomeScreen />;
   }
 
-  const hasSelection = Boolean(selectedObjectId);
   const anyOverlayOpen =
     overlays.sidebar ||
     overlays.inspector ||
@@ -127,14 +126,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {showDesktopLaunchers && !overlays.inspector && hasSelection && (
-        <OverlayLaunchTab
-          label="Properties"
-          icon={<SlidersHorizontal size={16} color="#e09f3e" />}
-          placement="right-top"
-          onOpen={() => openOverlay('inspector', isPhone)}
-        />
-      )}
 
       {!isPhone && (
         <>

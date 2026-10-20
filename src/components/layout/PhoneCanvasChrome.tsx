@@ -10,7 +10,7 @@ import {
   Scaling,
   Trash2,
 } from 'lucide-react';
-import { UndoRedoButtons } from './UndoRedoButtons';
+import { FloatingLeft } from './FloatingLeft';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
@@ -154,7 +154,8 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
-      {!contentOpen && <UndoRedoButtons placement="phone" />}
+      {/* Bottom-left: Properties (with a selection) + Undo/Redo; stays up while Properties is open so a second tap closes it. */}
+      {(!contentOpen || overlays.inspector) && <FloatingLeft placement="phone" showUndo={!contentOpen} />}
       {!contentOpen && (
         <PhoneTapButton
           className="add-fab is-phone"
@@ -174,16 +175,6 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           {children}
           <WorkshopSettings />
         </div>
-      )}
-      {selectedObject && !overlays.inspector && (
-        <PhoneTapButton
-          className="phone-properties-entry"
-          data-testid="phone-properties"
-          aria-label="Properties"
-          onTap={() => openOverlay('inspector')}
-        >
-          Properties
-        </PhoneTapButton>
       )}
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem

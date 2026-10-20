@@ -160,10 +160,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
     onClose();
     useJoinFlow.getState().list(selectedObjectId);
   });
-  const properties = useReliableTap(() => {
-    if (!useProjectStore.getState().selectedObjectId) return;
-    openOverlay('inspector', true);
-  });
   const share = useReliableTap(() => {
     onClose();
     onShareProject();
@@ -278,10 +274,6 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
           <span>Joints ({jointCount})</span>
         </button>
       )}
-      <button type="button" className="phone-sheet-row" data-testid="overlay-launch-properties" disabled={!selectedObjectId} onClick={properties} onPointerUp={properties}>
-        <SlidersHorizontal size={18} />
-        <span>Properties</span>
-      </button>
       {renaming ? (
         <form
           className="editor-overflow-rename"

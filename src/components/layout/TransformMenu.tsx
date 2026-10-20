@@ -6,7 +6,7 @@ import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { ResizeSizeRow, RotateAngleRow } from './SizeBar';
-import { UndoRedoButtons } from './UndoRedoButtons';
+import { FloatingLeft } from './FloatingLeft';
 
 export const TransformMenu: React.FC = () => {
   const {
@@ -46,7 +46,7 @@ export const TransformMenu: React.FC = () => {
 
   return (
     <>
-    <UndoRedoButtons placement="ipad" />
+    <FloatingLeft placement="ipad" />
     <button type="button" className="add-fab is-ipad" data-testid="toolbar-add" aria-label="Add" title="Add" onClick={addPart} onPointerUp={addPart}>
       <Plus size={24} strokeWidth={2.2} />
     </button>

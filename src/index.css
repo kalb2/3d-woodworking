@@ -2883,10 +2883,6 @@ html, body, #root {
 .undo-redo-pair.is-phone {
   bottom: calc(100% + 10px);
 }
-/* Properties pill sits centered so it never meets the Add button at the right. */
-.phone-properties-entry {
-  align-self: center;
-}
 
 /* Solid round swatches with a clear selected ring. */
 .finish-chip-grid .finish-swatch {
@@ -3145,3 +3141,16 @@ html, body, #root {
 .select-tip { width: min(380px, calc(100vw - 32px)); box-sizing: border-box; flex-wrap: wrap; justify-content: space-between; margin-top: 0; }
 .select-tip > span { flex: 1 1 160px; }
 .select-tip .group-bar-btn { background: #f1f5f9; color: #0f172a; min-height: 32px; }
+
+/* Bottom-left cluster mirrors the Add button (same height, row, insets): Properties + Undo/Redo. */
+.fab-left { position: absolute; display: flex; align-items: center; gap: 8px; z-index: 46; pointer-events: none; }
+.fab-left > * { pointer-events: auto; }
+.fab-left.is-phone { left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(100% + 6px); }
+.fab-left.is-ipad { left: max(20px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+.undo-redo-pair.is-inline { position: static; }
+.properties-fab { height: 48px; padding: 0 16px 0 14px; border-radius: 24px; border: none; background: #e09f3e; color: #fff; display: flex; align-items: center; gap: 7px;
+  font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 20px rgba(224, 159, 62, 0.35), 0 2px 6px rgba(15, 23, 42, 0.15); touch-action: manipulation; }
+.properties-fab.is-open { background: #fff; color: #b45309; box-shadow: inset 0 0 0 2px #e09f3e, 0 4px 12px rgba(15, 23, 42, 0.12); }
+.phone-sheet-dismiss.is-labeled { width: auto; padding: 0 16px; border-radius: 999px; font-size: 15px; font-weight: 600; color: #0f172a; }
+/* iPad: the transform menu sits centered on the same row, so Undo/Redo stack above Properties (Properties stays level with Add). */
+.fab-left.is-ipad { flex-direction: column-reverse; align-items: flex-start; }
