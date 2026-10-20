@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BoxSelect, Link2, List, Ruler, ScanLine, SquareDashed, Tv } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
+import { projectStyle } from '../../state/viewStyle';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { useMeasure } from '../../measure/useMeasure';
 import { isWallScanSupported, scanWalls } from '../../native/wallScan';
@@ -19,8 +20,8 @@ const UNITS: { id: LengthUnit; label: string }[] = [
 /** Everything that belongs to this one project (moved here from ••• and the old Settings sheet). */
 export const ProjectSection: React.FC = () => {
   const { openOverlay, setOverlayOpen, setSidebarPanel } = useAppStore();
-  const viewStyle = useAppStore((s) => s.preferences.viewStyle ?? 'realistic');
   const updatePreferences = useAppStore((s) => s.updatePreferences);
+  const setViewStyle = useProjectStore((s) => s.setViewStyle);
   const { projects, activeProjectId, selectedObjectId, renameProject, setUnit, toggleFloor, updateSnapSettings } = useProjectStore();
   const project = projects.find((p) => p.id === activeProjectId);
   const [name, setName] = useState(project?.name ?? '');
@@ -91,7 +92,8 @@ export const ProjectSection: React.FC = () => {
           <Seg label="Units" testId="project-units" value={project.unit} options={UNITS} onChange={(u) => setUnit(u)} />
         </Row>
         <Row label="Style">
-          <Seg label="Style" testId="style" value={viewStyle} onChange={(v) => updatePreferences({ viewStyle: v })}
+          <Seg label="Style" testId="style" value={projectStyle(project)}
+            onChange={(v) => { setViewStyle(v); updatePreferences({ viewStyle: v }); /* also the style for new projects */ }}
             options={[{ id: 'clean', label: 'Clean' }, { id: 'realistic', label: 'Realistic' }]} />
         </Row>
       </Section>

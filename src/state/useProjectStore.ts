@@ -8,6 +8,7 @@ import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRul
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater, jointGeometry, shiftAlong } from '../joinery/joints';
+import { isViewStyle, savedAppStyle, type ViewStyle } from './viewStyle';
 import { stretchObjects } from '../utils/groupStretch';
 import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
@@ -22,7 +23,16 @@ const freshenObjects = (os: FurnitureObject[]) => {
   const out = os.map((o) => { if (!o.material) return o; const m = freshenFinish(o.material); if (m === o.material) return o; changed = true; return { ...o, material: m }; });
   return changed ? out : os;
 };
-const normalizeProjects = (ps: FurnitureProject[]) => ps.map((p) => { const objects = freshenObjects(normalizeTree(p.objects ?? [])); return objects === p.objects ? p : { ...p, objects }; });
+const normalizeProjects = (ps: FurnitureProject[]) => {
+  // Projects from before per-project styles keep the look they had (the old app-wide style).
+  let legacy: ViewStyle | null = null;
+  return ps.map((p) => {
+    const objects = freshenObjects(normalizeTree(p.objects ?? []));
+    const styled = isViewStyle(p.viewStyle);
+    if (objects === p.objects && styled) return p;
+    return { ...p, objects, viewStyle: styled ? p.viewStyle : (legacy ??= savedAppStyle()) };
+  });
+};
 
 export interface WoodPreset {
   id: string;
@@ -159,6 +169,8 @@ interface ProjectState {
   deleteProject: (id: string) => void;
   switchProject: (id: string) => void;
   importProject: (project: FurnitureProject) => void;
+  /** Clean or Realistic for the open project (saved and synced with it). */
+  setViewStyle: (style: ViewStyle) => void;
 
   selectObject: (id: string | null, options?: { additive?: boolean }) => void;
   toggleMultiSelect: () => void;
@@ -381,7 +393,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       objects: [defaultCube],
       snapSettings: defaultSnapSettings(),
       showFloor: true,
-      floorOpacity: 0.4
+      floorOpacity: 0.4,
+      viewStyle: savedAppStyle(),
     };
 
     set(state => ({
@@ -470,7 +483,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   importProject: (raw: FurnitureProject) => {
-    const project = { ...raw, objects: freshenObjects(normalizeTree(raw.objects ?? [])) };
+    const project = { ...raw, objects: freshenObjects(normalizeTree(raw.objects ?? [])), viewStyle: isViewStyle(raw.viewStyle) ? raw.viewStyle : savedAppStyle() };
     set(state => ({
       projects: [...state.projects, project],
       activeProjectId: project.id,
@@ -718,6 +731,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       snapSettings: defaultSnapSettings(),
       showFloor: true,
       floorOpacity: 0.4,
+      viewStyle: savedAppStyle(),
     };
 
     set((state) => ({
@@ -967,6 +981,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       snapSettings: defaultSnapSettings(),
       showFloor: true,
       floorOpacity: 0.4,
+      viewStyle: savedAppStyle(),
       scannedRoom: room,
     };
     set((state) => ({
@@ -1242,6 +1257,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     set(state => ({
       projects: state.projects.map(p => (p.id === activeProjectId ? { ...p, unit } : p))
     }));
+    saveCurrentProject();
+  },
+
+  setViewStyle: (style) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    if (!isViewStyle(style)) return;
+    set((state) => ({ projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, viewStyle: style } : p)) }));
+    // saveCurrentProject bumps updatedAt, so the change syncs like other project fields.
     saveCurrentProject();
   },
 

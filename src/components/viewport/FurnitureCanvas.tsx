@@ -5,6 +5,7 @@ import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { cameraDir, cameraTarget } from '../../templates/userTemplates';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
+import { projectStyle } from '../../state/viewStyle';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { FurnitureMesh } from './FurnitureMesh';
@@ -162,7 +163,7 @@ export const FurnitureCanvas: React.FC = () => {
   const selectedObject = currentProject.objects.find(o => o.id === selectedObjectId);
   // Groups on the opened path don't catch taps (their members do).
   const openPath = new Set(pathTo(currentProject.objects, editingGroupId));
-  const realistic = (preferences.viewStyle ?? 'realistic') === 'realistic';
+  const realistic = projectStyle(currentProject) === 'realistic';
   // Phones get a smaller shadow map (keeps 60fps).
   const shadowRes = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 600 ? 1024 : 2048;
   const bgColor = currentProject.backgroundColor || preferences.backgroundColor || '#f8fafc';

@@ -205,6 +205,8 @@ export interface FurnitureProject {
   measurements?: PinnedMeasurement[];
   /** Joinery between two parts (receiver gets the cut). */
   joints?: Joint[];
+  /** Render style for this project: Clean (flat + outlines) or Realistic (grain + shadows). */
+  viewStyle?: 'clean' | 'realistic';
 }
 
 export interface PinnedMeasurement {

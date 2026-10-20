@@ -37,3 +37,28 @@ export function clusterLabel(statuses: TagStatus[]): string {
   const bad = statuses.filter((x) => x !== 'fits').length;
   return `${statuses.length} joints${bad ? ` · ${bad} to check` : ''}`;
 }
+
+/**
+ * Is a screen point under app UI (a sheet, bar, floating button, modal)?
+ * `stack` is document.elementsFromPoint, topmost first. Anything inside the 3D view
+ * (`root`, which holds the tags themselves) means the point is open; see-through
+ * backdrops are skipped; anything else covers it.
+ */
+export function pointCovered(stack: Element[], root: Element, passThrough: (el: Element) => boolean): boolean {
+  for (const el of stack) {
+    if (root.contains(el)) return false;
+    if (passThrough(el)) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Sample points of a tag box (centre + inset corners), in the same coordinates as the box. */
+export function boxSamples(b: { x: number; y: number; w: number; h: number }, inset = 3): [number, number][] {
+  const dx = Math.max(0, b.w / 2 - inset), dy = Math.max(0, b.h / 2 - inset);
+  return [[b.x, b.y], [b.x - dx, b.y - dy], [b.x + dx, b.y - dy], [b.x - dx, b.y + dy], [b.x + dx, b.y + dy]];
+}
+
+/** A tag hides when any part of it would sit under app UI (no half-tucked tags peeking over a sheet edge). */
+export const boxCovered = (b: { x: number; y: number; w: number; h: number }, covered: (x: number, y: number) => boolean) =>
+  boxSamples(b).some(([x, y]) => covered(x, y));

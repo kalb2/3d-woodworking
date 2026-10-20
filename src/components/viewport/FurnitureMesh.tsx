@@ -9,7 +9,7 @@ import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
 import { positiveSize } from '../../theme/partSurface';
-import { useAppStore } from '../../state/useAppStore';
+import { projectStyle } from '../../state/viewStyle';
 import { useProjectStore } from '../../state/useProjectStore';
 import { grainUVs } from '../../utils/grainUV';
 import { partCutters } from '../../joinery/joints';
@@ -32,7 +32,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const { shape, dimensions, position, rotation, material } = object;
   const isGroup = shape === 'group';
 
-  const style = useAppStore((s) => s.preferences.viewStyle ?? 'realistic');
+  const style = useProjectStore((s) => projectStyle(s.projects.find((p) => p.id === s.activeProjectId)));
   // Lots of parts: drop per-part outlines in Realistic to keep the frame rate up.
   const busy = useProjectStore((s) => (s.projects.find((p) => p.id === s.activeProjectId)?.objects.length ?? 0) > 200);
   const meshMaterial = useMemo(() => {
