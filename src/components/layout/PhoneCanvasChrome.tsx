@@ -1,4 +1,5 @@
 import React from 'react';
+import { stretchBox } from '../../utils/groupStretch';
 import {
   Copy,
   Ellipsis,
@@ -143,8 +144,9 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
   const currentProject = projects.find((p) => p.id === activeProjectId);
   const selectedObject = currentProject?.objects.find((object) => object.id === selectedObjectId);
   const contentOpen = overlays.sidebar || overlays.inspector || overlays.materials || overlays.settings;
-  // Groups and multi-selections don't resize (no meaningful per-axis size).
-  const noResize = selectedObject?.shape === 'group' || selectedObjectIds.length > 1;
+  // Groups and multi-selections resize by stretching, unless turned (wall-fitted built-ins) or scanned.
+  const noResize = (selectedObject?.shape === 'group' || selectedObjectIds.length > 1)
+    && !(currentProject && stretchBox(currentProject.objects, selectedObjectIds.length > 1 ? selectedObjectIds : [selectedObject!.id]));
 
   return (
     <div

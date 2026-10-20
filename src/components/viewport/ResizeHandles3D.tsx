@@ -16,7 +16,7 @@ const FACES: Face[] = ['+x', '-x', '+y', '-y', '+z', '-z'];
 const ACCENT = '#f97316';
 
 /** Translucent highlight over one face of the part (local frame). */
-const FaceHighlight: React.FC<{ face: Face; dims: { length: number; height: number; width: number } }> = ({ face, dims }) => {
+export const FaceHighlight: React.FC<{ face: Face; dims: { length: number; height: number; width: number } }> = ({ face, dims }) => {
   const a = faceAxis(face), s = faceSign(face);
   const half = { x: dims.length / 2, y: dims.height / 2, z: dims.width / 2 };
   const pos: [number, number, number] = [0, 0, 0];

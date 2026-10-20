@@ -1,4 +1,5 @@
 import React from 'react';
+import { stretchBox } from '../../utils/groupStretch';
 import { Move, RotateCw, Scaling, Copy, Trash2, Plus } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
@@ -21,7 +22,9 @@ export const TransformMenu: React.FC = () => {
 
   const project = projects.find((item) => item.id === activeProjectId);
   const selected = project?.objects.find((item) => item.id === selectedObjectId);
-  const noResize = selected?.shape === 'group' || selectedObjectIds.length > 1;
+  // Groups and multi-selections resize by stretching, unless turned (wall-fitted built-ins) or scanned.
+  const noResize = (selected?.shape === 'group' || selectedObjectIds.length > 1)
+    && !(project && stretchBox(project.objects, selectedObjectIds.length > 1 ? selectedObjectIds : [selected!.id]));
 
   const openOverlay = useAppStore((state) => state.openOverlay);
   const setSidebarPanel = useAppStore((state) => state.setSidebarPanel);

@@ -14,6 +14,7 @@ import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
+import { GroupResizeHandles3D } from './GroupResizeHandles3D';
 import { SnapHighlight } from './SnapHighlight';
 import { MeasureLayer } from '../../measure/MeasureLayer';
 import { useMeasure } from '../../measure/useMeasure';
@@ -354,9 +355,9 @@ export const FurnitureCanvas: React.FC = () => {
         {selectedObject && !holeEdit.editing && !multiSelect && !measuring && (
           <>
             {/* Direct 3D grab & drag resize handles */}
-            {activeGizmoMode === 'resize' && (
-              <ResizeHandles3D object={selectedObject} />
-            )}
+            {activeGizmoMode === 'resize' && (selectedObjectIds.length > 1 || selectedObject.shape === 'group'
+              ? <GroupResizeHandles3D ids={selectedObjectIds.length > 1 ? selectedObjectIds : [selectedObject.id]} />
+              : <ResizeHandles3D object={selectedObject} />)}
 
             {/* Touch-friendly translation & rotation gizmos */}
             {activeGizmoMode !== 'resize' && (

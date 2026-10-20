@@ -5,6 +5,7 @@ import { unitScale } from '../../utils/units';
 import type { Dimensions3D, LengthUnit } from '../../types/furniture';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { NumberField } from '../ui/NumberField';
+import { stretchBox } from '../../utils/groupStretch';
 
 const AXES: { key: keyof Dimensions3D; color: string; testId: string }[] = [
   { key: 'length', color: GIZMO_AXIS.x, testId: 'size-x' },
@@ -139,9 +140,10 @@ export const MoveFloorRow: React.FC = () => {
 
 /** One underlined number per axis, in the same bar as the transform tools. */
 export const ResizeSizeRow: React.FC = () => {
-  const { project, object, activeGizmoMode, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
+  const { project, object, activeGizmoMode, selectedObjectIds, updateObject, pushHistoryState, saveCurrentProject } = useSelectedPart();
   const [linked, setLinked] = useState(false);
-  if (activeGizmoMode !== 'resize' || !project || !object || object.shape === 'group') return null;
+  if (activeGizmoMode !== 'resize' || !project || !object) return null;
+  if (object.shape === 'group' || selectedObjectIds.length > 1) return <GroupSizeRow />;
 
   const scale = unitScale(project.unit);
 
@@ -190,6 +192,38 @@ export const ResizeSizeRow: React.FC = () => {
       >
         {linked ? <Link2 size={16} /> : <Unlink2 size={16} />}
       </button>
+    </div>
+  );
+};
+
+/** Group / multi-selection size: long parts stretch, thin ones keep size (left, bottom, back stay put). */
+const GroupSizeRow: React.FC = () => {
+  const { project, object, selectedObjectIds, stretchSelection, pushHistoryState, saveCurrentProject } = useSelectedPart();
+  if (!project || !object) return null;
+  const ids = selectedObjectIds.length > 1 ? selectedObjectIds : [object.id];
+  const box = stretchBox(project.objects, ids);
+  if (!box) return null;
+  const size = { length: box.max.x - box.min.x, height: box.max.y - box.min.y, width: box.max.z - box.min.z };
+  const face = { length: '+x', height: '+y', width: '+z' } as const;
+  const scale = unitScale(project.unit);
+  return (
+    <div className="size-inline" data-testid="group-size-bar" role="group" aria-label="Group size">
+      {AXES.map((axis) => (
+        <NumberField
+          key={axis.key}
+          className="size-figure"
+          testId={`group-${axis.testId}`}
+          min={0.25 * scale}
+          aria-label={`Group ${axis.key} in ${project.unit}`}
+          style={{ color: axis.color, borderBottomColor: axis.color }}
+          value={size[axis.key] * scale}
+          format={() => formatSize(size[axis.key], project.unit)}
+          onCommit={(n) => {
+            stretchSelection(ids, face[axis.key], n / scale, undefined, true);
+            commitSize(pushHistoryState, saveCurrentProject);
+          }}
+        />
+      ))}
     </div>
   );
 };
