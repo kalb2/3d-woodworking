@@ -16,7 +16,6 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { EditorOverflowList } from './EditorOverflow';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
-import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
 import { MoveFloorRow, ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
@@ -31,15 +30,9 @@ const PhoneTapButton: React.FC<PhoneTapButtonProps> = ({ onTap, type = 'button',
 
 export const PhoneCanvasHeader: React.FC = () => {
   const { setView, openOverlay, overlays, setOverlayOpen } = useAppStore();
-  const { projects, activeProjectId, setUnit } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
-  const unit = currentProject?.unit ?? 'in';
 
-  const cycleUnit = () => {
-    const order = ['in', 'cm', 'mm', 'ft'] as const;
-    const next = order[(order.indexOf(unit as typeof order[number]) + 1) % order.length] ?? 'in';
-    setUnit(next);
-  };
 
   return (
     <header className="editor-header phone-canvas-header" data-testid="phone-canvas-header">
@@ -59,16 +52,6 @@ export const PhoneCanvasHeader: React.FC = () => {
         <span className="phone-header-project-name">
           {currentProject?.name || 'My Project'}
         </span>
-        <span className="phone-header-sep" aria-hidden="true">/</span>
-        <PhoneTapButton
-          className="phone-header-unit"
-          onTap={cycleUnit}
-          aria-label={`Units: ${unit}. Tap to change`}
-          title="Change units"
-          data-testid="phone-project-units"
-        >
-          {unit}
-        </PhoneTapButton>
       </div>
 
       <div className="phone-header-actions">
@@ -114,7 +97,7 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
       <PhoneSheetGrab />
       <div className="phone-sheet-header">
         <span className="phone-sheet-title">More</span>
-        <OverlayDismissButton onDismiss={close} />
+        <OverlayDismissButton showLabel onDismiss={close} />
       </div>
       <div className="phone-sheet-body">
         <EditorOverflowList
@@ -173,7 +156,6 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
-          <WorkshopSettings />
         </div>
       )}
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">

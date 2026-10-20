@@ -14,22 +14,15 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
   onOpenCutList,
   onShareProject,
 }) => {
-  const { activeProjectId, projects, setUnit } = useProjectStore();
+  const { activeProjectId, projects } = useProjectStore();
   const { setView, overlays, openOverlay, setOverlayOpen } = useAppStore();
   const currentProject = projects.find((project) => project.id === activeProjectId);
-  const unit = currentProject?.unit ?? 'in';
 
-  const cycleUnit = () => {
-    const order = ['in', 'cm', 'mm', 'ft'] as const;
-    const next = order[(order.indexOf(unit as typeof order[number]) + 1) % order.length] ?? 'in';
-    setUnit(next);
-  };
 
   const toggleMore = () => {
     if (overlays.menu) setOverlayOpen('menu', false);
     else openOverlay('menu', true);
   };
-  const cycleUnits = useReliableTap(cycleUnit);
   const more = useReliableTap(toggleMore);
 
   return (
@@ -52,17 +45,6 @@ export const IPadHeader: React.FC<IPadHeaderProps> = ({
         <span className="editor-topbar-name" data-testid="editor-project-name">
           {currentProject?.name || 'My Project'}
         </span>
-        <button
-          type="button"
-          className="phone-header-unit"
-          onClick={cycleUnits}
-          onPointerUp={cycleUnits}
-          aria-label={`Units: ${unit}. Tap to change`}
-          title="Change units"
-          data-testid="editor-project-units"
-        >
-          {unit}
-        </button>
       </div>
 
       <div className="editor-topbar-more">

@@ -12,7 +12,6 @@ import {
   PhoneCanvasHeader,
   PhoneMenuSheet,
 } from './components/layout/PhoneCanvasChrome';
-import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
@@ -58,7 +57,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (currentView !== 'editor' || !isPhone || selectedObjectId) return;
-    setOverlayOpen('inspector', false);
     setOverlayOpen('materials', false);
   }, [selectedObjectId, isPhone, currentView, setOverlayOpen]);
 
@@ -131,7 +129,6 @@ export const App: React.FC = () => {
         <>
           <SidebarNav />
           <ObjectInspector />
-          <WorkshopSettings />
         </>
       )}
 

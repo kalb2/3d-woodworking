@@ -506,22 +506,6 @@ html, body, #root {
   color: #dc2626;
 }
 
-.phone-properties-entry {
-  align-self: flex-end;
-  margin: 2px 10px 4px;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
-  background: #ffffff;
-  color: var(--text-main);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-  cursor: pointer;
-  touch-action: manipulation;
-}
 
 .part-properties {
   display: flex;
@@ -3154,3 +3138,47 @@ html, body, #root {
 .phone-sheet-dismiss.is-labeled { width: auto; padding: 0 16px; border-radius: 999px; font-size: 15px; font-weight: 600; color: #0f172a; }
 /* iPad: the transform menu sits centered on the same row, so Undo/Redo stack above Properties (Properties stays level with Add). */
 .fab-left.is-ipad { flex-direction: column-reverse; align-items: flex-start; }
+
+/* ============ Properties sheet (part + project) ============
+   One rhythm everywhere: section kicker, then a card of 48px rows,
+   label left / control right, 12px side padding, 16px between sections. */
+.props { display: flex; flex-direction: column; gap: 16px; color: #0f172a; }
+.props-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; background: inherit; }
+.editor-root.is-phone .props-head { background: #ffffff; }
+.props-title { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+.props-tabs { display: flex; flex: 1 1 auto; min-width: 0; padding: 3px; border-radius: 12px; background: #f1f5f9; }
+.props-tabs button { flex: 1 1 50%; min-width: 0; height: 34px; padding: 0 10px; border: none; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #475569; }
+.props-tabs button span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.props-tabs button.is-on { background: #ffffff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
+.props-section { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.props-kicker { margin: 0 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; }
+.props-card { display: flex; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff; overflow: hidden; }
+.props-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 6px 12px; box-sizing: border-box; width: 100%; border: none; background: transparent; font: inherit; color: inherit; text-align: left; }
+.props-row + .props-row { border-top: 1px solid #f1f5f9; }
+.props-row.is-button { cursor: pointer; touch-action: manipulation; }
+.props-row.is-button:disabled { opacity: 0.5; }
+.props-row.is-action { justify-content: flex-start; }
+.props-row.is-action .props-label { flex: 1; }
+.props-action-icon { display: flex; color: #64748b; }
+.props-chevron { color: #94a3b8; flex-shrink: 0; }
+.props-label { font-size: 15px; font-weight: 500; white-space: nowrap; }
+.props-value { display: flex; align-items: center; justify-content: flex-end; min-width: 0; flex: 1 1 auto; }
+.props-readout { font-size: 14px; color: #475569; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.props-input { width: 100%; max-width: 220px; min-width: 0; height: 36px; padding: 0 10px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; font: inherit; font-size: 15px; color: #0f172a; text-align: right; text-overflow: ellipsis; }
+.props-input:focus { outline: none; border-color: #e09f3e; background: #fff; }
+.props-input.is-number { width: 88px; font-variant-numeric: tabular-nums; }
+.props-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: #f1f5f9; }
+.props-seg button { height: 32px; min-width: 44px; padding: 0 10px; border: none; border-radius: 8px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #475569; white-space: nowrap; }
+.props-seg button.is-on { background: #ffffff; color: #b45309; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
+/* Cuts + Finish keep their own content but match the card frame. */
+.props .holes-section { padding: 12px; border: 1px solid #e2e8f0; border-radius: 14px; gap: 8px; }
+.props .part-color-section { padding: 12px; gap: 12px; border-radius: 14px; }
+.props .finish-color-row { min-height: 40px; }
+/* iPad panel: the head must not scroll away either. */
+.props.glass-panel { background: #ffffff; padding-top: 4px !important; }
+.props.glass-panel .props-head { background: #ffffff; }
+.editor-overflow-list .phone-sheet-row { min-height: 44px; padding: 8px; }
+
+/* ••• menu group headers */
+.menu-kicker { margin: 10px 8px 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; }
+.menu-kicker:first-child { margin-top: 2px; }
