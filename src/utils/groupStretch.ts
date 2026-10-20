@@ -3,6 +3,7 @@ import type { Dimensions3D, FurnitureObject, LengthUnit } from '../types/furnitu
 import { ancestorIds, leavesOf, objectBox, refitGroups, unionBox, type Box } from '../state/groupTree';
 import { rotationMatrix, type Face } from './pushPull';
 import { snapSize } from './resizeRules';
+import { reanchorUpdate } from './holes';
 
 type Ax = 'x' | 'y' | 'z';
 const DIM: Record<Ax, keyof Dimensions3D> = { x: 'length', y: 'height', z: 'width' };
@@ -90,10 +91,8 @@ export function stretchObjects(objects: FurnitureObject[], rootIds: string[], fa
     const nMin = map(b.min[a]), nMax = map(b.max[a]);
     if (stretch && k) {
       const len = Math.max(MIN, nMax - nMin);
-      updates.set(o.id, {
-        dimensions: { ...o.dimensions, [DIM[k]]: r4(len) },
-        position: { ...o.position, [a]: r4((nMin + nMax) / 2) },
-      });
+      const dimensions = { ...o.dimensions, [DIM[k]]: r4(len) };
+      updates.set(o.id, { dimensions, position: { ...o.position, [a]: r4((nMin + nMax) / 2) }, ...reanchorUpdate(o, dimensions) });
     } else {
       // Keep size; move with the gaps (centered on its mapped span when no gap is rigid).
       const shift = elastic > 1e-6 ? nMin - b.min[a] : (nMin + nMax) / 2 - (b.min[a] + b.max[a]) / 2;

@@ -14,6 +14,9 @@ export const DOWEL_DIAMETER = 0.375;
 export const DOWEL_LENGTH = 1.5;
 export const POCKET_DIAMETER = 0.375;
 export const DEFAULT_SPACING: Record<'pocket' | 'dowel', number> = { pocket: 6, dowel: 4 };
+export const DEFAULT_SCREW_LENGTH = 1.25;
+export const dowelDiameter = (j: Pick<Joint, 'diameter'>) => j.diameter ?? DOWEL_DIAMETER;
+export const dowelLength = (j: Pick<Joint, 'length'>) => j.length ?? DOWEL_LENGTH;
 
 export const JOINT_TYPES: JointType[] = ['butt', 'dado', 'rabbet', 'pocket', 'dowel'];
 export const JOINT_LABEL: Record<JointType, string> = {
@@ -93,6 +96,21 @@ export function receiverThickness(R: FurnitureObject, face: Face): number {
   return half(R)[face[1] as Ax] * 2;
 }
 
+/**
+ * Dado / rabbet only make sense cut into a board's broad face (the touched face
+ * is across its thickness). Boards butted end to end or edge to edge have none.
+ */
+export function groovable(R: FurnitureObject, face: Face): boolean {
+  const h = half(R), a = face[1] as Ax;
+  return AX.every((x) => x === a || h[a] <= h[x] + 1e-6);
+}
+
+/** 'end' when the receiver is touched on its longest axis, else 'edge'. */
+export function buttKind(R: FurnitureObject, face: Face): 'end' | 'edge' {
+  const h = half(R), a = face[1] as Ax;
+  return AX.every((x) => h[a] >= h[x] - 1e-6) ? 'end' : 'edge';
+}
+
 /** 1/4" for 3/4" stock; a third of the thickness otherwise (1/16" steps). */
 export function defaultDepth(R: FurnitureObject, face: Face): number {
   return Math.max(0.0625, Math.round((receiverThickness(R, face) / 3) * 16) / 16);
@@ -113,9 +131,20 @@ export interface JointLayout {
   offset: number;
 }
 
+/**
+ * Groove extent across the cut (receiver-local t): the mating board's span, or
+ * `width` laid from the edge it sits at (rabbet) / its near side (dado).
+ */
+export function grooveSpan(j: Pick<Joint, 'width'>, R: FurnitureObject, L: JointLayout): [number, number] {
+  if (j.width === undefined || Math.abs(j.width - (L.tMax - L.tMin)) < 1e-6) return [L.tMin, L.tMax];
+  const h = half(R)[L.t];
+  if (L.tMax >= h - TOUCH_TOL && L.tMin > -h + TOUCH_TOL) return [r4(L.tMax - j.width), L.tMax];
+  return [L.tMin, r4(L.tMin + j.width)];
+}
+
 export function jointLayout(j: Joint, R: FurnitureObject | undefined, M: FurnitureObject | undefined): JointLayout | null {
   if (!R || !M) return null;
-  const c = contactOn(R, M, j.face, Math.max(j.extended, j.depth) + 0.05);
+  const c = contactOn(R, M, j.face, Math.max(j.extended, j.depth) + 0.5);
   if (!c) return null;
   const h = half(R);
   const [o0, o1] = AX.filter((x) => x !== c.axis);
@@ -132,13 +161,23 @@ export function jointLayout(j: Joint, R: FurnitureObject | undefined, M: Furnitu
   };
 }
 
-/** Evenly spaced spots along a span, inset from the ends. */
-export function spots(span: number, spacing: number): number[] {
-  if (span < 2.5) return [span / 2];
-  const inset = Math.min(1.5, span / 4);
-  const inner = span - 2 * inset;
-  const n = Math.max(2, Math.round(inner / Math.max(1, spacing)) + 1);
+/** Default distance from each end of a joint line to the first hole. */
+export const defaultSetback = (span: number) => Math.min(1.5, span / 4);
+
+/** Evenly spaced spots along a span, inset from the ends (`count` wins over `spacing`). */
+export function spots(span: number, spacing: number, setback?: number, count?: number): number[] {
+  if (count === 1 || (count === undefined && setback === undefined && span < 2.5)) return [r4(span / 2)];
+  const inset = Math.min(setback ?? defaultSetback(span), span / 2);
+  const inner = Math.max(0, span - 2 * inset);
+  const n = count !== undefined ? Math.max(1, Math.round(count)) : Math.max(2, Math.round(inner / Math.max(1, spacing)) + 1);
+  if (n === 1) return [r4(span / 2)];
   return Array.from({ length: n }, (_, i) => r4(inset + (inner * i) / (n - 1)));
+}
+
+/** Hole positions along the joint line (distance from its start). */
+export function hardwareSpots(j: Joint, L: JointLayout): number[] {
+  const spacing = j.spacing ?? DEFAULT_SPACING[j.type === 'dowel' ? 'dowel' : 'pocket'];
+  return spots(L.lMax - L.lMin, spacing, j.setback, j.count);
 }
 
 export type Cutter =
@@ -152,8 +191,7 @@ const arr = (v: THREE.Vector3): [number, number, number] => [r4(v.x), r4(v.y), r
 function hardwarePoints(j: Joint, R: FurnitureObject, L: JointLayout): THREE.Vector3[] {
   const h = half(R);
   const { axis, sign } = L.contact;
-  const spacing = j.spacing ?? DEFAULT_SPACING[j.type === 'dowel' ? 'dowel' : 'pocket'];
-  return spots(L.lMax - L.lMin, spacing).map((s) =>
+  return hardwareSpots(j, L).map((s) =>
     toWorld(R, vec({ [axis]: sign * h[axis], [L.t]: (L.tMin + L.tMax) / 2, [L.l]: L.lMin + s })));
 }
 
@@ -175,8 +213,9 @@ export function jointCutters(j: Joint, partId: string, R: FurnitureObject | unde
   if (j.type === 'dado' || j.type === 'rabbet') {
     if (partId !== R.id) return [];
     const d = Math.max(0.03, j.depth);
-    const lo = L.tMin <= -h[L.t] + TOUCH_TOL ? -h[L.t] - 0.5 : L.tMin;
-    const hi = L.tMax >= h[L.t] - TOUCH_TOL ? h[L.t] + 0.5 : L.tMax;
+    const [g0, g1] = grooveSpan(j, R, L);
+    const lo = g0 <= -h[L.t] + TOUCH_TOL ? -h[L.t] - 0.5 : g0;
+    const hi = g1 >= h[L.t] - TOUCH_TOL ? h[L.t] + 0.5 : g1;
     const center = vec({ [axis]: sign * (h[axis] - d / 2 + 0.025), [L.t]: (lo + hi) / 2, [L.l]: 0 });
     const size = vec({ [axis]: d + 0.05, [L.t]: hi - lo, [L.l]: h[L.l] * 2 + 1 });
     out.push({ kind: 'box', center: arr(center), size: arr(size) });
@@ -184,15 +223,16 @@ export function jointCutters(j: Joint, partId: string, R: FurnitureObject | unde
   }
   const pts = hardwarePoints(j, R, L);
   if (j.type === 'dowel') {
-    const rDepth = Math.min(DOWEL_LENGTH / 2, h[axis] * 2 * 0.6);
-    const mDepth = DOWEL_LENGTH - rDepth + 0.125;
+    const len = dowelLength(j), rad = dowelDiameter(j) / 2;
+    const rDepth = Math.min(len / 2, h[axis] * 2 * 0.6);
+    const mDepth = len - rDepth + 0.125;
     for (const p of pts) {
       if (partId === R.id) {
         const c = toLocal(R, p).add(vec({ [axis]: -sign * (rDepth / 2 - 0.02) }));
-        out.push({ kind: 'cyl', center: arr(c), axis: arr(vec({ [axis]: 1 })), radius: DOWEL_DIAMETER / 2, depth: rDepth + 0.04 });
+        out.push({ kind: 'cyl', center: arr(c), axis: arr(vec({ [axis]: 1 })), radius: rad, depth: rDepth + 0.04 });
       } else {
         const c = toLocal(M, p.clone().addScaledVector(n, mDepth / 2 - 0.02 - j.extended));
-        out.push({ kind: 'cyl', center: arr(c), axis: arr(dirToLocal(M, n)), radius: DOWEL_DIAMETER / 2, depth: mDepth + 0.04 });
+        out.push({ kind: 'cyl', center: arr(c), axis: arr(dirToLocal(M, n)), radius: rad, depth: mDepth + 0.04 });
       }
     }
     return out;
@@ -273,18 +313,94 @@ export interface HardwareItem { name: string; quantity: number }
 /** Screws and dowels the joints need. */
 export function jointHardware(project: Pick<FurnitureProject, 'objects' | 'joints'>): HardwareItem[] {
   const byId = new Map(project.objects.map((o) => [o.id, o]));
-  let screws = 0, dowels = 0;
+  const tally = new Map<string, number>();
+  const frac = (n: number) => `${formatLength(n, 'in').replace(/ in$/, '')}"`;
   for (const j of project.joints ?? []) {
     const c = hardwareCount(j, byId.get(j.receiverId), byId.get(j.materId));
-    if (j.type === 'pocket') screws += c;
-    if (j.type === 'dowel') dowels += c;
+    if (!c) continue;
+    const name = j.type === 'pocket'
+      ? `Pocket screws ${frac(j.screwLength ?? DEFAULT_SCREW_LENGTH)}`
+      : `Dowels ${frac(dowelDiameter(j))} x ${frac(dowelLength(j))}`;
+    tally.set(name, (tally.get(name) ?? 0) + c);
   }
-  const out: HardwareItem[] = [];
-  if (screws) out.push({ name: 'Pocket screws 1 1/4"', quantity: screws });
-  if (dowels) out.push({ name: 'Dowels 3/8" x 1 1/2"', quantity: dowels });
-  return out;
+  return [...tally].map(([name, quantity]) => ({ name, quantity })).sort((x, y) => (x.name < y.name ? 1 : -1));
 }
 
 /** Joints that involve a part. */
 export const jointsOf = (project: Pick<FurnitureProject, 'joints'> | undefined, id: string | null | undefined) =>
   id ? (project?.joints ?? []).filter((j) => j.receiverId === id || j.materId === id) : [];
+
+/** Move a part by `delta` along one of R's local axes; returns its new position. */
+export function shiftAlong(R: FurnitureObject, M: FurnitureObject, axis: Ax, delta: number) {
+  const d = vec({ [axis]: delta }).applyMatrix4(rotationMatrix(R));
+  return { x: r4(M.position.x + d.x), y: r4(M.position.y + d.y), z: r4(M.position.z + d.z) };
+}
+
+export interface JointGeometry {
+  L: JointLayout;
+  /** Receiver thickness through the touched face. */
+  rThick: number;
+  /** Mating board's thickness across the cut. */
+  matThick: number;
+  /** Groove extent across the cut (receiver-local) and its width. */
+  groove: [number, number];
+  grooveWidth: number;
+  /** How far the mating board sinks into the receiver. */
+  seat: number;
+  /** Which edge of the receiver the joint sits at (rabbets), if any. */
+  edge: 'start' | 'end' | null;
+  /** From the receiver's start edge to the near side of the groove. */
+  offset: number;
+  /** Receiver length across the cut. */
+  span: number;
+}
+
+export function jointGeometry(j: Joint, R: FurnitureObject | undefined, M: FurnitureObject | undefined): JointGeometry | null {
+  if (!R || !M) return null;
+  const L = jointLayout(j, R, M);
+  if (!L) return null;
+  const h = half(R);
+  const groove = grooveSpan(j, R, L);
+  const edge = L.tMin <= -h[L.t] + TOUCH_TOL ? 'start' : L.tMax >= h[L.t] - TOUCH_TOL ? 'end' : null;
+  return {
+    L, rThick: r4(h[L.contact.axis] * 2), matThick: r4(L.contact.box.max[L.t] - L.contact.box.min[L.t]),
+    groove, grooveWidth: r4(groove[1] - groove[0]), seat: r4(-L.contact.gap), edge,
+    offset: r4(L.tMin + h[L.t]), span: r4(h[L.t] * 2),
+  };
+}
+
+/** Move the mating board so its near side sits `extended` into the receiver face again (null = can't line it up). */
+export function reseatPosition(j: Joint, R: FurnitureObject | undefined, M: FurnitureObject | undefined) {
+  if (!R || !M || !joinable(R) || !joinable(M)) return null;
+  const b = boundsIn(R, M);
+  if (!b) return null;
+  const h = half(R), a = j.face[1] as Ax, sign = j.face[0] === '+' ? 1 : -1;
+  for (const o of AX.filter((x) => x !== a)) {
+    if (Math.min(b.max[o], h[o]) - Math.max(b.min[o], -h[o]) < TOUCH_TOL) return null;
+  }
+  const near = sign > 0 ? b.min[a] : b.max[a];
+  const target = sign * h[a] - sign * j.extended;
+  return shiftAlong(R, M, a, target - near);
+}
+
+/** Mirror the mating board to the other edge of the receiver (rabbet: which edge). */
+export function otherEdgePosition(j: Joint, R: FurnitureObject | undefined, M: FurnitureObject | undefined) {
+  const g = jointGeometry(j, R, M);
+  if (!g || !R || !M) return null;
+  return shiftAlong(R, M, g.L.t, -(g.L.tMin + g.L.tMax));
+}
+
+/** Where a joint's tag sits (world) and the cut region to highlight (receiver-local box). */
+export function jointMarker(j: Joint, R: FurnitureObject | undefined, M: FurnitureObject | undefined) {
+  const g = jointGeometry(j, R, M);
+  if (!g || !R) return null;
+  const { axis, sign } = g.L.contact;
+  const h = half(R);
+  const grooved = j.type === 'dado' || j.type === 'rabbet';
+  const [t0, t1] = grooved ? g.groove : [g.L.tMin, g.L.tMax];
+  const deep = grooved ? Math.max(0.03, j.depth) : 0.04;
+  const center = vec({ [axis]: sign * (h[axis] - deep / 2 + 0.01), [g.L.t]: (t0 + t1) / 2, [g.L.l]: (g.L.lMin + g.L.lMax) / 2 });
+  const size = vec({ [axis]: deep + 0.04, [g.L.t]: Math.max(0.05, t1 - t0) + 0.04, [g.L.l]: g.L.lMax - g.L.lMin + 0.04 });
+  const anchor = toWorld(R, vec({ [axis]: sign * (h[axis] + 0.05), [g.L.t]: (t0 + t1) / 2, [g.L.l]: (g.L.lMin + g.L.lMax) / 2 }));
+  return { anchor, center, size };
+}

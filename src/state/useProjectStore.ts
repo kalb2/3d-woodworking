@@ -9,13 +9,20 @@ import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater } from '../joinery/joints';
 import { stretchObjects } from '../utils/groupStretch';
+import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
 import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
-import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
+import { PRESET_WOOD_MATERIALS, freshenFinish } from '../utils/woodTextureGenerator';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
 
-const normalizeProjects = (ps: FurnitureProject[]) => ps.map((p) => { const objects = normalizeTree(p.objects ?? []); return objects === p.objects ? p : { ...p, objects }; });
+// Also refreshes finishes saved with the old, far-too-dark wood presets (walnut read as black).
+const freshenObjects = (os: FurnitureObject[]) => {
+  let changed = false;
+  const out = os.map((o) => { if (!o.material) return o; const m = freshenFinish(o.material); if (m === o.material) return o; changed = true; return { ...o, material: m }; });
+  return changed ? out : os;
+};
+const normalizeProjects = (ps: FurnitureProject[]) => ps.map((p) => { const objects = freshenObjects(normalizeTree(p.objects ?? [])); return objects === p.objects ? p : { ...p, objects }; });
 
 export interface WoodPreset {
   id: string;
@@ -442,7 +449,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   importProject: (raw: FurnitureProject) => {
-    const project = { ...raw, objects: normalizeTree(raw.objects ?? []) };
+    const project = { ...raw, objects: freshenObjects(normalizeTree(raw.objects ?? [])) };
     set(state => ({
       projects: [...state.projects, project],
       activeProjectId: project.id,
@@ -984,6 +991,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const slid = slideAlongWall(existingObj, fittedWall, updates.position);
         updates = { ...updates, position: slid.position, builtIn: { ...existingObj.builtIn, center: slid.center } };
       }
+    }
+
+    // Holes and notches keep their distance from their anchored edge.
+    if (updates.dimensions && !('holes' in updates) && !('board' in updates)) {
+      updates = { ...updates, ...reanchorUpdate(existingObj, updates.dimensions) };
     }
 
     let updatedObjects = proj.objects.map(o => (o.id === id ? { ...o, ...updates } : o));

@@ -10,13 +10,12 @@ import {
   Scaling,
   Trash2,
 } from 'lucide-react';
-import { UndoRedoButtons } from './UndoRedoButtons';
+import { FloatingLeft } from './FloatingLeft';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import { EditorOverflowList } from './EditorOverflow';
 import { OverlayDismissButton, PhoneSheetGrab } from './OverlayChrome';
-import { WorkshopSettings } from './WorkshopSettings';
 import { PHONE_FLOATING_SHEET_STYLE } from './phoneSheet';
 import { MoveFloorRow, ResizeSizeRow, RotateAngleRow } from './SizeBar';
 
@@ -31,15 +30,9 @@ const PhoneTapButton: React.FC<PhoneTapButtonProps> = ({ onTap, type = 'button',
 
 export const PhoneCanvasHeader: React.FC = () => {
   const { setView, openOverlay, overlays, setOverlayOpen } = useAppStore();
-  const { projects, activeProjectId, setUnit } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore();
   const currentProject = projects.find((p) => p.id === activeProjectId);
-  const unit = currentProject?.unit ?? 'in';
 
-  const cycleUnit = () => {
-    const order = ['in', 'cm', 'mm', 'ft'] as const;
-    const next = order[(order.indexOf(unit as typeof order[number]) + 1) % order.length] ?? 'in';
-    setUnit(next);
-  };
 
   return (
     <header className="editor-header phone-canvas-header" data-testid="phone-canvas-header">
@@ -59,16 +52,6 @@ export const PhoneCanvasHeader: React.FC = () => {
         <span className="phone-header-project-name">
           {currentProject?.name || 'My Project'}
         </span>
-        <span className="phone-header-sep" aria-hidden="true">/</span>
-        <PhoneTapButton
-          className="phone-header-unit"
-          onTap={cycleUnit}
-          aria-label={`Units: ${unit}. Tap to change`}
-          title="Change units"
-          data-testid="phone-project-units"
-        >
-          {unit}
-        </PhoneTapButton>
       </div>
 
       <div className="phone-header-actions">
@@ -114,7 +97,7 @@ export const PhoneMenuSheet: React.FC<PhoneMenuSheetProps> = ({
       <PhoneSheetGrab />
       <div className="phone-sheet-header">
         <span className="phone-sheet-title">More</span>
-        <OverlayDismissButton onDismiss={close} />
+        <OverlayDismissButton showLabel onDismiss={close} />
       </div>
       <div className="phone-sheet-body">
         <EditorOverflowList
@@ -154,7 +137,8 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
-      {!contentOpen && <UndoRedoButtons placement="phone" />}
+      {/* Bottom-left: Properties (with a selection) + Undo/Redo; stays up while Properties is open so a second tap closes it. */}
+      {(!contentOpen || overlays.inspector) && <FloatingLeft placement="phone" showUndo={!contentOpen} />}
       {!contentOpen && (
         <PhoneTapButton
           className="add-fab is-phone"
@@ -172,19 +156,10 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       {contentOpen && (
         <div className="phone-tool-sheet-body" data-testid="phone-tool-sheet-body">
           {children}
-          <WorkshopSettings />
         </div>
       )}
-      {selectedObject && !overlays.inspector && (
-        <PhoneTapButton
-          className="phone-properties-entry"
-          data-testid="phone-properties"
-          aria-label="Properties"
-          onTap={() => openOverlay('inspector')}
-        >
-          Properties
-        </PhoneTapButton>
-      )}
+      {/* Properties takes the whole sheet; the transform bar comes back when it closes. */}
+      {!overlays.inspector && (<>
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem
           label="Move"
@@ -238,6 +213,7 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
       <MoveFloorRow />
       <ResizeSizeRow />
       <RotateAngleRow />
+      </>)}
     </div>
   );
 };

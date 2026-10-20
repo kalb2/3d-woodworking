@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { Edges } from '@react-three/drei';
+import { Edges, Line } from '@react-three/drei';
+import { featureEdges } from '../../utils/featureEdges';
 import type { FurnitureObject } from '../../types/furniture';
 import { createWoodMeshMaterial } from '../../utils/woodTextureGenerator';
 import { createBoardGeometry, defaultBoardOptions } from '../../utils/boardGeometry';
@@ -142,6 +143,15 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseGeometry, holesKey, jointKey],
   );
+  // Cut parts (holes, joinery): outline only real feature edges. three's EdgesGeometry
+  // draws every CSG T-junction as a border, which shows as diagonals across faces.
+  const cutOutline = useMemo(() => {
+    if (geometry === baseGeometry) return null;
+    const a = featureEdges(geometry, 24);
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i < a.length; i += 3) pts.push([a[i], a[i + 1], a[i + 2]]);
+    return pts.length ? pts : null;
+  }, [geometry, baseGeometry]);
   const focusHoleId = useHoleFocus((st) => (st.objectId === object.id && st.editing ? st.holeId : null));
   const focusHole = focusHoleId ? holes.find((h) => h.id === focusHoleId) : undefined;
   const focusMarker = useMemo(() => {
@@ -189,11 +199,11 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
         )}
         {!isSelected && !isGroup && shape !== 'sphere' && (style === 'clean' || !busy) && (
           // Crisp SketchUp-style outline, constant screen width.
-          <Edges threshold={24} color={style === 'clean' ? '#1f2937' : '#475569'} lineWidth={style === 'clean' ? 1.4 : 1} transparent opacity={style === 'clean' ? 0.9 : 0.55} />
+          <PartEdges points={cutOutline} color={style === 'clean' ? '#1f2937' : '#475569'} lineWidth={style === 'clean' ? 1.4 : 1} transparent opacity={style === 'clean' ? 0.9 : 0.55} />
         )}
         {isSelected && !isGroup && shape !== 'sphere' && (
-          <Edges
-            threshold={24}
+          <PartEdges
+            points={cutOutline}
             color={SELECTION_COLOR}
             lineWidth={GIZMO_OUTLINE_WIDTH}
             depthTest={false}
@@ -220,3 +230,8 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     </group>
   );
 };
+
+/** Outline: precomputed feature edges for cut parts, else drei Edges (24°). */
+const PartEdges: React.FC<{ points: [number, number, number][] | null; color: string; lineWidth: number; transparent?: boolean; opacity?: number; depthTest?: boolean; toneMapped?: boolean }> = ({ points, ...rest }) => (
+  points ? <Line segments points={points} raycast={() => null} {...rest} /> : <Edges threshold={24} {...rest} />
+);

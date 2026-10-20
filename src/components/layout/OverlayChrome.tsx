@@ -10,26 +10,31 @@ export const PhoneSheetGrab: React.FC = () => (
 interface OverlayDismissButtonProps {
   onDismiss: () => void;
   label?: string;
+  /** Phone: show the word (e.g. Done) instead of the bare chevron. */
+  showLabel?: boolean;
 }
 
 /** Obvious dismiss control — pointerup so iOS WKWebView does not drop click. */
 export const OverlayDismissButton: React.FC<OverlayDismissButtonProps> = ({
   onDismiss,
   label = 'Done',
+  showLabel = false,
 }) => {
   const isPhone = useIsPhone();
   const onTap = useReliableTap(onDismiss);
   return (
     <button
       type="button"
-      className={isPhone ? 'phone-sheet-dismiss' : 'glass-button overlay-dismiss-btn'}
+      className={isPhone ? `phone-sheet-dismiss${showLabel ? ' is-labeled' : ''}` : 'glass-button overlay-dismiss-btn'}
       onClick={onTap}
       onPointerUp={onTap}
       aria-label={label}
       title={label}
       data-testid="overlay-dismiss"
     >
-      {isPhone ? (
+      {isPhone && showLabel ? (
+        <span>{label}</span>
+      ) : isPhone ? (
         <ChevronDown size={22} strokeWidth={1.75} />
       ) : (
         <>

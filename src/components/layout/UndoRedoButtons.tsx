@@ -8,7 +8,7 @@ import { useReliableTap } from '../../utils/reliableTap';
  * unavailable one dimmed) so nothing shifts under a finger; the whole pair is
  * hidden only when the project has no history at all.
  */
-export const UndoRedoButtons: React.FC<{ placement: 'phone' | 'ipad' }> = ({ placement }) => {
+export const UndoRedoButtons: React.FC<{ placement: 'phone' | 'ipad' | 'inline' }> = ({ placement }) => {
   const canUndo = useProjectStore((s) => s.historyIndex > 0);
   const canRedo = useProjectStore((s) => s.historyIndex < s.historyStack.length - 1);
   const undoTap = useReliableTap(() => useProjectStore.getState().undo());

@@ -18,26 +18,26 @@ export const PRESET_WOOD_MATERIALS: Record<WoodSpecies, WoodMaterial> = {
   },
   walnut: {
     id: 'walnut',
-    name: 'Dark Walnut',
+    name: 'Walnut',
     species: 'walnut',
-    baseColor: '#4a3525',
-    secondaryColor: '#2b1b10',
-    grainIntensity: 0.75,
+    baseColor: '#7d5842',
+    secondaryColor: '#583b2b',
+    grainIntensity: 0.7,
     grainScale: 3.8,
-    roughness: 0.35,
-    metalness: 0.05,
+    roughness: 0.4,
+    metalness: 0,
     varnishSheen: 'satin'
   },
   mahogany: {
     id: 'mahogany',
     name: 'Warm Mahogany',
     species: 'mahogany',
-    baseColor: '#6e2a1d',
-    secondaryColor: '#3d120a',
+    baseColor: '#7f3c27',
+    secondaryColor: '#552316',
     grainIntensity: 0.7,
     grainScale: 5.0,
-    roughness: 0.3,
-    metalness: 0.05,
+    roughness: 0.35,
+    metalness: 0,
     varnishSheen: 'glossy'
   },
   pine: {
@@ -68,24 +68,24 @@ export const PRESET_WOOD_MATERIALS: Record<WoodSpecies, WoodMaterial> = {
     id: 'cherry',
     name: 'American Cherry',
     species: 'cherry',
-    baseColor: '#8d402b',
-    secondaryColor: '#522013',
+    baseColor: '#99563a',
+    secondaryColor: '#6b3422',
     grainIntensity: 0.55,
     grainScale: 4.2,
-    roughness: 0.3,
-    metalness: 0.05,
+    roughness: 0.35,
+    metalness: 0,
     varnishSheen: 'satin'
   },
   ebony: {
     id: 'ebony',
     name: 'Smoked Ebony',
     species: 'ebony',
-    baseColor: '#1f1917',
-    secondaryColor: '#0a0807',
+    baseColor: '#2e2521',
+    secondaryColor: '#15100e',
     grainIntensity: 0.85,
     grainScale: 6.0,
-    roughness: 0.25,
-    metalness: 0.1,
+    roughness: 0.3,
+    metalness: 0,
     varnishSheen: 'glossy'
   },
   birch: {
@@ -230,6 +230,30 @@ export function materialFromSpecies(
   };
 }
 
+/**
+ * Projects store a copy of the finish. Older presets were far too dark (walnut read as
+ * black), so parts still carrying an old preset color pick up the current preset.
+ */
+const LEGACY_PRESET_COLORS: Partial<Record<WoodSpecies, string[]>> = {
+  walnut: ['#4a3525'],
+  mahogany: ['#6e2a1d'],
+  cherry: ['#8d402b'],
+  ebony: ['#1f1917'],
+};
+export function freshenFinish(mat: WoodMaterial): WoodMaterial {
+  const old = LEGACY_PRESET_COLORS[mat.species];
+  if (!old || !old.includes(mat.baseColor.toLowerCase())) return mat;
+  const p = PRESET_WOOD_MATERIALS[mat.species];
+  return { ...mat, baseColor: p.baseColor, secondaryColor: p.secondaryColor, roughness: p.roughness, metalness: p.metalness };
+}
+
+/** Mix a hex color toward white (t = 0..1). */
+export function lighten(hex: string, t: number): string {
+  const n = parseInt(normalizePaintHex(hex).slice(1), 16);
+  const ch = (v: number) => Math.round(v + (255 - v) * t).toString(16).padStart(2, '0');
+  return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+}
+
 function isSolidPaint(mat: WoodMaterial): boolean {
   if (mat.species === 'mdf') return true; // flat, matte, no grain
   return mat.species === 'custom_paint'
@@ -268,6 +292,20 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
 
   ctx.fillStyle = mat.baseColor;
   ctx.fillRect(0, 0, width, height);
+
+  // Lighter figure streaks (real walnut/cherry show warm, lighter bands between darker lines).
+  const streaks = 6 + Math.floor(mat.grainScale * 2);
+  ctx.strokeStyle = lighten(mat.baseColor, 0.22);
+  for (let i = 0; i < streaks; i++) {
+    const y = Math.random() * height;
+    ctx.globalAlpha = (0.18 + Math.random() * 0.22) * Math.min(1, mat.grainIntensity + 0.2);
+    ctx.lineWidth = 6 + Math.random() * 16;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= width; x += 16) ctx.lineTo(x, y + Math.sin((x + i * 37) * 0.012) * 9);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 
   const grainLines = Math.floor(mat.grainScale * 40);
   ctx.lineWidth = 1.2;
@@ -314,6 +352,9 @@ export function generateWoodTexture(mat: WoodMaterial): THREE.CanvasTexture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(1, 1);
+  // The canvas holds sRGB colors; without this they are read as linear and the
+  // renderer's output conversion skews them.
+  texture.colorSpace = THREE.SRGBColorSpace;
 
   textureCache.set(cacheKey, texture);
   return texture;
@@ -342,7 +383,8 @@ function solidSurface(params: THREE.MeshStandardMaterialParameters): THREE.MeshS
 
 export type ViewStyle = 'clean' | 'realistic';
 
-export function createWoodMeshMaterial(mat: WoodMaterial, style: ViewStyle = 'realistic'): THREE.MeshStandardMaterial {
+export function createWoodMeshMaterial(input: WoodMaterial, style: ViewStyle = 'realistic'): THREE.MeshStandardMaterial {
+  const mat = freshenFinish(input);
   // Paint is a flat opaque color (and Clean style draws every part flat).
   if (style === 'clean' || isSolidPaint(mat)) {
     return solidSurface({
@@ -356,7 +398,9 @@ export function createWoodMeshMaterial(mat: WoodMaterial, style: ViewStyle = 're
 
   return solidSurface({
     map: woodTex,
-    color: mat.baseColor,
+    // The texture already carries the wood color. Tinting it with baseColor again
+    // multiplied the color by itself (walnut #4a3525 came out near black).
+    color: '#ffffff',
     roughness: mat.roughness,
     metalness: mat.metalness,
     bumpMap: woodTex,

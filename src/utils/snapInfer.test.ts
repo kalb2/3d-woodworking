@@ -58,7 +58,7 @@ describe('snap inference', () => {
     const r = calculateSnappedPosition(mover, { x: 18.4, y: 15, z: 0.08 }, [cab], settings);
     expect(r.position.x).toBe(18); // against cab's right face
     expect(r.position.z).toBeCloseTo(0, 9); // fronts flush
-    expect(r.hint).toBe('Flush');
+    expect(r.hint).toBe('Sides touching · Tops flush');
     const off = calculateSnappedPosition(mover, { x: 18.4, y: 15, z: 0.4 }, [cab], { ...settings, enabled: false });
     expect(off.position).toEqual({ x: 18.4, y: 15, z: 0.4 });
     expect(off.alignments ?? []).toEqual([]);

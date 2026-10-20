@@ -29,7 +29,6 @@ export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; sca
 
   return (
     <div className="holes-section" data-testid="holes-section">
-      {holes.length > 0 && <span className="part-properties-kicker">Cuts</span>}
       {holes.map((h) => (
         <button key={h.id} type="button" className="hole-list-row" data-testid="hole-row" onClick={() => enterHoleMode(h.id)}>
           <span>{describeHole(h, unit, scale)}</span>

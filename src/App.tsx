@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, SlidersHorizontal } from 'lucide-react';
+import { Box } from 'lucide-react';
 import { useProjectStore } from './state/useProjectStore';
 import { useAccountStore } from './state/useAccountStore';
 import { useAppStore } from './state/useAppStore';
@@ -12,7 +12,6 @@ import {
   PhoneCanvasHeader,
   PhoneMenuSheet,
 } from './components/layout/PhoneCanvasChrome';
-import { WorkshopSettings } from './components/layout/WorkshopSettings';
 import { SidebarNav } from './components/sidebar/SidebarNav';
 import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
@@ -58,7 +57,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (currentView !== 'editor' || !isPhone || selectedObjectId) return;
-    setOverlayOpen('inspector', false);
     setOverlayOpen('materials', false);
   }, [selectedObjectId, isPhone, currentView, setOverlayOpen]);
 
@@ -66,7 +64,6 @@ export const App: React.FC = () => {
     return <HomeScreen />;
   }
 
-  const hasSelection = Boolean(selectedObjectId);
   const anyOverlayOpen =
     overlays.sidebar ||
     overlays.inspector ||
@@ -127,20 +124,11 @@ export const App: React.FC = () => {
         />
       )}
 
-      {showDesktopLaunchers && !overlays.inspector && hasSelection && (
-        <OverlayLaunchTab
-          label="Properties"
-          icon={<SlidersHorizontal size={16} color="#e09f3e" />}
-          placement="right-top"
-          onOpen={() => openOverlay('inspector', isPhone)}
-        />
-      )}
 
       {!isPhone && (
         <>
           <SidebarNav />
           <ObjectInspector />
-          <WorkshopSettings />
         </>
       )}
 
