@@ -11,7 +11,8 @@ import { positiveSize } from '../../theme/partSurface';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { grainUVs } from '../../utils/grainUV';
-import { cutHoles, faceAxes, faceThickness, footprint, getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
+import { partCutters } from '../../joinery/joints';
+import { cutHoles, cutSolids, faceAxes, faceThickness, footprint, getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 
 interface FurnitureMeshProps {
   object: FurnitureObject;
@@ -48,6 +49,14 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       : [1, 1, 1];
   const holes = supportsHoles(shape) ? getHoles(object) : [];
   const holesKey = JSON.stringify(holes);
+  // Joinery cuts (dados, rabbets, dowel/pocket holes) follow the parts they join.
+  const jointKey = useProjectStore((s) => {
+    if (!supportsHoles(shape)) return '';
+    const p = s.projects.find((x) => x.id === s.activeProjectId);
+    if (!p?.joints?.length) return '';
+    const c = partCutters(p, object.id);
+    return c.length ? JSON.stringify(c) : '';
+  });
   const baseGeometry = useMemo(() => {
     const l = positiveSize(dimensions.length);
     const w = positiveSize(dimensions.width);
@@ -125,12 +134,13 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const grainShape = !roundPart && shape !== 'group';
   const geometry = useMemo(
     () => {
-      const g = holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry;
+      let g = holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry;
+      if (jointKey) g = cutSolids(g, JSON.parse(jointKey));
       // Grain runs along the part's longest dimension (box-like parts).
       return grainShape ? grainUVs(g, { x: length, y: height, z: width }) : g;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseGeometry, holesKey],
+    [baseGeometry, holesKey, jointKey],
   );
   const focusHoleId = useHoleFocus((st) => (st.objectId === object.id && st.editing ? st.holeId : null));
   const focusHole = focusHoleId ? holes.find((h) => h.id === focusHoleId) : undefined;

@@ -2,6 +2,7 @@ import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { generateCutList, exportCutListCSV, cutListByMaterial } from '../../utils/exportUtils';
+import { jointHardware } from '../../joinery/joints';
 
 interface CutListDrawerProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   if (!isOpen || !currentProject) return null;
 
   const cutList = generateCutList(currentProject);
+  const hardware = jointHardware(currentProject);
 
   return (
     <div style={{
@@ -100,7 +102,10 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
                     </tr>
                     {g.items.map((item) => (
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{item.name}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                          {item.name}
+                          {item.notes && <div data-testid="cut-joinery" style={{ fontSize: 12, fontWeight: 400, color: '#9ca3af', marginTop: 2 }}>{item.notes}</div>}
+                        </td>
                         <td style={{ padding: '10px 12px', color: '#9ca3af' }}>{item.shape}</td>
                         <td style={{ padding: '10px 12px' }}>{item.length}</td>
                         <td style={{ padding: '10px 12px' }}>{item.width}</td>
@@ -111,6 +116,19 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
                     ))}
                   </React.Fragment>
                 ))
+              )}
+              {hardware.length > 0 && (
+                <>
+                  <tr data-testid="cut-hardware-row">
+                    <td colSpan={7} style={{ padding: '14px 12px 6px', fontWeight: 700, color: '#e09f3e' }}>Hardware</td>
+                  </tr>
+                  {hardware.map((h) => (
+                    <tr key={h.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <td colSpan={6} style={{ padding: '10px 12px', fontWeight: 600 }}>{h.name}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#e09f3e' }}>{h.quantity}</td>
+                    </tr>
+                  ))}
+                </>
               )}
             </tbody>
           </table>

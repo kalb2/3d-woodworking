@@ -7,7 +7,8 @@ import { squareUpRoom } from '../generators/squareRoom';
 import { floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
-import type { Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
+import { extendMater } from '../joinery/joints';
+import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { PRESET_WOOD_MATERIALS } from '../utils/woodTextureGenerator';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
@@ -187,6 +188,9 @@ interface ProjectState {
   /** Pin a tape-measure dimension line in the active project. Returns its id. */
   addMeasurement: (a: Position3D, b: Position3D) => string | null;
   removeMeasurement: (id: string) => void;
+  /** Add or edit a joint; dado/rabbet can lengthen the mating part into the groove. */
+  saveJoint: (j: Omit<Joint, 'id' | 'extended'> & { id?: string }, extend: boolean) => string | null;
+  removeJoint: (id: string) => void;
   /** New project whose scene is the scanned room (locked reference parts). */
   createProjectFromScan: (name: string, room: ScannedRoom, unit?: LengthUnit) => boolean;
   updateObject: (id: string, updates: Partial<FurnitureObject>, skipHistory?: boolean) => void;
@@ -790,6 +794,47 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   removeMeasurement: (id) => {
     const { activeProjectId, saveCurrentProject } = get();
     set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, measurements: (p.measurements ?? []).filter((m) => m.id !== id) } : p)) }));
+    saveCurrentProject();
+  },
+
+  saveJoint: (j, extend) => {
+    const { activeProjectId, projects, updateObject, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return null;
+    const find = (id: string) => get().projects.find((p) => p.id === activeProjectId)?.objects.find((o) => o.id === id);
+    const old = j.id ? proj.joints?.find((x) => x.id === j.id) : undefined;
+    if (old?.extended) {
+      const R = find(old.receiverId), M = find(old.materId);
+      if (R && M) updateObject(M.id, extendMater(R, M, old.face, -old.extended), true);
+    }
+    const grow = extend && (j.type === 'dado' || j.type === 'rabbet') ? j.depth : 0;
+    if (grow) {
+      const R = find(j.receiverId), M = find(j.materId);
+      if (R && M) updateObject(M.id, extendMater(R, M, j.face, grow), true);
+    }
+    const id = j.id ?? `joint_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const joint: Joint = { ...j, id, extended: grow };
+    set((st) => ({
+      projects: st.projects.map((p) => {
+        if (p.id !== activeProjectId) return p;
+        const ids = new Set(p.objects.map((o) => o.id));
+        const rest = (p.joints ?? []).filter((x) => x.id !== id && ids.has(x.receiverId) && ids.has(x.materId));
+        return { ...p, joints: [...rest, joint] };
+      }),
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+    return id;
+  },
+  removeJoint: (id) => {
+    const { activeProjectId, projects, updateObject, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const old = proj?.joints?.find((x) => x.id === id);
+    if (!proj || !old) return;
+    const R = proj.objects.find((o) => o.id === old.receiverId), M = proj.objects.find((o) => o.id === old.materId);
+    if (old.extended && R && M) updateObject(M.id, extendMater(R, M, old.face, -old.extended), true);
+    set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, joints: (p.joints ?? []).filter((x) => x.id !== id) } : p)) }));
+    pushHistoryState();
     saveCurrentProject();
   },
 
