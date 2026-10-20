@@ -74,3 +74,17 @@ describe('••• menu', () => {
       expect(r.getByTestId(kept)).toBeTruthy();
   });
 });
+
+describe('phone dock while Properties is open', () => {
+  it('hides the transform bar, and brings it back on close', async () => {
+    const { PhoneBottomSheet } = await import('./PhoneCanvasChrome');
+    s().createProject('Dock', 'in');
+    act(() => useAppStore.getState().setOverlayOpen('inspector', false));
+    const r = render(<PhoneBottomSheet />);
+    expect(r.queryByTestId('transform-menu')).toBeTruthy();
+    act(() => useAppStore.getState().setOverlayOpen('inspector', true));
+    expect(r.queryByTestId('transform-menu')).toBeNull();
+    act(() => useAppStore.getState().setOverlayOpen('inspector', false));
+    expect(r.queryByTestId('transform-menu')).toBeTruthy();
+  });
+});
