@@ -7,7 +7,7 @@ import { squareUpRoom } from '../generators/squareRoom';
 import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
-import { extendMater } from '../joinery/joints';
+import { extendMater, jointGeometry, shiftAlong } from '../joinery/joints';
 import { stretchObjects } from '../utils/groupStretch';
 import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
@@ -201,6 +201,11 @@ interface ProjectState {
   saveJoint: (j: Omit<Joint, 'id' | 'extended'> & { id?: string }, extend: boolean) => string | null;
   removeJoint: (id: string) => void;
   /**
+   * Slide where a joint is cut along the receiving board (dado position, rabbet edge).
+   * The mating board, and anything that sits on it, follows so it stays seated. One undo step.
+   */
+  slideJoint: (id: string, delta: number) => boolean;
+  /**
    * Push/pull a group or multi-selection on one face to a new size (from `base`
    * objects when given, e.g. the drag start). No undo step; the caller commits.
    */
@@ -229,6 +234,15 @@ function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): Furnitur
   return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
 }
 
+/** Joints that went with each undo snapshot (keyed by the snapshot array). */
+const jointSnaps = new WeakMap<FurnitureObject[], Joint[]>();
+/** First undo entry for a project: its parts plus its joints. */
+function seedHistory(objects: FurnitureObject[], joints?: Joint[]): FurnitureObject[] {
+  const snap = [...objects];
+  jointSnaps.set(snap, JSON.parse(JSON.stringify(joints ?? [])));
+  return snap;
+}
+
 /** Max undo steps kept per project. */
 export const HISTORY_LIMIT = 100;
 
@@ -238,10 +252,17 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const { historyStack, activeProjectId, selectedObjectIds, editingGroupId, saveCurrentProject } = get();
     const objects: FurnitureObject[] = JSON.parse(JSON.stringify(historyStack[index]));
     const ids = new Set(objects.map((o) => o.id));
+    // Undo/redo restores joints with the parts (depth, type, seating stay in step).
+    const snapJoints = jointSnaps.get(historyStack[index]);
     const keep = selectedObjectIds.filter((id) => ids.has(id));
     set((state) => ({
       historyIndex: index,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...withRoomSync(p, objects), updatedAt: Date.now() } : p)),
+      projects: state.projects.map((p) => {
+        if (p.id !== activeProjectId) return p;
+        const joints = (snapJoints ? JSON.parse(JSON.stringify(snapJoints)) as Joint[] : p.joints ?? [])
+          .filter((j) => ids.has(j.receiverId) && ids.has(j.materId));
+        return { ...withRoomSync(p, objects), joints, updatedAt: Date.now() };
+      }),
       selectedObjectIds: keep,
       selectedObjectId: keep[keep.length - 1] ?? null,
       editingGroupId: editingGroupId && ids.has(editingGroupId) ? editingGroupId : null,
@@ -257,7 +278,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   editingGroupId: null,
   activeGizmoMode: 'move',
   showDimensions: true,
-  historyStack: [[...INITIAL_PROJECT.objects]],
+  historyStack: [seedHistory(INITIAL_PROJECT.objects, INITIAL_PROJECT.joints)],
   historyIndex: 0,
 
   loadProjects: () => {
@@ -274,7 +295,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
             selectedObjectId: firstId,
             selectedObjectIds: firstId ? [firstId] : [],
             editingGroupId: null,
-            historyStack: [[...projects[0].objects]],
+            historyStack: [seedHistory(projects[0].objects, projects[0].joints)],
             historyIndex: 0
           });
           try {
@@ -328,7 +349,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         selectedObjectId: selected,
         selectedObjectIds: selected ? [selected] : [],
         editingGroupId: null,
-        historyStack: active ? [[...active.objects]] : [[]],
+        historyStack: active ? [seedHistory(active.objects, active.joints)] : [seedHistory([])],
         historyIndex: 0,
       });
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
@@ -370,7 +391,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectIds: [defaultCube.id],
       editingGroupId: null,
       multiSelect: false,
-      historyStack: [[defaultCube]],
+      historyStack: [seedHistory([defaultCube])],
       historyIndex: 0
     }));
 
@@ -403,7 +424,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectId: dupProj.objects[0]?.id || null,
       selectedObjectIds: dupProj.objects[0] ? [dupProj.objects[0].id] : [],
       editingGroupId: null,
-      historyStack: [[...dupProj.objects]],
+      historyStack: [seedHistory(dupProj.objects, dupProj.joints)],
       historyIndex: 0
     }));
 
@@ -424,7 +445,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectId: newActiveProj.objects[0]?.id || null,
       selectedObjectIds: newActiveProj.objects[0] ? [newActiveProj.objects[0].id] : [],
       editingGroupId: null,
-      historyStack: [[...newActiveProj.objects]],
+      historyStack: [seedHistory(newActiveProj.objects, newActiveProj.joints)],
       historyIndex: 0
     });
 
@@ -443,7 +464,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectId: proj.objects[0]?.id || null,
       selectedObjectIds: proj.objects[0] ? [proj.objects[0].id] : [],
       editingGroupId: null,
-      historyStack: [[...proj.objects]],
+      historyStack: [seedHistory(proj.objects, proj.joints)],
       historyIndex: 0
     });
   },
@@ -456,7 +477,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectId: project.objects[0]?.id || null,
       selectedObjectIds: project.objects[0] ? [project.objects[0].id] : [],
       editingGroupId: null,
-      historyStack: [[...project.objects]],
+      historyStack: [seedHistory(project.objects, project.joints)],
       historyIndex: 0
     }));
 
@@ -706,7 +727,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectIds: [objects[0].id],
       editingGroupId: null,
       multiSelect: false,
-      historyStack: [[...objects]],
+      historyStack: [seedHistory(objects)],
       historyIndex: 0,
     }));
     get().saveCurrentProject();
@@ -840,6 +861,38 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     saveCurrentProject();
     return id;
   },
+  slideJoint: (id, delta) => {
+    const { activeProjectId, projects, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    const j = proj?.joints?.find((x) => x.id === id);
+    if (!proj || !j || !Number.isFinite(delta) || Math.abs(delta) < 1e-9) return false;
+    const byId = new Map(proj.objects.map((o) => [o.id, o]));
+    const R = byId.get(j.receiverId), M = byId.get(j.materId);
+    const g = jointGeometry(j, R, M);
+    if (!g || !R || !M) return false;
+    // Keep the cut on the board.
+    const half = g.span / 2;
+    const d = Math.max(-half - g.groove[0], Math.min(half - g.groove[1], delta));
+    if (Math.abs(d) < 1e-9) return false;
+    // The mating board and parts joined onto it (it is their receiver) move together.
+    const moving = new Set([M.id]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const k of proj.joints ?? []) {
+        if (moving.has(k.receiverId) && !moving.has(k.materId) && k.materId !== R.id && byId.has(k.materId)) { moving.add(k.materId); grew = true; }
+      }
+    }
+    set((st) => ({
+      projects: st.projects.map((p) => (p.id !== activeProjectId ? p : {
+        ...p,
+        objects: p.objects.map((o) => (moving.has(o.id) ? { ...o, position: shiftAlong(R, o, g.L.t, d) } : o)),
+        updatedAt: Date.now(),
+      })),
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+    return true;
+  },
   removeJoint: (id) => {
     const { activeProjectId, projects, updateObject, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
@@ -923,7 +976,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       selectedObjectIds: [],
       editingGroupId: null,
       multiSelect: false,
-      historyStack: [[...objects]],
+      historyStack: [seedHistory(objects)],
       historyIndex: 0,
     }));
     get().saveCurrentProject();
@@ -1124,11 +1177,15 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj) return;
     const snapshot = JSON.stringify(proj.objects);
+    const jointsNow = JSON.stringify(proj.joints ?? []);
+    const top = historyStack[historyIndex];
     // A gesture that changed nothing (tap on a handle, no-op edit) is not an undo step.
-    if (historyStack[historyIndex] && JSON.stringify(historyStack[historyIndex]) === snapshot) return;
+    if (top && JSON.stringify(top) === snapshot && JSON.stringify(jointSnaps.get(top) ?? []) === jointsNow) return;
 
     const newHistory = historyStack.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(snapshot));
+    const entry: FurnitureObject[] = JSON.parse(snapshot);
+    jointSnaps.set(entry, JSON.parse(jointsNow));
+    newHistory.push(entry);
     while (newHistory.length > HISTORY_LIMIT) newHistory.shift();
 
     set({
