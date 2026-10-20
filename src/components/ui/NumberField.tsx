@@ -162,7 +162,8 @@ export const NumberField: React.FC<NumberFieldProps> = ({
     />
   );
   if (!fractions) return input;
-  return <>{input}{draft !== null && <FractionBar onPick={pickFraction} />}</>;
+  const label = typeof rest['aria-label'] === 'string' ? rest['aria-label'] : '';
+  return <>{input}{draft !== null && <FractionBar label={label} text={draft} input={inputRef} onPick={pickFraction} />}</>;
 };
 
 /** Keep the field focused (and the keypad up) when a chip is pressed. */
@@ -177,22 +178,38 @@ const FractionChip: React.FC<{ frac: string; onPick: (f: string) => void }> = ({
 };
 
 /** A row of fractions that sits on top of the number keypad while an inch field is being edited. */
-const FractionBar: React.FC<{ onPick: (f: string) => void }> = ({ onPick }) => {
+const FractionBar: React.FC<{ label: string; text: string; input: React.RefObject<HTMLInputElement | null>; onPick: (f: string) => void }> = ({ label, text, input, onPick }) => {
   const [bottom, setBottom] = useState(0);
+  const barRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     // Sit just above the keyboard: the gap between the visual and layout viewport bottoms.
-    const place = () => setBottom(Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)));
+    const place = () => {
+      setBottom(Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)));
+      // Scroll the field above the bar when its sheet can.
+      const el = input.current, bar = barRef.current;
+      if (!el || !bar) return;
+      const over = el.getBoundingClientRect().bottom - (vv.offsetTop + vv.height - bar.offsetHeight) + 12;
+      let box: HTMLElement | null = el.parentElement;
+      while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+      if (over > 0 && box) box.scrollTop += over;
+    };
     place();
     vv.addEventListener('resize', place);
     vv.addEventListener('scroll', place);
     return () => { vv.removeEventListener('resize', place); vv.removeEventListener('scroll', place); };
-  }, []);
+  }, [input]);
   return createPortal(
-    <div className="fraction-bar" data-testid="fraction-bar" role="group" aria-label="Add a fraction" style={{ bottom }}
+    <div className="fraction-bar" data-testid="fraction-bar" role="group" aria-label="Add a fraction" style={{ bottom }} ref={barRef}
       onPointerDown={keepFocus} onMouseDown={keepFocus}>
-      {FRACTIONS.map((f) => <FractionChip key={f} frac={f} onPick={onPick} />)}
+      {/* What is being typed, in case the keyboard covers the field. */}
+      <div className="fraction-readout" data-testid="fraction-readout" aria-hidden="true">
+        <span>{label}</span><b>{text || ' '}</b>
+      </div>
+      <div className="fraction-chips">
+        {FRACTIONS.map((f) => <FractionChip key={f} frac={f} onPick={onPick} />)}
+      </div>
     </div>,
     document.body,
   );

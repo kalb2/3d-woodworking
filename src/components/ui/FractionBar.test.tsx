@@ -62,3 +62,14 @@ describe('Fraction fields', () => {
     expect(r.queryByTestId('fraction-bar')).toBeNull();
   });
 });
+
+describe('Fraction readout', () => {
+  it('shows the field name and what is typed, in case the keyboard covers the field', () => {
+    const r = render(<NumberField value={1} fractions testId="f" aria-label="From bottom end" onCommit={() => {}} />);
+    const input = r.getByTestId('f') as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '16' } });
+    fireEvent.click(r.getByTestId('fraction-1-2'));
+    expect(r.getByTestId('fraction-readout').textContent).toBe('From bottom end16 1/2');
+  });
+});
