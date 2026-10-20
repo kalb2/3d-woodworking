@@ -231,7 +231,8 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({
       </button>
       <button type="button" className="phone-sheet-row" data-testid="menu-select-area" onClick={selectArea} onPointerUp={selectArea}>
         <BoxSelect size={18} />
-        <span>Select area</span>
+        {/* With a part selected this keeps it and lets you tap more parts to add them. */}
+        <span>{selectedObjectId ? 'Select more' : 'Select area'}</span>
       </button>
       {canRename && (
         <button type="button" className="phone-sheet-row" data-testid="menu-rename-selection" onClick={renameSelection} onPointerUp={renameSelection}>

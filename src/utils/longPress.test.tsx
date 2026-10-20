@@ -57,6 +57,7 @@ describe('long-press tip and adding to the selection', () => {
     act(() => s().selectObject(a));
     const r = render(<GroupBar />);
     expect(r.getByTestId('select-tip').textContent).toContain('Tip: long-press another part to add it');
+    expect(r.getByTestId('select-tip-more')).toBeTruthy();
     fireEvent.click(r.getByTestId('select-tip-ok'));
     expect(r.queryByTestId('select-tip')).toBeNull();
     expect(useSelectTip.getState().seen).toBe(true);
@@ -67,5 +68,84 @@ describe('long-press tip and adding to the selection', () => {
     expect(r.getByTestId('multi-join')).toBeTruthy();
     act(() => s().selectObject(b, { additive: true }));
     expect(s().selectedObjectIds).toEqual([a]);
+  });
+});
+
+describe('press on another part (camera hand-off)', () => {
+  // jsdom has no PointerEvent constructor.
+  class PE extends MouseEvent {
+    pointerId: number; pointerType: string;
+    constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; this.pointerType = init.pointerType ?? 'touch'; }
+  }
+  const setup = async () => {
+    vi.useFakeTimers();
+    (globalThis as unknown as { PointerEvent: typeof PE }).PointerEvent = PE;
+    const { startPartPress } = await import('./longPress');
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const seen: string[] = [];
+    el.addEventListener('pointerdown', (e) => seen.push(`down@${(e as MouseEvent).clientX}`));
+    document.addEventListener('pointerup', () => seen.push('up'));
+    const controls = { enabled: true, domElement: el };
+    const cb = { onTap: vi.fn(), onHold: vi.fn() };
+    const ring = vi.fn();
+    const handOff = { current: false };
+    startPartPress({ x: 100, y: 100, pointerId: 7, pointerType: 'touch', controls, orbitAllowed: () => true, handOff, setRing: ring, ...cb });
+    const fire = (type: string, x: number, y = 100) => window.dispatchEvent(new PE(type, { pointerId: 7, clientX: x, clientY: y }));
+    return { controls, cb, ring, seen, fire };
+  };
+
+  it('holds the camera still from the first touch; 12px of jitter does not cancel; hold adds; lift frees the camera', async () => {
+    const { controls, cb, ring, fire } = await setup();
+    expect(controls.enabled).toBe(false);
+    expect(ring).toHaveBeenCalledWith({ x: 100, y: 100, done: false });
+    fire('pointermove', 108, 108); // ~11px
+    vi.advanceTimersByTime(LONG_PRESS_MS);
+    expect(cb.onHold).toHaveBeenCalledOnce();
+    expect(controls.enabled).toBe(false); // still held: no orbit
+    fire('pointerup', 108, 108);
+    expect(controls.enabled).toBe(true);
+    expect(cb.onTap).not.toHaveBeenCalled();
+  });
+
+  it('a quick lift selects (tap) and frees the camera', async () => {
+    const { controls, cb, fire } = await setup();
+    vi.advanceTimersByTime(150);
+    fire('pointerup', 101);
+    expect(cb.onTap).toHaveBeenCalledOnce();
+    expect(controls.enabled).toBe(true);
+  });
+
+  it('moving past the slop hands the touch to the camera at the current point', async () => {
+    const { controls, cb, seen, fire } = await setup();
+    fire('pointermove', 106);
+    fire('pointermove', 120); // 20px: orbit
+    expect(controls.enabled).toBe(true);
+    expect(seen).toEqual(['up', 'down@120']);
+    vi.advanceTimersByTime(LONG_PRESS_MS);
+    fire('pointerup', 160);
+    expect(cb.onHold).not.toHaveBeenCalled();
+    expect(cb.onTap).not.toHaveBeenCalled();
+  });
+});
+
+describe('Select more fallback', () => {
+  it('the tip button enters select mode and keeps the part selected', async () => {
+    localStorage.clear();
+    const { useProjectStore } = await import('../state/useProjectStore');
+    const { GroupBar } = await import('../components/layout/GroupBar');
+    const { useSelectTip } = await import('./longPress');
+    useSelectTip.setState({ seen: false });
+    const s = () => useProjectStore.getState();
+    s().createProject('More', 'in');
+    s().addObject('board');
+    const id = s().projects.find((p) => p.id === s().activeProjectId)!.objects.slice(-1)[0].id;
+    act(() => s().selectObject(id));
+    const r = render(<GroupBar />);
+    fireEvent.click(r.getByTestId('select-tip-more'));
+    expect(s().multiSelect).toBe(true);
+    expect(s().selectedObjectIds).toEqual([id]);
+    expect(r.getByTestId('select-bar').textContent).toContain('1 selected');
+    act(() => s().toggleMultiSelect());
   });
 });

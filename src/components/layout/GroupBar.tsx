@@ -86,6 +86,7 @@ export const GroupBar: React.FC = () => {
   const tip = !tipSeen && count === 1 && !s.multiSelect ? (
     <div className="measure-tip select-tip" data-testid="select-tip" role="note">
       <span>Tip: long-press another part to add it</span>
+      <Btn label="Select more" testId="select-tip-more" onTap={() => { dismissTip(); if (!s.multiSelect) s.toggleMultiSelect(); }} />
       <Btn label="Got it" testId="select-tip-ok" onTap={dismissTip} />
     </div>
   ) : null;

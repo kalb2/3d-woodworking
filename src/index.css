@@ -3129,3 +3129,15 @@ html, body, #root {
 .view-style-seg button.is-on { background: #0f172a; color: #fff; }
 .hole-anchor-label { font-size: 11px; color: #64748b; }
 .select-tip { pointer-events: auto; }
+
+/* No iOS text selection / callout / magnifier on the 3D canvas (long-press is ours). */
+.canvas-touch-root, .canvas-touch-root canvas { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+/* Long-press feedback: fills over 400ms at the finger, pops when the part is added. */
+.press-ring { position: fixed; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; pointer-events: none; z-index: 400;
+  background: conic-gradient(#e09f3e var(--press, 0deg), rgba(224,159,62,0.18) 0); -webkit-mask: radial-gradient(circle, transparent 21px, #000 22px); mask: radial-gradient(circle, transparent 21px, #000 22px);
+  animation: press-fill 400ms linear forwards; }
+.press-ring.is-done { animation: press-pop 260ms ease-out forwards; background: #e09f3e; }
+@property --press { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes press-fill { from { --press: 0deg; transform: scale(0.7); } to { --press: 360deg; transform: scale(1); } }
+@keyframes press-pop { from { transform: scale(1); opacity: 1; } to { transform: scale(1.35); opacity: 0; } }

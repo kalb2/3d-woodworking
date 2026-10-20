@@ -14,7 +14,7 @@ import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
-import { createPress, useSelectTip } from '../../utils/longPress';
+import { startPartPress, useSelectTip } from '../../utils/longPress';
 import { lightHaptic } from '../../native/haptics';
 import { GroupResizeHandles3D } from './GroupResizeHandles3D';
 import { SnapHighlight } from './SnapHighlight';
@@ -145,6 +145,8 @@ export const FurnitureCanvas: React.FC = () => {
   const [dragRect, setDragRect] = useState<ScreenRect | null>(null);
   const dragStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const lastTap = useRef<{ id: string; time: number } | null>(null);
+  const handOff = useRef(false);
+  const [pressRing, setPressRing] = useState<{ x: number; y: number; done: boolean } | null>(null);
   const focusWallId = useBuiltInFlow((s) => s.focusWallId);
   const holeEdit = useHoleFocus();
 
@@ -218,6 +220,7 @@ export const FurnitureCanvas: React.FC = () => {
   };
 
   const handlePartPointerDown = (event: any, objId: string) => {
+    if (handOff.current) return; // our own replayed touch, meant for the camera
     if (measureTap(event, objId)) return;
     event.stopPropagation();
     if (useMeasure.getState().selectedId) useMeasure.getState().select(null);
@@ -256,44 +259,37 @@ export const FurnitureCanvas: React.FC = () => {
   };
 
   const startPress = (event: any, target: string) => {
-    const ne = event.nativeEvent ?? event;
-    const x = ne.clientX ?? 0, y = ne.clientY ?? 0;
-    const controls = orbitControlsRef.current as { enabled: boolean } | null;
-    let held = false;
-    const finish = () => {
-      window.removeEventListener('pointermove', onMove, true);
-      window.removeEventListener('pointerup', onUp, true);
-      window.removeEventListener('pointercancel', onCancel, true);
-      if (held && controls) controls.enabled = !useProjectStore.getState().multiSelect;
-    };
-    const press = createPress(x, y, {
+    const ne = (event.nativeEvent ?? event) as PointerEvent;
+    startPartPress({
+      x: ne.clientX ?? 0, y: ne.clientY ?? 0, pointerId: ne.pointerId ?? 1, pointerType: ne.pointerType || 'touch',
+      controls: orbitControlsRef.current,
+      orbitAllowed: () => !useProjectStore.getState().multiSelect,
+      handOff,
+      setRing: setPressRing,
       onTap: () => selectObject(target),
-      onLongPress: () => {
-        held = true;
-        if (controls) controls.enabled = false; // the held finger must not orbit
+      onHold: () => {
         selectObject(target, { additive: true });
         void lightHaptic();
         useSelectTip.getState().dismiss();
       },
     });
-    // Capture phase on window: runs before OrbitControls sees the lift.
-    const onMove = (e: PointerEvent) => press.move(e.clientX, e.clientY);
-    const onUp = () => { press.up(); finish(); };
-    const onCancel = () => { press.cancel(); finish(); };
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onCancel, true);
   };
 
   return (
     <div
+      className="canvas-touch-root"
       style={{ width: '100%', height: '100%', position: 'relative', touchAction: 'none', backgroundColor: bgColor }}
       onClick={handleCanvasClick}
+      onContextMenu={(e) => e.preventDefault()}
       onPointerDownCapture={onAreaDown}
       onPointerMoveCapture={onAreaMove}
       onPointerUpCapture={onAreaUp}
       onPointerCancelCapture={onAreaUp}
     >
+      {pressRing && (
+        // Hold feedback: a ring that fills over the long-press time, then pops.
+        <div className={`press-ring${pressRing.done ? ' is-done' : ''}`} data-testid="press-ring" aria-hidden="true" style={{ left: pressRing.x, top: pressRing.y }} />
+      )}
       {dragRect && (() => {
         const r = { x0: Math.min(dragRect.x0, dragRect.x1), y0: Math.min(dragRect.y0, dragRect.y1), x1: Math.max(dragRect.x0, dragRect.x1), y1: Math.max(dragRect.y0, dragRect.y1) };
         return <div className="area-select-rect" style={{ position: 'fixed', left: r.x0, top: r.y0, width: r.x1 - r.x0, height: r.y1 - r.y0 }} />;
