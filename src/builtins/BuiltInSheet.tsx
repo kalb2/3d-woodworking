@@ -7,9 +7,10 @@ import { useReliableTap } from '../utils/reliableTap';
 import { describeWall } from '../native/wallScan';
 import { autoBaseCount, MEDIA_WALL_DEFAULTS, type UpperStyle } from '../generators/mediaWall';
 import { fitMediaWall } from '../generators/fitMediaWall';
-import type { BuiltInTemplateId, FurnitureObject, RoomWall } from '../types/furniture';
+import type { FurnitureObject, RoomWall } from '../types/furniture';
 import { BUILT_IN_TEMPLATES, builtInLabel, findBuiltInTemplate, listBuiltIns } from './builtIns';
 import { useBuiltInFlow } from './useBuiltInFlow';
+import { TemplateSetup } from './TemplateSetup';
 
 const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 };
 const inputStyle: React.CSSProperties = { width: 72, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(148,163,184,0.5)', fontSize: 14, textAlign: 'right', background: 'transparent', color: 'inherit' };
@@ -80,55 +81,6 @@ const MediaWallForm: React.FC<{ wall?: RoomWall; existing?: FurnitureObject; onD
         {existing ? 'Update' : 'Generate'}
       </button>
     </div>
-  );
-};
-
-/** Generic form for parametric modules (fields come from the template). */
-const ModuleForm: React.FC<{ templateId: BuiltInTemplateId; wall?: RoomWall; existing?: FurnitureObject; onDone: () => void }> = ({ templateId, wall, existing, onDone }) => {
-  const insertBuiltIn = useProjectStore((s) => s.insertBuiltIn);
-  const t = findBuiltInTemplate(templateId)!;
-  const [values, setValues] = useState<Record<string, number | string>>(() => ({ ...t.defaults, ...(existing?.builtIn?.input ?? {}) }));
-  const set = (k: string, v: number | string) => setValues((cur) => ({ ...cur, [k]: v }));
-  const generate = () => {
-    const { wallWidth: _w, ...input } = values;
-    const ok = insertBuiltIn({ template: templateId, input, wallId: wall?.id, center: existing?.builtIn?.center, editId: existing?.builtIn?.id });
-    if (ok) onDone();
-  };
-  const generateTap = useReliableTap(generate);
-  return (
-    <div data-testid="module-form" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {t.fields!.map((f) => f.kind === 'choice' ? (
-        <div key={f.key} style={fieldStyle}>
-          <span>{f.label}</span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {f.options!.map((o) => (
-              <ChoiceButton key={o.value} label={o.label} active={values[f.key] === o.value} testId={`mod-${f.key}-${o.value}`} onTap={() => set(f.key, o.value)} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <label key={f.key} style={fieldStyle}>
-          <span>{f.count ? f.label : `${f.label} (in)`}</span>
-          <NumberField testId={`mod-${f.key}`} value={Number(values[f.key])} min={f.min ?? 0} integer={f.count} onCommit={(n) => set(f.key, n)} style={inputStyle} />
-        </label>
-      ))}
-      {wall && <span style={{ fontSize: 11, color: '#9ca3af' }}>Lines up next to matching modules on this wall and skips windows and doors.</span>}
-      <button type="button" data-testid="mod-generate" onClick={generateTap} onPointerUp={generateTap}
-        style={{ marginTop: 4, padding: '10px 12px', borderRadius: 10, border: 'none', background: '#e09f3e', color: '#fff', fontWeight: 700, fontSize: 14 }}>
-        {existing ? 'Update' : 'Add'}
-      </button>
-    </div>
-  );
-};
-
-const ChoiceButton: React.FC<{ label: string; active: boolean; testId: string; onTap: () => void }> = ({ label, active, testId, onTap }) => {
-  const tap = useReliableTap(onTap);
-  return (
-    <button type="button" data-testid={testId} onClick={tap} onPointerUp={tap}
-      style={{ padding: '6px 10px', borderRadius: 8, fontSize: 13, border: '1px solid rgba(148,163,184,0.5)',
-        background: active ? '#e09f3e' : 'transparent', color: active ? '#fff' : 'inherit' }}>
-      {label}
-    </button>
   );
 };
 
@@ -255,7 +207,7 @@ export const BuiltInSheet: React.FC = () => {
     title = `${existing ? 'Edit ' : ''}${findBuiltInTemplate(flow.template ?? 'media-wall')?.name ?? 'Built-in'}${wall ? ` · ${wall.label}` : ''}`;
     const tid = flow.template ?? 'media-wall';
     body = findBuiltInTemplate(tid)?.fields
-      ? <ModuleForm key={`${tid}-${flow.editGroupId ?? flow.wallId ?? 'free'}`} templateId={tid} wall={wall} existing={existing} onDone={flow.close} />
+      ? <TemplateSetup key={`${tid}-${flow.editGroupId ?? flow.wallId ?? 'free'}`} templateId={tid} wall={wall} existing={existing} onDone={flow.close} />
       : <MediaWallForm key={flow.editGroupId ?? flow.wallId ?? 'free'} wall={wall} existing={existing} onDone={flow.close} />;
   }
 

@@ -2,14 +2,14 @@ import { create } from 'zustand';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
-import { placeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
+import { placeBuiltIn, resizeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
 import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater, jointGeometry, shiftAlong } from '../joinery/joints';
 import { isViewStyle, savedAppStyle, type ViewStyle } from './viewStyle';
-import { stretchObjects } from '../utils/groupStretch';
+import { stretchBox, stretchObjects } from '../utils/groupStretch';
 import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
 import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
@@ -752,10 +752,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return null;
-    const result = placeBuiltIn(proj.objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD);
+    const result = placeBuiltIn(proj.objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD, Date.now(), proj.joints ?? []);
     if (!result) return null;
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects, joints: result.joints, updatedAt: Date.now() } : p)),
       selectedObjectId: result.groupId,
       selectedObjectIds: [result.groupId],
       multiSelect: false,
@@ -814,16 +814,17 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const locked = proj.roomLocked !== false;
     const roomParts: FurnitureObject[] = roomScanParts(room).map((o, i) => ({ ...o, id: `obj_${stamp}_room_${i}`, ...(locked ? {} : { locked: false }) }));
     let objects = [...roomParts, ...proj.objects.filter((o) => o.generator !== 'room-scan')];
+    let joints = proj.joints ?? [];
     // Re-fit built-ins that sit on a scanned wall so they stay flush.
     for (const g of proj.objects) {
       const bi = g.builtIn;
       if (g.shape !== 'group' || !bi?.wallId || !room.walls.some((w) => w.id === bi.wallId)) continue;
       const width = typeof bi.input.wallWidth === 'number' ? bi.input.wallWidth : undefined;
-      const placed = placeBuiltIn(objects, room, { template: bi.template, input: bi.input, wallId: bi.wallId, center: bi.center, width, editId: bi.id }, g.material);
-      if (placed) objects = placed.objects;
+      const placed = placeBuiltIn(objects, room, { template: bi.template, input: bi.input, wallId: bi.wallId, center: bi.center, width, editId: bi.id }, g.material, Date.now(), joints);
+      if (placed) { objects = placed.objects; joints = placed.joints; }
     }
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, scannedRoom: room } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, joints, scannedRoom: room } : p)),
       selectedObjectId: null,
       selectedObjectIds: [],
     }));
@@ -924,6 +925,23 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return;
     const floorOn = Boolean(proj.showFloor && proj.snapSettings.floorCollision !== false);
+    // An unchanged template group rebuilds at the new size (shelves and doors respace) instead of stretching.
+    if (rootIds.length === 1) {
+      const start = base ?? proj.objects;
+      const g = start.find((o) => o.id === rootIds[0]);
+      const box = g?.builtIn ? stretchBox(start, rootIds) : null;
+      if (g?.builtIn && box) {
+        const ax = face[1] as 'x' | 'y' | 'z';
+        const step = proj.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP;
+        const snap = !exact && proj.snapSettings.enabled !== false ? (n: number) => Math.round(n / step) * step : undefined;
+        const rebuilt = resizeBuiltIn(start, proj.joints ?? [], proj.scannedRoom, g.id, face, size - (box.max[ax] - box.min[ax]), snap);
+        if (rebuilt) {
+          if (rebuilt.objects === proj.objects && rebuilt.joints === proj.joints) return;
+          set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: rebuilt.objects, joints: rebuilt.joints } : p)) }));
+          return;
+        }
+      }
+    }
     const objects = stretchObjects(base ?? proj.objects, rootIds, face, size, {
       snap: !exact && proj.snapSettings.enabled !== false, step: proj.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP, unit: proj.unit, floorOn,
     });
@@ -957,8 +975,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!proj || !group?.builtIn) return;
     const id = group.builtIn.id;
     const objects = deleteCascade(proj.objects.filter((o) => o.builtInId !== id || o.parentId), [groupId]);
+    const left = new Set(objects.map((o) => o.id));
+    const joints = (proj.joints ?? []).filter((j) => left.has(j.receiverId) && left.has(j.materId));
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects, joints } : p)),
       selectedObjectId: null,
       selectedObjectIds: [],
       editingGroupId: state.editingGroupId === groupId ? null : state.editingGroupId,
@@ -1087,8 +1107,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         if (dry) {
           const c = Math.cos(rad(dry));
           const s = Math.sin(rad(dry));
-          const nx = x * c - z * s;
-          const nz = x * s + z * c;
+          // Same handedness as the parts' own Y rotation (three.js): +x turns toward -z.
+          const nx = x * c + z * s;
+          const nz = -x * s + z * c;
           x = nx;
           z = nz;
         }

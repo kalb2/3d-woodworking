@@ -59,7 +59,11 @@ const CameraFocus: React.FC = () => {
     const target = new THREE.Vector3(focus.x, focus.y, focus.z);
     const dir = camera.position.clone().sub(controls.target);
     if (dir.lengthSq() < 1e-6) dir.set(0.6, 0.5, 0.8);
-    dir.normalize().multiplyScalar(Math.max(40, focus.radius * 1.6));
+    // Fit the target's radius in the narrower field of view (phones are tall).
+    const cam = camera as THREE.PerspectiveCamera;
+    const fov = ((cam.fov ?? 50) * Math.PI) / 180;
+    const fit = (focus.radius * 1.15) / Math.sin(Math.min(fov, fov * (cam.aspect ?? 1)) / 2);
+    dir.normalize().multiplyScalar(Math.max(40, focus.radius * 1.6, fit));
     controls.target.copy(target);
     camera.position.copy(target.clone().add(dir));
     controls.update();
