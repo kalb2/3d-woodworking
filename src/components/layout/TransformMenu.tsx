@@ -86,11 +86,11 @@ export const TransformMenu: React.FC = () => {
         <RotateCw size={18} />
         <span>Rotate</span>
       </button>
+      {canEditSelection && (<>
       <button
         type="button"
         className="is-duplicate"
         data-testid="toolbar-duplicate"
-        disabled={!canEditSelection}
         onClick={duplicateSelection}
         onPointerUp={duplicateSelection}
       >
@@ -101,13 +101,13 @@ export const TransformMenu: React.FC = () => {
         type="button"
         className="is-delete"
         data-testid="toolbar-delete"
-        disabled={!canEditSelection}
         onClick={deleteSelection}
         onPointerUp={deleteSelection}
       >
         <Trash2 size={18} />
         <span>Delete</span>
       </button>
+      </>)}
       </div>
     </div>
     </>

@@ -185,12 +185,13 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           showLabel
           onTap={() => setGizmoMode('rotate')}
         />
+        {/* Only shown when they can act: no greyed buttons. */}
+        {selectedObject && (<>
         <DockItem
           label="Duplicate"
           testId="toolbar-duplicate"
           icon={<Copy size={22} strokeWidth={1.8} />}
           active={false}
-          disabled={!selectedObject}
           showLabel
           className="is-duplicate"
           onTap={() => {
@@ -202,13 +203,13 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           testId="toolbar-delete"
           icon={<Trash2 size={22} strokeWidth={1.8} />}
           active={false}
-          disabled={!selectedObject}
           showLabel
           className="is-delete"
           onTap={() => {
             if (selectedObject) deleteSelected();
           }}
         />
+        </>)}
       </nav>
       <MoveFloorRow />
       <ResizeSizeRow />
