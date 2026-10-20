@@ -7,7 +7,7 @@ import { unitScale } from '../utils/units';
 import type { FurnitureObject, Joint, JointType, LengthUnit } from '../types/furniture';
 import { useJoinFlow } from './useJoinFlow';
 import {
-  DEFAULT_SPACING, JOINT_LABEL, JOINT_TYPES, contactOn, defaultDepth, hardwareCount, jointLayout, jointNote, jointsOf, pairContact,
+  DEFAULT_SPACING, JOINT_LABEL, JOINT_TYPES, buttKind, contactOn, groovable, defaultDepth, hardwareCount, jointLayout, jointNote, jointsOf, pairContact,
 } from './joints';
 import type { Face } from '../utils/pushPull';
 
@@ -67,13 +67,27 @@ const JoinForm: React.FC<FormProps> = ({ objects, unit, initial, onDone }) => {
   };
   const toggleExtend = useReliableTap(() => setExtend((v) => !v));
   if (!R || !M) return <p style={{ margin: 0 }}>Those parts are gone.</p>;
+  // Dado / rabbet need a broad face to cut into (this way round, or swapped).
+  const grooveHere = groovable(R, side.face);
+  const grooveSwapped = !grooveHere && Boolean(flip && groovable(M, flip.face));
+  const canGroove = grooveHere || grooveSwapped;
+  const types = JOINT_TYPES.filter((t) => canGroove || (t !== 'dado' && t !== 'rabbet') || t === type);
+  const pick = (t: JointType) => {
+    if ((t === 'dado' || t === 'rabbet') && grooveSwapped) swap();
+    setType(t);
+  };
 
   const cutIn = type === 'pocket' ? M : R;
   return (
     <div data-testid="join-form" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div role="group" aria-label="Joint type" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {JOINT_TYPES.map((t) => <Tap key={t} label={JOINT_LABEL[t]} testId={`join-type-${t}`} active={type === t} onTap={() => setType(t)} />)}
+        {types.map((t) => <Tap key={t} label={JOINT_LABEL[t]} testId={`join-type-${t}`} active={type === t} onTap={() => pick(t)} />)}
       </div>
+      {!canGroove && (
+        <p data-testid="join-no-groove" style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>
+          These boards meet {buttKind(R, side.face) === 'end' ? 'end to end' : 'edge to edge'}, so there is no face to cut a dado or rabbet into. Use a butt joint, pocket screws, or dowels.
+        </p>
+      )}
       {type !== 'butt' && (
         <div style={{ ...fieldStyle, color: '#9ca3af', fontSize: 13 }}>
           <span data-testid="join-where">

@@ -93,6 +93,21 @@ export function receiverThickness(R: FurnitureObject, face: Face): number {
   return half(R)[face[1] as Ax] * 2;
 }
 
+/**
+ * Dado / rabbet only make sense cut into a board's broad face (the touched face
+ * is across its thickness). Boards butted end to end or edge to edge have none.
+ */
+export function groovable(R: FurnitureObject, face: Face): boolean {
+  const h = half(R), a = face[1] as Ax;
+  return AX.every((x) => x === a || h[a] <= h[x] + 1e-6);
+}
+
+/** 'end' when the receiver is touched on its longest axis, else 'edge'. */
+export function buttKind(R: FurnitureObject, face: Face): 'end' | 'edge' {
+  const h = half(R), a = face[1] as Ax;
+  return AX.every((x) => h[a] >= h[x] - 1e-6) ? 'end' : 'edge';
+}
+
 /** 1/4" for 3/4" stock; a third of the thickness otherwise (1/16" steps). */
 export function defaultDepth(R: FurnitureObject, face: Face): number {
   return Math.max(0.0625, Math.round((receiverThickness(R, face) / 3) * 16) / 16);
