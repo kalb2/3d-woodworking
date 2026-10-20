@@ -9,7 +9,7 @@ import type { ButtFasten, FurnitureObject, FurnitureProject, Joint, JointType, L
 import { useJoinFlow, type JoinView } from './useJoinFlow';
 import {
   DEFAULT_SCREW_LENGTH, JOINT_LABEL, JOINT_TYPES, buttKind, contactOn, defaultDepth, defaultSetback, dowelDiameter, dowelLength,
-  groovable, hardwareSpots, jointGeometry, otherEdgePosition, pairContact, reseatPosition, shiftAlong,
+  groovable, hardwareSpots, jointGeometry, pairContact, reseatPosition,
 } from './joints';
 import { fitCheck, type FitResult } from './fitCheck';
 import { JointDiagram } from './JointDiagram';
@@ -92,6 +92,8 @@ const JointEditor: React.FC<{ project: FurnitureProject; joint: Joint; onDone: (
   const n = g && (j.type === 'pocket' || j.type === 'dowel') ? hardwareSpots(j, g.L).length : 0;
   const prev = (key: keyof Joint) => (v: number | null) => setPreview((p) => ({ ...p, [key]: v ?? undefined }));
   const edgeNames = g ? EDGE_NAMES[g.L.t] : EDGE_NAMES.x;
+  /** Where the groove starts, measured from the receiver's start end. */
+  const grooveFrom = g ? Math.round((g.groove[0] + g.span / 2) * 1e4) / 1e4 : 0;
 
   return (
     <div className="joint-editor" data-testid="joint-editor">
@@ -119,16 +121,16 @@ const JointEditor: React.FC<{ project: FurnitureProject; joint: Joint; onDone: (
           <LenField label="Width" unit={unit} testId="joint-width" value={g.grooveWidth} onCommit={(w) => save({ width: Math.abs(w - g.matThick) < 1e-6 ? undefined : w })} onPreview={prev('width')} />
           <LenField label="Depth" unit={unit} testId="joint-depth" value={j.depth} min={0.03} onCommit={(d) => save({ depth: Math.max(0.03, d) })} onPreview={prev('depth')} />
           {j.type === 'dado' ? (
-            <LenField label={`From ${edgeNames[0].toLowerCase()} end`} unit={unit} testId="joint-offset" value={g.offset} min={0}
-              onCommit={(o) => st.updateObject(M.id, { position: shiftAlong(R, M, g.L.t, o - g.offset) })} />
+            <LenField label={`From ${edgeNames[0].toLowerCase()} end`} unit={unit} testId="joint-offset" value={grooveFrom} min={0}
+              onCommit={(o) => st.slideJoint(j.id, o - grooveFrom)} />
           ) : (
             <Row label="Edge">
               <Seg label="Edge" testId="joint-edge" value={g.edge === 'start' ? 'start' : 'end'}
                 options={[{ id: 'start', label: edgeNames[0] }, { id: 'end', label: edgeNames[1] }]}
                 onChange={(e) => {
                   if ((e === 'start') === (g.edge === 'start')) return;
-                  const p = otherEdgePosition(j, R, M);
-                  if (p) st.updateObject(M.id, { position: p });
+                  // Cut the rabbet on the other edge; the mating board moves with it.
+                  st.slideJoint(j.id, e === 'start' ? -g.span / 2 - g.groove[0] : g.span / 2 - g.groove[1]);
                 }} />
             </Row>
           )}
