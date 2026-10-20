@@ -6,11 +6,30 @@ export function isPartialNumber(text: string, allowNegative = true): boolean {
   return re.test(text.trim());
 }
 
+/** Text that is a fraction in progress: '3/', '1 1/4', '1-1/', '3/4"'. */
+export function isPartialFraction(text: string): boolean {
+  return /^\d*(\.\d*)?([ -]?\d*(\/\d*)?)?"?$/.test(text.trim());
+}
+
+/** '3/4' → 0.75, '1 1/4' or '1-1/4' → 1.25, '1.5"' → 1.5; null when not a number. */
+export function parseFraction(text: string): number | null {
+  const t = text.trim().replace(/"$/, '').trim().replace(',', '.');
+  const m = /^(?:(\d+)[ -])?(\d+)\/(\d+)$/.exec(t);
+  if (m) {
+    const den = Number(m[3]);
+    if (!den) return null;
+    return (m[1] ? Number(m[1]) : 0) + Number(m[2]) / den;
+  }
+  if (t === '' || t === '-' || t === '.' || t === '-.') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Parse on commit; null = not a number (revert). Clamp and round only here. */
-export function parseCommit(text: string, opts: { min?: number; max?: number; integer?: boolean } = {}): number | null {
+export function parseCommit(text: string, opts: { min?: number; max?: number; integer?: boolean; fractions?: boolean } = {}): number | null {
   const t = text.trim().replace(',', '.');
   if (t === '' || t === '-' || t === '.' || t === '-.') return null;
-  let n = Number(t);
+  let n = opts.fractions ? (parseFraction(t) ?? NaN) : Number(t);
   if (!Number.isFinite(n)) return null;
   if (opts.integer) n = Math.round(n);
   if (opts.min !== undefined) n = Math.max(opts.min, n);
@@ -37,6 +56,10 @@ export interface NumberFieldProps extends Omit<React.InputHTMLAttributes<HTMLInp
   format?: (value: number) => string;
   testId?: string;
   ref?: React.Ref<HTMLInputElement>;
+  /** Accept imperial fractions ('3/4', '1 1/4'). */
+  fractions?: boolean;
+  /** Called while typing with the number so far (null = not a number yet), for live previews. */
+  onPreview?: (value: number | null) => void;
 }
 
 /**
@@ -46,7 +69,7 @@ export interface NumberFieldProps extends Omit<React.InputHTMLAttributes<HTMLInp
  * reformats mid-typing.
  */
 export const NumberField: React.FC<NumberFieldProps> = ({
-  value, onCommit, min, max, integer, format, testId, onFocus, onBlur, onKeyDown, ref, ...rest
+  value, onCommit, min, max, integer, format, testId, onFocus, onBlur, onKeyDown, ref, fractions, onPreview, ...rest
 }) => {
   const [draft, setDraft] = useState<string | null>(null);
   const skipCommit = useRef(false);
@@ -56,8 +79,9 @@ export const NumberField: React.FC<NumberFieldProps> = ({
   const commit = () => {
     const text = draft;
     setDraft(null);
+    onPreview?.(null);
     if (text === null) return;
-    const n = parseCommit(text, { min, max, integer });
+    const n = parseCommit(text, { min, max, integer, fractions });
     if (n === null) return;
     if (Math.abs(n - value) > 1e-9) onCommit(n);
   };
@@ -67,7 +91,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({
       {...rest}
       ref={ref}
       type="text"
-      inputMode={integer ? 'numeric' : 'decimal'}
+      inputMode={integer ? 'numeric' : fractions ? 'text' : 'decimal'}
       autoComplete="off"
       autoCorrect="off"
       spellCheck={false}
@@ -84,10 +108,16 @@ export const NumberField: React.FC<NumberFieldProps> = ({
       }}
       onChange={(e) => {
         const t = e.target.value;
-        if (isPartialNumber(t.replace(',', '.'), allowNegative)) setDraft(t);
+        const okText = fractions ? isPartialFraction(t.replace(',', '.')) : isPartialNumber(t.replace(',', '.'), allowNegative);
+        if (!okText) return;
+        setDraft(t);
+        if (onPreview) {
+          const n = parseCommit(t, { min, max, integer, fractions });
+          onPreview(n);
+        }
       }}
       onBlur={(e) => {
-        if (skipCommit.current) { skipCommit.current = false; setDraft(null); }
+        if (skipCommit.current) { skipCommit.current = false; setDraft(null); onPreview?.(null); }
         else commit();
         onBlur?.(e);
       }}

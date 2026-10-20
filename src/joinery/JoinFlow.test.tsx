@@ -63,14 +63,22 @@ describe('Join keeps the same two parts for every joint type', () => {
         act(() => useJoinFlow.getState().start(a, b));
         r = render(<JoinSheet />);
         tap(r.getByTestId(`join-type-${type}`));
-        if (type === 'dado' || type === 'rabbet') tap(r.getByTestId('join-extend')); // keep sizes; checked separately
         tap(r.getByTestId('join-save'));
         cleanup();
         expect(proj().objects).toHaveLength(n0);
         expect(proj().joints).toHaveLength(1);
         const j = proj().joints![0];
         expect(j.type).toBe(type);
-        expect(snapshot()).toEqual(before); // nothing moved or resized
+        const grooved = type === 'dado' || type === 'rabbet';
+        if (!grooved) expect(snapshot()).toEqual(before); // nothing moved or resized
+        else {
+          // Only the mating board changes: it grows by the depth to seat in the groove.
+          const m = before.find((o) => o.id === j.materId)!, now = snapshot().find((o) => o.id === j.materId)!;
+          const grew = (['length', 'height', 'width'] as const).reduce((acc, k) => acc + now.dimensions[k] - m.dimensions[k], 0);
+          expect(grew).toBeCloseTo(j.depth, 6);
+          expect(snapshot().filter((o) => o.id !== j.materId)).toEqual(before.filter((o) => o.id !== j.materId));
+        }
+        expect(useJoinFlow.getState().view).toMatchObject({ kind: 'edit', jointId: j.id }); // editor opens next
         const cR = partCutters(proj(), j.receiverId), cM = partCutters(proj(), j.materId);
         if (type === 'butt') { expect(cR).toEqual([]); expect(cM).toEqual([]); }
         if (type === 'dado' || type === 'rabbet') {

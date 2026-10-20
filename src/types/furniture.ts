@@ -244,4 +244,19 @@ export interface Joint {
   extended: number;
   /** Pocket screw / dowel spacing (inches). */
   spacing?: number;
+  /** Dado/rabbet groove width; default = the mating board's thickness. */
+  width?: number;
+  /** Pocket screws / dowels: how many (wins over spacing). */
+  count?: number;
+  /** Pocket screws / dowels: distance from each end of the joint to the first hole. */
+  setback?: number;
+  /** Pocket screw length (inches). */
+  screwLength?: number;
+  /** Dowel diameter and length (inches). */
+  diameter?: number;
+  length?: number;
+  /** Butt joint: how it is held. */
+  fasten?: ButtFasten;
 }
+
+export type ButtFasten = 'glue' | 'screws' | 'glue-screws' | 'none';

@@ -1,6 +1,6 @@
 import { NumberField } from '../ui/NumberField';
 import React, { useEffect, useState } from 'react';
-import { BookmarkPlus, BoxSelect, Link2, SlidersHorizontal } from 'lucide-react';
+import { BookmarkPlus, BoxSelect, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
@@ -14,7 +14,7 @@ import { shapeLabel } from '../../catalog/shapeCatalog';
 import { supportsHoles } from '../../utils/holes';
 import { HolesSection } from './HolesSection';
 import { jointsOf } from '../../joinery/joints';
-import { useJoinFlow } from '../../joinery/useJoinFlow';
+import { JointRows } from '../../joinery/JoinSheet';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { partsFromSelection, useUserTemplates } from '../../templates/userTemplates';
 import { ActionRow, Row, Section, Seg } from '../properties/rows';
@@ -102,7 +102,7 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
   const edgeSize = board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22);
   const close = () => setOverlayOpen('inspector', false);
 
-  const jointCount = jointsOf(project, object.id).length;
+  const partJoints = jointsOf(project, object.id).filter((j) => project.objects.some((o) => o.id === j.receiverId) && project.objects.some((o) => o.id === j.materId));
   let editTarget: FurnitureObject | undefined = object;
   while (editTarget && !editTarget.builtIn) editTarget = editTarget.parentId ? project.objects.find((x) => x.id === editTarget!.parentId) : undefined;
   const canSaveTemplate = object.generator !== 'room-scan' && !object.reference;
@@ -152,13 +152,18 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
         </section>
       )}
 
+      {partJoints.length > 0 && (
+        <Section title="Joints" testId="props-joints">
+          <JointRows project={project} joints={partJoints} partId={object.id} onOpen={close} />
+        </Section>
+      )}
+
       <Section title="Selection" testId="props-selection">
         <ActionRow label="Select more" icon={<BoxSelect size={18} />} testId="menu-select-area" onTap={() => {
           const st = useProjectStore.getState();
           if (!st.multiSelect) st.toggleMultiSelect();
           close();
         }} />
-        {jointCount > 0 && <ActionRow label={`Joints (${jointCount})`} icon={<Link2 size={18} />} testId="menu-joints" onTap={() => { close(); useJoinFlow.getState().list(object.id); }} />}
         {editTarget?.builtIn && <ActionRow label="Edit template" icon={<SlidersHorizontal size={18} />} testId="menu-edit-template" onTap={() => {
           close();
           useBuiltInFlow.getState().startEdit(editTarget!.id, editTarget!.builtIn!.template, editTarget!.builtIn!.wallId);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BoxSelect, List, Ruler, ScanLine, SquareDashed, Tv } from 'lucide-react';
+import { BoxSelect, Link2, List, Ruler, ScanLine, SquareDashed, Tv } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
@@ -9,6 +9,8 @@ import { roomFromScan } from '../../generators/roomScan';
 import { DEFAULT_RESIZE_STEP, RESIZE_STEPS } from '../../utils/resizeRules';
 import type { LengthUnit } from '../../types/furniture';
 import { ActionRow, Row, Section, Seg, SwitchRow } from './rows';
+import { useJoinFlow } from '../../joinery/useJoinFlow';
+import { fitCheck } from '../../joinery/fitCheck';
 
 const UNITS: { id: LengthUnit; label: string }[] = [
   { id: 'in', label: 'in' }, { id: 'ft', label: 'ft' }, { id: 'cm', label: 'cm' }, { id: 'mm', label: 'mm' },
@@ -43,6 +45,9 @@ export const ProjectSection: React.FC = () => {
   const hasRoom = Boolean(project.scannedRoom?.walls.length);
   const roomLocked = project.roomLocked !== false;
   const hasBuiltIns = project.objects.some((o) => o.shape === 'group' && o.builtIn);
+  const byId = new Map(project.objects.map((o) => [o.id, o]));
+  const joints = (project.joints ?? []).filter((j) => byId.has(j.receiverId) && byId.has(j.materId));
+  const needLook = joints.filter((j) => fitCheck(j, byId.get(j.receiverId), byId.get(j.materId), project.unit).status !== 'fits').length;
 
   const scanRoom = () => {
     if (scanning) return;
@@ -108,6 +113,13 @@ export const ProjectSection: React.FC = () => {
           {canScan && <ActionRow label={scanning ? 'Scanning…' : hasRoom ? 'Rescan room' : 'Scan room'} icon={<ScanLine size={18} />} testId="menu-scan-room" disabled={scanning} onTap={scanRoom} />}
           {hasRoom && <SwitchRow label="Lock scanned walls" testId="menu-lock-walls" on={roomLocked} onToggle={toggleRoomLock} />}
           {hasRoom && <ActionRow label="Square up walls" icon={<SquareDashed size={18} />} testId="menu-square-walls" onTap={squareUp} />}
+        </Section>
+      )}
+
+      {joints.length > 0 && (
+        <Section title="Joints" testId="props-project-joints">
+          <ActionRow label={`${joints.length} joint${joints.length === 1 ? '' : 's'}${needLook ? ` · ${needLook} need${needLook === 1 ? 's' : ''} a look` : ' · all fit'}`}
+            icon={<Link2 size={18} />} testId="menu-all-joints" onTap={() => { close(); useJoinFlow.getState().list(); }} />
         </Section>
       )}
 

@@ -1,192 +1,283 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
-import { NumberField } from '../components/ui/NumberField';
+import { NumberField, cleanNumber } from '../components/ui/NumberField';
+import { Row, Section, Seg, SwitchRow } from '../components/properties/rows';
 import { unitScale } from '../utils/units';
-import type { FurnitureObject, Joint, JointType, LengthUnit } from '../types/furniture';
-import { useJoinFlow } from './useJoinFlow';
+import { formatLength } from '../utils/measure';
+import type { ButtFasten, FurnitureObject, FurnitureProject, Joint, JointType, LengthUnit } from '../types/furniture';
+import { useJoinFlow, type JoinView } from './useJoinFlow';
 import {
-  DEFAULT_SPACING, JOINT_LABEL, JOINT_TYPES, buttKind, contactOn, groovable, defaultDepth, hardwareCount, jointLayout, jointNote, jointsOf, pairContact,
+  DEFAULT_SCREW_LENGTH, JOINT_LABEL, JOINT_TYPES, buttKind, contactOn, defaultDepth, defaultSetback, dowelDiameter, dowelLength,
+  groovable, hardwareSpots, jointGeometry, otherEdgePosition, pairContact, reseatPosition, shiftAlong,
 } from './joints';
-import type { Face } from '../utils/pushPull';
+import { fitCheck, type FitResult } from './fitCheck';
+import { JointDiagram } from './JointDiagram';
 
-const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 14 };
-const inputStyle: React.CSSProperties = { width: 90, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(148,163,184,0.5)', background: 'transparent', color: 'inherit', textAlign: 'right' };
+/** Joint sizes are shown in inches for in/ft projects, else the metric unit. */
+const fieldUnit = (u: LengthUnit): LengthUnit => (u === 'ft' ? 'in' : u);
+const SHORT_LABEL: Record<JointType, string> = { butt: 'Butt', dado: 'Dado', rabbet: 'Rabbet', pocket: 'Pocket', dowel: 'Dowels' };
 
-const Tap: React.FC<{ label: string; onTap: () => void; testId: string; active?: boolean; tone?: 'primary' | 'danger'; style?: React.CSSProperties }> = ({ label, onTap, testId, active, tone, style }) => {
+const Btn: React.FC<{ label: string; onTap: () => void; testId: string; tone?: 'primary' | 'danger' | 'plain'; active?: boolean; style?: React.CSSProperties }> = ({ label, onTap, testId, tone = 'plain', active, style }) => {
   const tap = useReliableTap(onTap);
   return (
     <button type="button" data-testid={testId} aria-pressed={active} onClick={tap} onPointerUp={tap}
-      className={tone === 'primary' ? 'glass-button active' : 'glass-button'}
-      style={{ minHeight: 40, padding: '6px 12px', fontSize: 14, ...(active ? { background: '#e09f3e', color: '#fff', borderColor: '#e09f3e' } : {}), ...(tone === 'danger' ? { color: '#ef4444' } : {}), ...style }}>
-      {label}
+      className={`joint-btn is-${tone}${active ? ' is-on' : ''}`} style={style}>{label}</button>
+  );
+};
+
+/** Length input: fractions in inches, plain numbers in metric. Commits on blur / Done. */
+const LenField: React.FC<{ label: string; value: number; unit: LengthUnit; testId: string; min?: number; onCommit: (inches: number) => void; onPreview?: (inches: number | null) => void }> = ({ label, value, unit, testId, min = 0.01, onCommit, onPreview }) => {
+  const fu = fieldUnit(unit), k = unitScale(fu), imperial = fu === 'in';
+  return (
+    <Row label={label}>
+      <NumberField className="props-input is-number" testId={testId} aria-label={label} fractions={imperial} min={min * k}
+        value={value * k} format={() => (imperial ? formatLength(value, 'in').replace(/ in$/, '"') : `${cleanNumber(value * k, 1)}`)}
+        onCommit={(n) => onCommit(n / k)} onPreview={onPreview ? (n) => onPreview(n === null ? null : n / k) : undefined} />
+      {!imperial && <span className="props-unit">{fu}</span>}
+    </Row>
+  );
+};
+
+const CountField: React.FC<{ value: number; testId: string; onCommit: (n: number) => void }> = ({ value, testId, onCommit }) => (
+  <Row label="How many">
+    <NumberField className="props-input is-number" testId={testId} aria-label="How many" integer min={1} max={40} value={value} onCommit={onCommit} />
+  </Row>
+);
+
+export const FitLine: React.FC<{ fit: FitResult }> = ({ fit }) => (
+  <div className={`joint-fit is-${fit.status}`} data-testid="joint-fit" role="status">
+    <span className="joint-dot" aria-hidden="true" />
+    <span>{fit.message}</span>
+  </div>
+);
+
+export const fitWord = (fit: FitResult) => (fit.status === 'fits' ? 'Fits' : fit.status === 'broken' ? 'Broken' : 'Check');
+
+/** Edge names across the cut, in plain words. */
+const EDGE_NAMES: Record<'x' | 'y' | 'z', [string, string]> = { x: ['Left', 'Right'], y: ['Bottom', 'Top'], z: ['Back', 'Front'] };
+
+/** Everything about one saved joint: fit check, live cross-section, the sizes that matter for its type. */
+const JointEditor: React.FC<{ project: FurnitureProject; joint: Joint; onDone: () => void }> = ({ project, joint: j, onDone }) => {
+  const st = useProjectStore.getState();
+  const byId = new Map(project.objects.map((o) => [o.id, o]));
+  const R = byId.get(j.receiverId), M = byId.get(j.materId);
+  const unit = project.unit;
+  const [preview, setPreview] = useState<Partial<Joint>>({});
+  const seated = j.extended > 0;
+  const save = (patch: Partial<Joint>, seat = seated) => {
+    const next = { ...j, ...patch };
+    const { extended: _e, ...rest } = next;
+    void _e;
+    st.saveJoint(rest, (next.type === 'dado' || next.type === 'rabbet') && seat);
+    setPreview({});
+  };
+  const removeTap = () => { st.removeJoint(j.id); onDone(); };
+  if (!R || !M) {
+    return (
+      <div className="joint-editor" data-testid="joint-editor">
+        <FitLine fit={fitCheck(j, R, M, unit)} />
+        <Btn label="Remove joint" testId="join-remove" tone="danger" onTap={removeTap} />
+      </div>
+    );
+  }
+  const fit = fitCheck(j, R, M, unit);
+  const g = jointGeometry(j, R, M);
+  const draft = { ...j, ...preview };
+  const grooved = j.type === 'dado' || j.type === 'rabbet';
+  const canGroove = groovable(R, j.face);
+  const types = JOINT_TYPES.filter((t) => canGroove || (t !== 'dado' && t !== 'rabbet') || t === j.type);
+  const reseat = fit.status === 'broken' ? reseatPosition(j, R, M) : null;
+  const span = g ? g.L.lMax - g.L.lMin : 0;
+  const n = g && (j.type === 'pocket' || j.type === 'dowel') ? hardwareSpots(j, g.L).length : 0;
+  const prev = (key: keyof Joint) => (v: number | null) => setPreview((p) => ({ ...p, [key]: v ?? undefined }));
+  const edgeNames = g ? EDGE_NAMES[g.L.t] : EDGE_NAMES.x;
+
+  return (
+    <div className="joint-editor" data-testid="joint-editor">
+      <FitLine fit={fit} />
+      {fit.status === 'broken' && (
+        <div className="joint-actions">
+          {reseat && <Btn label="Re-seat" testId="joint-reseat" tone="primary" onTap={() => st.updateObject(M.id, { position: reseat })} />}
+          <Btn label="Remove joint" testId="join-remove-broken" tone="danger" onTap={removeTap} />
+        </div>
+      )}
+      {g && <JointDiagram joint={draft} R={R} M={M} unit={unit} seated={grooved && seated} />}
+
+      {g && (
+        <Section title="Joint" testId="joint-type-section">
+          <div className="props-row joint-type-row">
+            <Seg label="Joint type" testId="joint-type" value={j.type} options={types.map((t) => ({ id: t, label: SHORT_LABEL[t] }))}
+              onChange={(t) => save({ type: t, depth: t === 'dado' || t === 'rabbet' ? (grooved ? j.depth : defaultDepth(R, j.face)) : j.depth }, t === 'dado' || t === 'rabbet' ? (grooved ? seated : true) : false)} />
+          </div>
+          {!canGroove && <p className="props-note" data-testid="join-no-groove">These boards meet {buttKind(R, j.face) === 'end' ? 'end to end' : 'edge to edge'}, so there is no face for a dado or rabbet.</p>}
+        </Section>
+      )}
+
+      {g && grooved && (
+        <Section title={`${j.type === 'dado' ? 'Dado' : 'Rabbet'} in ${R.name}`} testId="joint-groove">
+          <LenField label="Width" unit={unit} testId="joint-width" value={g.grooveWidth} onCommit={(w) => save({ width: Math.abs(w - g.matThick) < 1e-6 ? undefined : w })} onPreview={prev('width')} />
+          <LenField label="Depth" unit={unit} testId="joint-depth" value={j.depth} min={0.03} onCommit={(d) => save({ depth: Math.max(0.03, d) })} onPreview={prev('depth')} />
+          {j.type === 'dado' ? (
+            <LenField label={`From ${edgeNames[0].toLowerCase()} end`} unit={unit} testId="joint-offset" value={g.offset} min={0}
+              onCommit={(o) => st.updateObject(M.id, { position: shiftAlong(R, M, g.L.t, o - g.offset) })} />
+          ) : (
+            <Row label="Edge">
+              <Seg label="Edge" testId="joint-edge" value={g.edge === 'start' ? 'start' : 'end'}
+                options={[{ id: 'start', label: edgeNames[0] }, { id: 'end', label: edgeNames[1] }]}
+                onChange={(e) => {
+                  if ((e === 'start') === (g.edge === 'start')) return;
+                  const p = otherEdgePosition(j, R, M);
+                  if (p) st.updateObject(M.id, { position: p });
+                }} />
+            </Row>
+          )}
+          <SwitchRow label={`Seat ${M.name} in it`} on={seated} testId="joint-seat" onToggle={() => save({}, !seated)} />
+        </Section>
+      )}
+
+      {g && j.type === 'pocket' && (
+        <Section title={`Pocket screws in ${M.name}`} testId="joint-pocket">
+          <CountField value={n} testId="joint-count" onCommit={(c) => save({ count: c })} />
+          <LenField label="From the ends" unit={unit} testId="joint-setback" value={j.setback ?? defaultSetback(span)} min={0} onCommit={(s) => save({ setback: s })} />
+          <LenField label="Screw length" unit={unit} testId="joint-screw" value={j.screwLength ?? DEFAULT_SCREW_LENGTH} onCommit={(s) => save({ screwLength: s })} onPreview={prev('screwLength')} />
+        </Section>
+      )}
+
+      {g && j.type === 'dowel' && (
+        <Section title="Dowels" testId="joint-dowel">
+          <LenField label="Diameter" unit={unit} testId="joint-diameter" value={dowelDiameter(j)} onCommit={(d) => save({ diameter: d })} onPreview={prev('diameter')} />
+          <LenField label="Length" unit={unit} testId="joint-length" value={dowelLength(j)} onCommit={(l) => save({ length: l })} onPreview={prev('length')} />
+          <CountField value={n} testId="joint-count" onCommit={(c) => save({ count: c })} />
+          <LenField label="From the ends" unit={unit} testId="joint-setback" value={j.setback ?? defaultSetback(span)} min={0} onCommit={(s) => save({ setback: s })} />
+        </Section>
+      )}
+
+      {g && j.type === 'butt' && (
+        <Section title="Butt joint" testId="joint-butt">
+          <Row label="Cuts"><span className="props-readout">None, the boards just meet</span></Row>
+          <Row label="Held with">
+            <Seg<ButtFasten> label="Held with" testId="joint-fasten" value={j.fasten ?? 'glue'}
+              options={[{ id: 'glue', label: 'Glue' }, { id: 'screws', label: 'Screws' }, { id: 'glue-screws', label: 'Both' }, { id: 'none', label: 'None' }]}
+              onChange={(f) => save({ fasten: f })} />
+          </Row>
+        </Section>
+      )}
+
+      {fit.status !== 'broken' && <Btn label="Remove joint" testId="join-remove" tone="danger" onTap={removeTap} />}
+    </div>
+  );
+};
+
+/** Pick a joint for two touching boards; the editor opens right after. */
+const NewJoint: React.FC<{ project: FurnitureProject; a: string; b: string }> = ({ project, a, b }) => {
+  const byId = new Map(project.objects.map((o) => [o.id, o]));
+  const pair = pairContact(byId.get(a), byId.get(b));
+  const [type, setType] = useState<JointType>('butt');
+  const [side, setSide] = useState(pair ? { receiverId: pair.receiver.id, materId: pair.mater.id, face: pair.face } : null);
+  const R = side ? byId.get(side.receiverId) : undefined, M = side ? byId.get(side.materId) : undefined;
+  const add = useReliableTap(() => {
+    if (!R || !M || !side) return;
+    const grooved = type === 'dado' || type === 'rabbet';
+    const id = useProjectStore.getState().saveJoint({ type, ...side, depth: defaultDepth(R, side.face) }, grooved);
+    if (id) useJoinFlow.getState().edit(id);
+  });
+  if (!pair || !R || !M || !side) return <p style={{ margin: 0 }}>These parts need to touch, square to each other.</p>;
+  const here = groovable(R, side.face);
+  const flip = contactOn(M, R);
+  const swapped = !here && Boolean(flip && groovable(M, flip.face));
+  const canGroove = here || swapped;
+  const pick = (t: JointType) => {
+    if ((t === 'dado' || t === 'rabbet') && swapped && flip) setSide({ receiverId: M.id, materId: R.id, face: flip.face });
+    setType(t);
+  };
+  const types = JOINT_TYPES.filter((t) => canGroove || (t !== 'dado' && t !== 'rabbet'));
+  const cutIn = type === 'pocket' ? M : R;
+  return (
+    <div data-testid="join-form" className="joint-editor">
+      <div role="group" aria-label="Joint type" className="joint-type-grid">
+        {types.map((t) => <Btn key={t} label={JOINT_LABEL[t]} testId={`join-type-${t}`} active={type === t} onTap={() => pick(t)} />)}
+      </div>
+      {!canGroove && (
+        <p className="props-note" data-testid="join-no-groove">
+          These boards meet {buttKind(R, side.face) === 'end' ? 'end to end' : 'edge to edge'}, so there is no face to cut a dado or rabbet into. Use a butt joint, pocket screws, or dowels.
+        </p>
+      )}
+      <p className="props-note" data-testid="join-where">
+        {type === 'butt' && `${M.name} meets ${R.name}. No cuts.`}
+        {(type === 'dado' || type === 'rabbet') && `${type === 'dado' ? 'Groove' : 'Rabbet'} in ${R.name}; ${M.name} sits in it.`}
+        {type === 'pocket' && `Pocket holes in ${cutIn.name} (hidden face), screwed into ${R.name}.`}
+        {type === 'dowel' && `Dowels between ${M.name} and ${R.name}.`}
+        {' '}You can adjust sizes next.
+      </p>
+      <button type="button" className="joint-btn is-primary is-wide" data-testid="join-save" onClick={add} onPointerUp={add}>Add joint</button>
+    </div>
+  );
+};
+
+/** Rows of joints with a status dot + word; tap opens the editor. */
+export const JointRows: React.FC<{ project: FurnitureProject; joints: Joint[]; partId?: string; back?: JoinView; onOpen?: () => void }> = ({ project, joints, partId, back, onOpen }) => {
+  const byId = new Map(project.objects.map((o) => [o.id, o]));
+  return (
+    <>
+      {joints.map((j) => <JointRow key={j.id} j={j} byId={byId} unit={project.unit} partId={partId} back={back} onOpen={onOpen} />)}
+    </>
+  );
+};
+
+const JointRow: React.FC<{ j: Joint; byId: Map<string, FurnitureObject>; unit: LengthUnit; partId?: string; back?: JoinView; onOpen?: () => void }> = ({ j, byId, unit, partId, back, onOpen }) => {
+  const R = byId.get(j.receiverId), M = byId.get(j.materId);
+  const fit = fitCheck(j, R, M, unit);
+  const name = partId ? (j.receiverId === partId ? M : R)?.name ?? 'missing part' : `${R?.name ?? '?'} + ${M?.name ?? '?'}`;
+  const open = useReliableTap(() => { onOpen?.(); useJoinFlow.getState().edit(j.id, back); });
+  return (
+    <button type="button" className="props-row is-button" data-testid="joint-row" onClick={open} onPointerUp={open}>
+      <span className="props-label joint-row-label">{JOINT_LABEL[j.type]} · {name}</span>
+      <span className={`joint-status is-${fit.status}`} data-testid="joint-status"><span className="joint-dot" aria-hidden="true" />{fitWord(fit)}</span>
     </button>
   );
 };
 
-/** Joint sizes are shown in inches for in/ft projects, else the metric unit. */
-const fieldUnit = (u: LengthUnit): LengthUnit => (u === 'ft' ? 'in' : u);
-
-interface FormProps {
-  objects: FurnitureObject[];
-  unit: LengthUnit;
-  initial: { type: JointType; receiverId: string; materId: string; face: Face; depth: number; extend: boolean; spacing?: number; id?: string };
-  onDone: () => void;
-}
-
-const JoinForm: React.FC<FormProps> = ({ objects, unit, initial, onDone }) => {
-  const { saveJoint, removeJoint } = useProjectStore();
-  const byId = new Map(objects.map((o) => [o.id, o]));
-  const [type, setType] = useState<JointType>(initial.type);
-  const [side, setSide] = useState({ receiverId: initial.receiverId, materId: initial.materId, face: initial.face });
-  const R = byId.get(side.receiverId), M = byId.get(side.materId);
-  const [depth, setDepth] = useState(initial.depth);
-  const [extend, setExtend] = useState(initial.extend);
-  const [spacing, setSpacing] = useState<number | undefined>(initial.spacing);
-  // The other way round (e.g. both ends flush): offer Swap.
-  const flip = R && M ? contactOn(M, R) : null;
-  const fu = fieldUnit(unit), k = unitScale(fu);
-  const grooved = type === 'dado' || type === 'rabbet';
-  const holes = type === 'pocket' || type === 'dowel';
-  const sp = spacing ?? DEFAULT_SPACING[type === 'dowel' ? 'dowel' : 'pocket'];
-  const draft: Joint = { id: initial.id ?? 'draft', type, ...side, depth, extended: initial.id ? initial.depth : 0, spacing: holes ? sp : undefined };
-  const L = jointLayout(draft, R, M);
-  const count = holes ? hardwareCount(draft, R, M) : 0;
-
-  const save = useReliableTap(() => {
-    if (!R || !M) return;
-    saveJoint({ id: initial.id, type, ...side, depth, ...(holes ? { spacing: sp } : {}) }, grooved && extend);
-    onDone();
-  });
-  const remove = () => { if (initial.id) removeJoint(initial.id); onDone(); };
-  const swap = () => {
-    if (!flip || !R || !M) return;
-    setSide({ receiverId: M.id, materId: R.id, face: flip.face });
-    setDepth(defaultDepth(M, flip.face));
-  };
-  const toggleExtend = useReliableTap(() => setExtend((v) => !v));
-  if (!R || !M) return <p style={{ margin: 0 }}>Those parts are gone.</p>;
-  // Dado / rabbet need a broad face to cut into (this way round, or swapped).
-  const grooveHere = groovable(R, side.face);
-  const grooveSwapped = !grooveHere && Boolean(flip && groovable(M, flip.face));
-  const canGroove = grooveHere || grooveSwapped;
-  const types = JOINT_TYPES.filter((t) => canGroove || (t !== 'dado' && t !== 'rabbet') || t === type);
-  const pick = (t: JointType) => {
-    if ((t === 'dado' || t === 'rabbet') && grooveSwapped) swap();
-    setType(t);
-  };
-
-  const cutIn = type === 'pocket' ? M : R;
-  return (
-    <div data-testid="join-form" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div role="group" aria-label="Joint type" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {types.map((t) => <Tap key={t} label={JOINT_LABEL[t]} testId={`join-type-${t}`} active={type === t} onTap={() => pick(t)} />)}
-      </div>
-      {!canGroove && (
-        <p data-testid="join-no-groove" style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>
-          These boards meet {buttKind(R, side.face) === 'end' ? 'end to end' : 'edge to edge'}, so there is no face to cut a dado or rabbet into. Use a butt joint, pocket screws, or dowels.
-        </p>
-      )}
-      {type !== 'butt' && (
-        <div style={{ ...fieldStyle, color: '#9ca3af', fontSize: 13 }}>
-          <span data-testid="join-where">
-            {grooved && `${type === 'dado' ? 'Groove' : 'Rabbet'} in ${R.name}${L ? `, ${jointNote(draft, R.id, R, M, fu).replace(/^\w+ /, '')}` : ''}`}
-            {type === 'pocket' && `${count} pocket holes in ${cutIn.name} (hidden face), screwed into ${R.name}`}
-            {type === 'dowel' && `${count} dowels, 3/8" × 1 1/2"`}
-          </span>
-          {flip && type !== 'dowel' && <Tap label="Swap" testId="join-swap" onTap={swap} />}
-        </div>
-      )}
-      {grooved && (
-        <>
-          <label style={fieldStyle}>
-            <span>Depth ({fu})</span>
-            <NumberField testId="join-depth" value={Math.round(depth * k * 1000) / 1000} min={0.01} onCommit={(n) => setDepth(Math.max(0.03, n / k))} style={inputStyle} />
-          </label>
-          <button type="button" className="phone-sheet-row" role="switch" aria-checked={extend} data-testid="join-extend"
-            onClick={toggleExtend} onPointerUp={toggleExtend} style={{ justifyContent: 'space-between' }}>
-            <span>Lengthen {M.name} into the groove</span>
-            <span className={`menu-switch${extend ? ' is-on' : ''}`} aria-hidden="true"><span /></span>
-          </button>
-        </>
-      )}
-      {holes && (
-        <label style={fieldStyle}>
-          <span>Spacing ({fu})</span>
-          <NumberField testId="join-spacing" value={Math.round(sp * k * 100) / 100} min={0.1} onCommit={(n) => setSpacing(Math.max(1, n / k))} style={inputStyle} />
-        </label>
-      )}
-      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        {initial.id && <Tap label="Remove joint" testId="join-remove" tone="danger" onTap={remove} style={{ flex: 1 }} />}
-        <button type="button" className="glass-button active" data-testid="join-save" onClick={save} onPointerUp={save} style={{ flex: 1, minHeight: 44 }}>
-          {initial.id ? 'Save' : 'Add joint'}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const JointRow: React.FC<{ j: Joint; partId: string; objects: FurnitureObject[]; unit: LengthUnit }> = ({ j, partId, objects, unit }) => {
-  const byId = new Map(objects.map((o) => [o.id, o]));
-  const other = byId.get(j.receiverId === partId ? j.materId : j.receiverId);
-  const edit = useReliableTap(() => useJoinFlow.getState().edit(j.id, partId));
-  const remove = () => useProjectStore.getState().removeJoint(j.id);
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} data-testid="joint-row">
-      <button type="button" className="phone-sheet-row" onClick={edit} onPointerUp={edit} style={{ flex: 1, flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-        <span>{JOINT_LABEL[j.type]} · {other?.name ?? 'missing part'}</span>
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>{jointNote(j, partId, byId.get(j.receiverId), byId.get(j.materId), fieldUnit(unit))}</span>
-      </button>
-      <Tap label="Remove" testId="joint-remove" tone="danger" onTap={remove} />
-    </div>
-  );
-};
-
-/** Join two boards, or list/edit a board's joints. */
+/** Join two boards, edit a joint, or list joints. */
 export const JoinSheet: React.FC = () => {
   const view = useJoinFlow((f) => f.view);
   const close = useJoinFlow((f) => f.close);
   const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
-  const closeTap = useReliableTap(close);
+  const doneTap = useReliableTap(() => {
+    const v = useJoinFlow.getState().view;
+    if (v?.kind === 'edit' && v.back) useJoinFlow.setState({ view: v.back }); else close();
+  });
   if (!view || !project) return null;
   const byId = new Map(project.objects.map((o) => [o.id, o]));
   let title = 'Join';
   let body: React.ReactNode = null;
 
   if (view.kind === 'new') {
-    const pair = pairContact(byId.get(view.a), byId.get(view.b));
     title = 'Join boards';
-    body = pair
-      ? <JoinForm objects={project.objects} unit={project.unit} onDone={close}
-          initial={{ type: 'butt', receiverId: pair.receiver.id, materId: pair.mater.id, face: pair.face, depth: defaultDepth(pair.receiver, pair.face), extend: true }} />
-      : <p style={{ margin: 0 }}>These parts need to touch, square to each other.</p>;
+    body = <NewJoint project={project} a={view.a} b={view.b} />;
   } else if (view.kind === 'edit') {
     const j = project.joints?.find((x) => x.id === view.jointId);
-    title = j ? `Edit ${JOINT_LABEL[j.type].toLowerCase()}` : 'Joint';
-    const done = () => (view.back ? useJoinFlow.getState().list(view.back) : close());
+    const R = j ? byId.get(j.receiverId) : undefined, M = j ? byId.get(j.materId) : undefined;
+    title = j ? `${JOINT_LABEL[j.type]} · ${R?.name ?? '?'} + ${M?.name ?? '?'}` : 'Joint';
     body = j
-      ? <JoinForm key={j.id} objects={project.objects} unit={project.unit} onDone={done}
-          initial={{ id: j.id, type: j.type, receiverId: j.receiverId, materId: j.materId, face: j.face, depth: j.depth, extend: j.extended > 0 || j.type === 'butt' || j.type === 'pocket' || j.type === 'dowel', spacing: j.spacing }} />
+      ? <JointEditor key={j.id} project={project} joint={j} onDone={() => (view.back ? useJoinFlow.setState({ view: view.back }) : close())} />
       : <p style={{ margin: 0 }}>That joint was removed.</p>;
   } else {
-    const part = byId.get(view.partId);
-    const list = jointsOf(project, view.partId).filter((j) => byId.has(j.receiverId) && byId.has(j.materId));
-    title = `Joints · ${part?.name ?? ''}`;
+    const part = view.partId ? byId.get(view.partId) : undefined;
+    const all = (project.joints ?? []).filter((j) => byId.has(j.receiverId) && byId.has(j.materId));
+    const list = view.partId ? all.filter((j) => j.receiverId === view.partId || j.materId === view.partId) : all;
+    title = part ? `Joints · ${part.name}` : 'Joints';
     body = list.length
-      ? <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{list.map((j) => <JointRow key={j.id} j={j} partId={view.partId} objects={project.objects} unit={project.unit} />)}</div>
-      : <p style={{ margin: 0, color: '#9ca3af' }}>No joints. Select this board and one it touches, then tap Join.</p>;
+      ? <div className="props-card"><JointRows project={project} joints={list} partId={view.partId} back={view} /></div>
+      : <p className="props-note">No joints yet. Select two boards that touch, then tap Join.</p>;
   }
 
   return (
-    <div className="new-project-backdrop" data-testid="join-sheet" onPointerUp={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <div className="new-project-card-sheet glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ width: 40 }} />
-          <h2 style={{ margin: 0, fontSize: 17 }}>{title}</h2>
-          <button type="button" className="glass-button" aria-label="Close" onClick={closeTap} onPointerUp={closeTap} style={{ padding: 6, minHeight: 40, minWidth: 40 }}>
-            <X size={16} />
-          </button>
+    <div className="new-project-backdrop joint-backdrop" data-testid="join-sheet" onPointerUp={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="new-project-card-sheet glass-panel joint-sheet" data-testid="joint-sheet-card">
+        <div className="joint-head">
+          <h2 className="joint-title">{title}</h2>
+          <button type="button" className="joint-btn is-plain" data-testid="join-done" onClick={doneTap} onPointerUp={doneTap}>Done</button>
         </div>
         {body}
       </div>

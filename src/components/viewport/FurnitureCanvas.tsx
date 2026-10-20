@@ -17,6 +17,7 @@ import { ResizeHandles3D } from './ResizeHandles3D';
 import { startPartPress, useSelectTip } from '../../utils/longPress';
 import { lightHaptic } from '../../native/haptics';
 import { GroupResizeHandles3D } from './GroupResizeHandles3D';
+import { JointTags } from './JointTags';
 import { SnapHighlight } from './SnapHighlight';
 import { MeasureLayer } from '../../measure/MeasureLayer';
 import { useMeasure } from '../../measure/useMeasure';
@@ -352,6 +353,7 @@ export const FurnitureCanvas: React.FC = () => {
         <CameraFocus />
         <ProjectorBridge />
         <SnapHighlight />
+        <JointTags />
         <MeasureLayer />
         <TrackTarget />
         <AutoFrame projectId={currentProject.id} />
