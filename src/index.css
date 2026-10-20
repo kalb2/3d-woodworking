@@ -3135,9 +3135,13 @@ html, body, #root {
 
 /* Long-press feedback: fills over 400ms at the finger, pops when the part is added. */
 .press-ring { position: fixed; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; pointer-events: none; z-index: 400;
-  background: conic-gradient(#e09f3e var(--press, 0deg), rgba(224,159,62,0.18) 0); -webkit-mask: radial-gradient(circle, transparent 21px, #000 22px); mask: radial-gradient(circle, transparent 21px, #000 22px);
+  background: conic-gradient(#f97316 var(--press, 0deg), rgba(15,23,42,0.28) 0); -webkit-mask: radial-gradient(circle, transparent 20px, #000 21px); mask: radial-gradient(circle, transparent 20px, #000 21px);
   animation: press-fill 400ms linear forwards; }
 .press-ring.is-done { animation: press-pop 260ms ease-out forwards; background: #e09f3e; }
 @property --press { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 @keyframes press-fill { from { --press: 0deg; transform: scale(0.7); } to { --press: 360deg; transform: scale(1); } }
 @keyframes press-pop { from { transform: scale(1); opacity: 1; } to { transform: scale(1.35); opacity: 0; } }
+/* Long-press tip: readable width, buttons on the white card (the dark-bar button style would vanish). */
+.select-tip { width: min(380px, calc(100vw - 32px)); box-sizing: border-box; flex-wrap: wrap; justify-content: space-between; margin-top: 0; }
+.select-tip > span { flex: 1 1 160px; }
+.select-tip .group-bar-btn { background: #f1f5f9; color: #0f172a; min-height: 32px; }

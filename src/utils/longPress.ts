@@ -5,13 +5,20 @@ export const LONG_PRESS_MS = 400;
 /** Finger travel (px) that turns a press into an orbit instead. */
 export const LONG_PRESS_SLOP = 14;
 
+type Timers = { set: (fn: () => void, ms: number) => unknown; clear: (t: unknown) => void };
+/** Wrapped so setTimeout is never called with the wrong `this` (WebKit/Chrome throw 'Illegal invocation'). */
+const BROWSER_TIMERS: Timers = {
+  set: (fn, ms) => window.setTimeout(fn, ms),
+  clear: (t) => window.clearTimeout(t as number),
+};
+
 export interface PressCallbacks { onTap: () => void; onLongPress: () => void; onCancel?: () => void }
 
 /**
  * One press: short lift = tap, hold still = long press, move = cancel (the
  * camera orbits). Timers are injectable for tests.
  */
-export function createPress(x: number, y: number, cb: PressCallbacks, timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout }, slop = LONG_PRESS_SLOP) {
+export function createPress(x: number, y: number, cb: PressCallbacks, timers: Timers = BROWSER_TIMERS, slop = LONG_PRESS_SLOP) {
   let state: 'down' | 'long' | 'done' = 'down';
   const timer = timers.set(() => {
     if (state !== 'down') return;
@@ -68,7 +75,7 @@ export interface PartPressOptions {
   setRing: (r: PressRing | ((prev: PressRing) => PressRing)) => void;
   onTap: () => void;
   onHold: () => void;
-  timers?: { set: typeof setTimeout; clear: typeof clearTimeout };
+  timers?: Timers;
 }
 
 /**
@@ -93,7 +100,7 @@ export function startPartPress(o: PartPressOptions) {
     onLongPress: () => {
       o.onHold();
       o.setRing({ x: o.x, y: o.y, done: true });
-      (o.timers?.set ?? setTimeout)(() => o.setRing((r) => (r?.done ? null : r)), 260);
+      (o.timers ?? BROWSER_TIMERS).set(() => o.setRing((r) => (r?.done ? null : r)), 260);
     },
     onCancel: () => {
       o.setRing(null);
@@ -112,7 +119,7 @@ export function startPartPress(o: PartPressOptions) {
         o.handOff.current = false;
       }
     },
-  }, o.timers);
+  }, o.timers ?? BROWSER_TIMERS);
   // Capture phase on window: we see moves and the lift before the camera does.
   const onMove = (e: PointerEvent) => {
     if (e.pointerId !== o.pointerId) return;

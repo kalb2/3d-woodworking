@@ -149,3 +149,20 @@ describe('Select more fallback', () => {
     act(() => s().toggleMultiSelect());
   });
 });
+
+describe('timers', () => {
+  it('never calls setTimeout detached (WebKit throws Illegal invocation)', () => {
+    const real = window.setTimeout;
+    const strict = function (this: unknown, fn: () => void, ms?: number) {
+      if (this !== window) throw new TypeError('Illegal invocation');
+      return real.call(window, fn, ms) as unknown as number;
+    };
+    (window as unknown as { setTimeout: unknown }).setTimeout = strict;
+    try {
+      const p = createPress(0, 0, { onTap: () => {}, onLongPress: () => {} });
+      p.up();
+    } finally {
+      window.setTimeout = real;
+    }
+  });
+});
