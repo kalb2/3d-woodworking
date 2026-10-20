@@ -6,7 +6,7 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useJoinFlow } from '../../joinery/useJoinFlow';
 import { jointMarker } from '../../joinery/joints';
 import { fitCheck, jointTag, type FitResult } from '../../joinery/fitCheck';
-import { TAG_HEIGHT, clusterLabel, clusterTags, tagWidth, worstStatus } from '../../joinery/tagClusters';
+import { TAG_HEIGHT, boxCovered, clusterLabel, clusterTags, pointCovered, tagWidth, worstStatus } from '../../joinery/tagClusters';
 import { rotationMatrix } from '../../utils/pushPull';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject, Joint, LengthUnit } from '../../types/furniture';
@@ -80,6 +80,11 @@ const Cluster: React.FC<{ items: TagItem[]; open: boolean; onToggle: (open: bool
 const TagLayer: React.FC<{ items: TagItem[] }> = ({ items }) => {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
+  const gl = useThree((s) => s.gl);
+  /** Groups whose tag would sit under a sheet, bar or button (key = joined ids). */
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const hiddenRef = useRef('');
+  const lastProbe = useRef(0);
   const [groups, setGroups] = useState<string[][]>(() => items.map((i) => [i.j.id]));
   const [openKey, setOpenKey] = useState<string | null>(null);
   const keyRef = useRef('');
@@ -100,6 +105,33 @@ const TagLayer: React.FC<{ items: TagItem[] }> = ({ items }) => {
     const next = clusterTags(boxes);
     const key = next.map((g) => g.join(',')).join('|');
     if (key !== keyRef.current) { keyRef.current = key; setGroups(next); }
+
+    // Hide tags under app UI. Checked against what is actually on screen, so a sheet
+    // being dragged, the joint editor, the Add sheet or a floating button all count.
+    const now = performance.now();
+    if (now - lastProbe.current < 100 || typeof document.elementsFromPoint !== 'function') return;
+    lastProbe.current = now;
+    const canvas = gl.domElement;
+    const root = canvas.closest('.canvas-touch-root') ?? canvas.parentElement;
+    if (!root) return;
+    const rect = canvas.getBoundingClientRect();
+    const covered = (x: number, y: number) => {
+      const cx = rect.left + x, cy = rect.top + y;
+      if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) return false;
+      return pointCovered(document.elementsFromPoint(cx, cy), root, (el) => el.classList.contains('overlay-backdrop'));
+    };
+    const byBox = new Map(boxes.map((b) => [b.id, b]));
+    const status = new Map(items.map((i) => [i.j.id, i.fit.status]));
+    const off: string[] = [];
+    for (const g of next) {
+      const bs = g.map((id) => byBox.get(id)!).filter(Boolean);
+      if (!bs.length || bs[0].x < -1e5) continue;
+      const x = bs.reduce((a, b) => a + b.x, 0) / bs.length, y = bs.reduce((a, b) => a + b.y, 0) / bs.length;
+      const w = bs.length === 1 ? bs[0].w : tagWidth(clusterLabel(g.map((id) => status.get(id) ?? 'fits')));
+      if (boxCovered({ x, y, w, h: TAG_HEIGHT }, covered)) off.push(g.join(','));
+    }
+    const hk = off.join('|');
+    if (hk !== hiddenRef.current) { hiddenRef.current = hk; setHidden(new Set(off)); }
   });
   const byId = new Map(items.map((i) => [i.j.id, i]));
   return (
@@ -111,7 +143,8 @@ const TagLayer: React.FC<{ items: TagItem[] }> = ({ items }) => {
         const key = g.join(',');
         return (
           <group key={key} position={at}>
-            <Html center zIndexRange={[30, 0]}>
+            <Html center zIndexRange={[30, 0]}
+              style={hidden.has(key) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
               {members.length === 1
                 ? <TagButton item={members[0]} />
                 : <Cluster items={members} open={openKey === key} onToggle={(o) => setOpenKey(o ? key : null)} />}

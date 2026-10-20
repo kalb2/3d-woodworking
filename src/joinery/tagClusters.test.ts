@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { clusterLabel, clusterTags, tagWidth, worstStatus } from './tagClusters';
+import { boxCovered, boxSamples, clusterLabel, clusterTags, pointCovered, tagWidth, worstStatus } from './tagClusters';
 
 const box = (id: string, x: number, y: number, w = 120) => ({ id, x, y, w, h: 36 });
 
@@ -21,5 +22,30 @@ describe('joint tag clustering', () => {
     expect(worstStatus(['fits', 'check'])).toBe('check');
     expect(worstStatus(['check', 'broken'])).toBe('broken');
     expect(tagWidth('Dado 3/4"')).toBeGreaterThan(80);
+  });
+});
+
+describe('tags under app UI', () => {
+  const root = document.createElement('div');
+  const tag = document.createElement('button'); root.appendChild(tag);
+  const sheet = document.createElement('div');
+  const backdrop = document.createElement('div'); backdrop.className = 'overlay-backdrop';
+  const pass = (el: Element) => el.classList.contains('overlay-backdrop');
+
+  it('a point is open when the 3D view (or the tag) is on top, through a see-through backdrop', () => {
+    expect(pointCovered([tag, root], root, pass)).toBe(false);
+    expect(pointCovered([backdrop, root], root, pass)).toBe(false);
+    expect(pointCovered([], root, pass)).toBe(false);
+  });
+  it('a sheet, bar or button on top covers it', () => {
+    expect(pointCovered([sheet, tag, root], root, pass)).toBe(true);
+    expect(pointCovered([backdrop, sheet, root], root, pass)).toBe(true);
+  });
+  it('a tag half under a sheet edge hides; one clear of it stays', () => {
+    const sheetTop = 400;
+    const covered = (_x: number, y: number) => y >= sheetTop;
+    expect(boxCovered({ x: 100, y: 390, w: 120, h: 36 }, covered)).toBe(true);
+    expect(boxCovered({ x: 100, y: 360, w: 120, h: 36 }, covered)).toBe(false);
+    expect(boxSamples({ x: 0, y: 0, w: 20, h: 10 }, 3)).toContainEqual([7, 2]);
   });
 });
