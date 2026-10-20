@@ -28,7 +28,10 @@ export interface AppPreferences {
   defaultFloorOpacity: number;
   backgroundColor: string;
   accentColor: string;
-  /** Clean = flat colors + outlines; Realistic = grain + shadows. */
+  /**
+   * Style for new projects: the last one picked in Properties → Project. (Before styles were
+   * per project this was app-wide; old projects adopt it once on load.)
+   */
   viewStyle: 'clean' | 'realistic';
 }
 

@@ -188,7 +188,9 @@ export function importProjectFromJSON(jsonString: string): FurnitureProject | nu
       },
       showFloor: projectData.showFloor ?? true,
       floorOpacity: projectData.floorOpacity ?? 0.4,
-      backgroundColor: projectData.backgroundColor
+      backgroundColor: projectData.backgroundColor,
+      // Keeps the exported style; older files without one get the style for new projects on import.
+      ...(projectData.viewStyle === 'clean' || projectData.viewStyle === 'realistic' ? { viewStyle: projectData.viewStyle } : {}),
     };
 
     return imported;
