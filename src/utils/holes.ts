@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { create } from 'zustand';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
-import type { BoardHole, Dimensions3D, FurnitureObject, ShapeType } from '../types/furniture';
+import type { BoardHole, Dimensions3D, FurnitureObject, HoleAnchor, ShapeType } from '../types/furniture';
 import { isOutlineHole } from './boardGeometry';
 
 /** Shapes that can take holes (box-like solids). */
@@ -12,10 +12,66 @@ export function getHoles(o: FurnitureObject): BoardHole[] {
   return (o.shape === 'board' ? o.board?.holes : o.holes) ?? [];
 }
 
-/** Partial update that sets an object's holes in the right place. */
+/** Partial update that sets an object's holes in the right place (anchors follow placement). */
 export function holesUpdate(o: FurnitureObject, holes: BoardHole[]): Partial<FurnitureObject> {
+  const prev = new Map(getHoles(o).map((h) => [h.id, h]));
+  const next = holes.map((h) => {
+    const was = prev.get(h.id);
+    if (h.anchor?.manual) return h;
+    // New or moved (or reshaped) features re-pick the nearest edge; untouched ones keep theirs.
+    const moved = !was || !h.anchor || was.x !== h.x || was.z !== h.z || was.kind !== h.kind || was.edge !== h.edge || was.face !== h.face;
+    return moved ? { ...h, anchor: inferHoleAnchor(o.dimensions, h) } : h;
+  });
+  return rawHolesUpdate(o, next);
+}
+
+function rawHolesUpdate(o: FurnitureObject, holes: BoardHole[]): Partial<FurnitureObject> {
   if (o.shape === 'board' && o.board) return { board: { ...o.board, holes } };
   return { holes };
+}
+
+/** Nearest edge on one offset axis (centered features stay centered). */
+export function nearestAnchor(offset: number, half: number, span: number): HoleAnchor {
+  if (Math.abs(offset) <= Math.max(0.01, span * 0.002)) return 'center';
+  void half;
+  return offset < 0 ? 'start' : 'end';
+}
+
+/** Anchors for a feature from where it sits now. A notch always holds the edge it opens onto. */
+export function inferHoleAnchor(d: Dimensions3D, h: BoardHole): { u: HoleAnchor; v: HoleAnchor } {
+  const { u, v } = faceSize(d, h.face);
+  const a = { u: nearestAnchor(h.x, u / 2, u), v: nearestAnchor(h.z, v / 2, v) };
+  if ((h.kind ?? 'round') === 'notch' && h.edge) {
+    const side: HoleAnchor = h.edge[1] === '+' ? 'end' : 'start';
+    if (h.edge[0] === 'u') a.u = side; else a.v = side;
+  }
+  return a;
+}
+
+const shiftFor = (a: HoleAnchor, grow: number) => (a === 'start' ? -grow / 2 : a === 'end' ? grow / 2 : 0);
+
+/**
+ * Part resized from `from` to `to`: keep each feature's distance from its
+ * anchored edge (center-anchored ones stay centered). Anchors are filled in
+ * for older features. No clamping, so shrink-then-grow is lossless.
+ */
+export function reanchorHoles(holes: BoardHole[], from: Dimensions3D, to: Dimensions3D): BoardHole[] {
+  return holes.map((h) => {
+    const anchor = h.anchor ?? inferHoleAnchor(from, h);
+    const a = faceSize(from, h.face), b = faceSize(to, h.face);
+    const r6 = (n: number) => Math.round(n * 1e6) / 1e6 || 0;
+    return { ...h, anchor, x: r6(h.x + shiftFor(anchor.u, b.u - a.u)), z: r6(h.z + shiftFor(anchor.v, b.v - a.v)) };
+  });
+}
+
+/** Update that re-anchors a part's holes for new dimensions ({} when nothing to do). */
+export function reanchorUpdate(o: FurnitureObject, to: Dimensions3D): Partial<FurnitureObject> {
+  if (!supportsHoles(o.shape)) return {};
+  const holes = getHoles(o);
+  if (!holes.length) return {};
+  const d = o.dimensions;
+  if (d.length === to.length && d.width === to.width && d.height === to.height) return {};
+  return rawHolesUpdate(o, reanchorHoles(holes, d, to));
 }
 
 export function newHole(o: FurnitureObject, index = getHoles(o).length, kind: 'round' | 'rect' | 'notch' = 'round', face: BoardHole['face'] = 'top'): BoardHole {

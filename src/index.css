@@ -3127,3 +3127,5 @@ html, body, #root {
 .view-style-seg { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 999px; overflow: hidden; }
 .view-style-seg button { border: none; background: transparent; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; color: #475569; min-height: 32px; }
 .view-style-seg button.is-on { background: #0f172a; color: #fff; }
+.hole-anchor-label { font-size: 11px; color: #64748b; }
+.select-tip { pointer-events: auto; }

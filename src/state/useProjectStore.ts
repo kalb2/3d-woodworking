@@ -9,6 +9,7 @@ import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater } from '../joinery/joints';
 import { stretchObjects } from '../utils/groupStretch';
+import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
 import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
@@ -984,6 +985,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const slid = slideAlongWall(existingObj, fittedWall, updates.position);
         updates = { ...updates, position: slid.position, builtIn: { ...existingObj.builtIn, center: slid.center } };
       }
+    }
+
+    // Holes and notches keep their distance from their anchored edge.
+    if (updates.dimensions && !('holes' in updates) && !('board' in updates)) {
+      updates = { ...updates, ...reanchorUpdate(existingObj, updates.dimensions) };
     }
 
     let updatedObjects = proj.objects.map(o => (o.id === id ? { ...o, ...updates } : o));

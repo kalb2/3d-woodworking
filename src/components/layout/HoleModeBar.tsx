@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react';
-import type { BoardHole } from '../../types/furniture';
+import type { BoardHole, HoleAnchor } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
-import { clampHole, getHoles, holesUpdate, useHoleFocus } from '../../utils/holes';
+import { clampHole, getHoles, holesUpdate, inferHoleAnchor, useHoleFocus } from '../../utils/holes';
 import { unitScale } from '../../utils/units';
 import { NumberField } from '../ui/NumberField';
+
+const ANCHORS: HoleAnchor[] = ['start', 'center', 'end'];
+/** Labels for start/center/end of each offset axis, as seen on that face. */
+export function anchorLabels(face: BoardHole['face'], axis: 'u' | 'v'): [string, string, string] {
+  if (axis === 'u') return face === 'side' ? ['Back', 'Center', 'Front'] : ['Left', 'Center', 'Right'];
+  return (face ?? 'top') === 'top' ? ['Front', 'Center', 'Back'] : ['Bottom', 'Center', 'Top'];
+}
 
 const clean = (v: number) => String(Math.round(v * 100) / 100);
 const STEP = 0.125;
@@ -45,6 +52,11 @@ export const HoleModeBar: React.FC = () => {
       patch(rect && (hole.height ?? hole.diameter) === hole.diameter ? { diameter: size, height: size } : { diameter: size });
     }
   };
+  const setAnchor = (ax: 'u' | 'v', a: HoleAnchor) => {
+    const base = hole.anchor ?? inferHoleAnchor(object.dimensions, hole);
+    const holes = getHoles(object).map((h) => (h.id === hole.id ? { ...h, anchor: { ...base, [ax]: a, manual: true } } : h));
+    updateObject(object.id, holesUpdate(object, holes));
+  };
   const remove = () => {
     updateObject(object.id, holesUpdate(object, getHoles(object).filter((h) => h.id !== hole.id)));
     exit();
@@ -80,6 +92,21 @@ export const HoleModeBar: React.FC = () => {
             {hole.depth !== undefined && (
               <CommitField value={hole.depth} scale={scale} onCommit={(v) => patch({ depth: Math.max(0.0625, v) })} label="Depth" min={0} />
             )}
+          </div>
+          <div className="hole-bar-row hole-anchor-row" data-testid="hole-anchor">
+            <span className="hole-anchor-label">Measured from</span>
+            {(['u', 'v'] as const).filter((ax) => !(notch && hole.edge?.[0] === ax)).map((ax) => {
+              const labels = anchorLabels(hole.face, ax);
+              const current = (hole.anchor ?? inferHoleAnchor(object.dimensions, hole))[ax];
+              return (
+                <div className="hole-seg" key={ax} role="group" aria-label={`Measured from (${labels[0]} / ${labels[2]})`}>
+                  {ANCHORS.map((a, i) => (
+                    <button type="button" key={a} data-testid={`anchor-${ax}-${a}`} className={current === a ? 'is-on' : ''} aria-pressed={current === a}
+                      onClick={() => setAnchor(ax, a)}>{labels[i]}</button>
+                  ))}
+                </div>
+              );
+            })}
           </div>
           <div className="hole-bar-row hole-bar-exact">
             <label>X <CommitField value={hole.x} scale={scale} onCommit={(v) => patch({ x: v })} label="X offset" /></label>

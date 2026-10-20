@@ -39,7 +39,15 @@ export interface BoardHole {
   height?: number;
   /** Notches: which edge of the face it opens onto (u = x offset axis, v = y offset axis). */
   edge?: 'u-' | 'u+' | 'v-' | 'v+';
+  /**
+   * Which edge each offset is measured from, so the feature keeps its distance
+   * from that edge when the part is resized. u = x offset axis, v = z offset axis.
+   * Absent (older parts) = nearest edge. `manual` = picked by the user.
+   */
+  anchor?: { u: HoleAnchor; v: HoleAnchor; manual?: boolean };
 }
+
+export type HoleAnchor = 'start' | 'center' | 'end';
 
 export interface BoardOptions {
   cornerRadius: number;

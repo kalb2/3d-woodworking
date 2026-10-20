@@ -8,6 +8,7 @@ import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
 import { pairContact } from '../../joinery/joints';
 import { useJoinFlow } from '../../joinery/useJoinFlow';
+import { useSelectTip } from '../../utils/longPress';
 
 const groupLabel = (g: FurnitureObject) => (g.builtIn ? findBuiltInTemplate(g.builtIn.template)?.name ?? g.name : g.name);
 
@@ -36,6 +37,8 @@ const Crumb: React.FC<{ label: string; onTap: () => void }> = ({ label, onTap })
 export const GroupBar: React.FC = () => {
   const s = useProjectStore();
   const flowOpen = useBuiltInFlow((f) => Boolean(f.mode || f.focusWallId));
+  const tipSeen = useSelectTip((t) => t.seen);
+  const dismissTip = useSelectTip((t) => t.dismiss);
   const project = s.projects.find((p) => p.id === s.activeProjectId);
   if (!project || flowOpen) return null;
   const byId = new Map(project.objects.map((o) => [o.id, o]));
@@ -79,7 +82,15 @@ export const GroupBar: React.FC = () => {
     );
   }
 
-  if (!path.length && !bar) return null;
+  // First time a part is selected: how to add more without a Select mode.
+  const tip = !tipSeen && count === 1 && !s.multiSelect ? (
+    <div className="measure-tip select-tip" data-testid="select-tip" role="note">
+      <span>Tip: long-press another part to add it</span>
+      <Btn label="Got it" testId="select-tip-ok" onTap={dismissTip} />
+    </div>
+  ) : null;
+
+  if (!path.length && !bar && !tip) return null;
   return (
     <div className="group-top">
       {path.length > 0 && (
@@ -89,6 +100,7 @@ export const GroupBar: React.FC = () => {
         </div>
       )}
       {bar}
+      {tip}
     </div>
   );
 };

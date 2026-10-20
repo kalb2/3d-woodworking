@@ -14,6 +14,8 @@ import { getHoles, supportsHoles, useHoleFocus } from '../../utils/holes';
 import { TransparentFloor } from './TransparentFloor';
 import { TouchGizmo3D } from './TouchGizmo3D';
 import { ResizeHandles3D } from './ResizeHandles3D';
+import { createPress, useSelectTip } from '../../utils/longPress';
+import { lightHaptic } from '../../native/haptics';
 import { GroupResizeHandles3D } from './GroupResizeHandles3D';
 import { SnapHighlight } from './SnapHighlight';
 import { MeasureLayer } from '../../measure/MeasureLayer';
@@ -243,7 +245,44 @@ export const FurnitureCanvas: React.FC = () => {
       enterGroup(target);
       return;
     }
+    // Something else already selected: a quick tap selects this part, a long
+    // press adds it (or takes it out) without orbiting.
+    const sel = useProjectStore.getState().selectedObjectIds;
+    if (!additive && !multiSelect && sel.length > 0 && !(sel.length === 1 && sel[0] === target)) {
+      startPress(event, target);
+      return;
+    }
     selectObject(target, { additive });
+  };
+
+  const startPress = (event: any, target: string) => {
+    const ne = event.nativeEvent ?? event;
+    const x = ne.clientX ?? 0, y = ne.clientY ?? 0;
+    const controls = orbitControlsRef.current as { enabled: boolean } | null;
+    let held = false;
+    const finish = () => {
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onCancel, true);
+      if (held && controls) controls.enabled = !useProjectStore.getState().multiSelect;
+    };
+    const press = createPress(x, y, {
+      onTap: () => selectObject(target),
+      onLongPress: () => {
+        held = true;
+        if (controls) controls.enabled = false; // the held finger must not orbit
+        selectObject(target, { additive: true });
+        void lightHaptic();
+        useSelectTip.getState().dismiss();
+      },
+    });
+    // Capture phase on window: runs before OrbitControls sees the lift.
+    const onMove = (e: PointerEvent) => press.move(e.clientX, e.clientY);
+    const onUp = () => { press.up(); finish(); };
+    const onCancel = () => { press.cancel(); finish(); };
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onCancel, true);
   };
 
   return (
