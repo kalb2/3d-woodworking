@@ -1,7 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
-import { formatLength, measureDistance, measureStepText } from '../utils/measure';
+import { formatLength, measureDistance, measureHint } from '../utils/measure';
 import { useMeasure } from './useMeasure';
 
 const Btn: React.FC<{ label: string; onTap: () => void; tone?: 'primary' | 'danger'; testId: string }> = ({ label, onTap, tone, testId }) => {
@@ -31,20 +31,42 @@ export const MeasureBar: React.FC = () => {
     );
   }
   if (!m.active) return null;
+  const hint = measureHint(m.a, m.b, m.hover, unit);
+  const done = Boolean(m.a && m.b);
   return (
     <div className="group-top">
-      <div className="group-bar" data-testid="measure-bar">
-        <span className="group-bar-label" data-testid="measure-label">{measureStepText(m.a, m.b, unit)}</span>
-        {m.a && m.b && <Btn label="Pin" tone="primary" testId="measure-pin" onTap={() => { addMeasurement(m.a!, m.b!); m.reset(); }} />}
-        {m.a && m.b && <Btn label="Measure again" testId="measure-again" onTap={m.reset} />}
-        <Btn label="Done" testId="measure-done" onTap={m.stop} />
+      <div className={`measure-card${done ? ' is-result' : ''}`} data-testid="measure-bar" role="status" aria-live="polite">
+        <div className="measure-card-text">
+          <span className="measure-step" data-testid="measure-step">{hint.step}</span>
+          <span className="measure-title" data-testid="measure-label">{hint.title}</span>
+          <span className="measure-detail" data-testid="measure-detail">{hint.detail}</span>
+        </div>
+        <div className="measure-actions">
+          {done && <Btn label="Pin it" tone="primary" testId="measure-pin" onTap={() => { addMeasurement(m.a!, m.b!); m.reset(); }} />}
+          {done && <Btn label="Measure again" testId="measure-again" onTap={m.reset} />}
+          <Btn label="Done" testId="measure-done" onTap={m.stop} />
+        </div>
       </div>
       {m.showTip && (
         <div className="measure-tip" data-testid="measure-tip">
-          <span>Touch and slide to place a point. It snaps to corners, edge middles and face centers, or the floor grid. Lift to place. Two fingers move the view.</span>
+          <span>Tap a point, or touch and slide to aim: the ring rides above your finger so you can see it. It snaps to corners, edges and faces, or the floor grid. Lift to place. Two fingers move the view.</span>
           <Btn label="Got it" testId="measure-tip-ok" onTap={m.dismissTip} />
         </div>
       )}
+    </div>
+  );
+};
+
+/** While aiming with a finger: a ring where the point is, joined to the finger by a short line. */
+export const MeasureAimGuide: React.FC = () => {
+  const aim = useMeasure((m) => (m.active ? m.aim : null));
+  if (!aim) return null;
+  const h = Math.max(0, aim.fy - aim.y);
+  return (
+    <div className="measure-aim" data-testid="measure-aim" aria-hidden="true">
+      <div className="measure-aim-line" style={{ left: aim.x, top: aim.y, height: h }} />
+      <div className="measure-aim-ring" style={{ left: aim.x, top: aim.y }} />
+      <div className="measure-aim-finger" style={{ left: aim.fx, top: aim.fy }} />
     </div>
   );
 };
