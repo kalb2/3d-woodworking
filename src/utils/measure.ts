@@ -1,7 +1,7 @@
 import type { FurnitureObject, Position3D } from '../types/furniture';
 import { boxCorners } from '../state/groupTree';
 
-export type SnapKind = 'vertex' | 'midpoint' | 'face' | 'surface' | 'floor';
+export type SnapKind = 'vertex' | 'midpoint' | 'edge' | 'face' | 'surface' | 'floor';
 export interface MeasurePoint extends Position3D { kind: SnapKind }
 
 /** Corners, edge midpoints and face centers of a box part (world). */
@@ -23,6 +23,23 @@ export function snapCandidates(o: FurnitureObject): MeasurePoint[] {
 
 const dist = (a: Position3D, b: Position3D) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
+/** Closest point to `p` on segment a–b. */
+function closestOnSegment(p: Position3D, a: Position3D, b: Position3D): Position3D {
+  const ab = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+  const len2 = ab.x * ab.x + ab.y * ab.y + ab.z * ab.z;
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y + (p.z - a.z) * ab.z) / len2)) : 0;
+  const r = (n: number) => Math.round(n * 10000) / 10000 || 0;
+  return { x: r(a.x + ab.x * t), y: r(a.y + ab.y * t), z: r(a.z + ab.z * t) };
+}
+
+/** The 12 edges of a box part (world). */
+export function boxEdges(o: FurnitureObject): [Position3D, Position3D][] {
+  const c = boxCorners(o);
+  const out: [Position3D, Position3D][] = [];
+  for (let i = 0; i < 8; i++) for (const bit of [4, 2, 1]) if (!(i & bit)) out.push([c[i], c[i | bit]]);
+  return out;
+}
+
 /**
  * Snap a tapped surface point to the nearest corner / edge midpoint / face
  * center of the tapped part within `tol` inches (corners win ties, then
@@ -30,14 +47,30 @@ const dist = (a: Position3D, b: Position3D) => Math.hypot(a.x - b.x, a.y - b.y, 
  */
 export function snapMeasurePoint(hit: Position3D, part: FurnitureObject | undefined, tol: number): MeasurePoint {
   if (!part) return { ...hit, kind: 'surface' };
-  const rank: Record<SnapKind, number> = { vertex: 0, midpoint: 1, face: 2, surface: 3, floor: 4 };
+  const rank: Record<SnapKind, number> = { vertex: 0, midpoint: 1, edge: 2, face: 3, surface: 4, floor: 5 };
   let best: MeasurePoint | null = null;
   let bestScore = Infinity;
-  for (const c of snapCandidates(part)) {
+  const cands = snapCandidates(part);
+  // Corners and edge middles first.
+  for (const c of cands) {
+    if (c.kind === 'face') continue;
     const d = dist(hit, c);
     if (d > tol) continue;
     const score = d + rank[c.kind] * tol * 0.15;
     if (score < bestScore) { best = c; bestScore = score; }
+  }
+  if (best) return best;
+  // Then anywhere along an edge (a bit tighter, so faces stay easy to hit).
+  let edge: Position3D | null = null, edgeD = tol * 0.6;
+  for (const [a, b] of boxEdges(part)) {
+    const q = closestOnSegment(hit, a, b), d = dist(hit, q);
+    if (d <= edgeD) { edge = q; edgeD = d; }
+  }
+  if (edge) return { ...edge, kind: 'edge' };
+  for (const c of cands) {
+    if (c.kind !== 'face') continue;
+    const d = dist(hit, c);
+    if (d <= tol && d < bestScore) { best = c; bestScore = d; }
   }
   return best ?? { ...hit, kind: 'surface' };
 }
@@ -67,7 +100,33 @@ export function snapFloorPoint(p: { x: number; z: number }, step: number): Measu
   return { x: r(p.x), y: 0, z: r(p.z), kind: 'floor' };
 }
 
-export const SNAP_LABEL: Record<SnapKind, string> = { vertex: 'Corner', midpoint: 'Edge middle', face: 'Face center', surface: 'Surface', floor: 'Floor' };
+export const SNAP_LABEL: Record<SnapKind, string> = { vertex: 'Corner', midpoint: 'Edge middle', edge: 'Edge', face: 'Face center', surface: 'Surface', floor: 'Floor' };
+
+/** What the hint says about the point under the finger. */
+export function snapPhrase(kind: SnapKind): string {
+  if (kind === 'surface') return 'On the surface (no snap)';
+  if (kind === 'floor') return 'On the floor grid';
+  return `Snapped to ${SNAP_LABEL[kind].toLowerCase()}`;
+}
+
+export interface MeasureHint { step: string; title: string; detail: string }
+
+/** Step-by-step hint for the tape measure banner. */
+export function measureHint(a: MeasurePoint | null, b: MeasurePoint | null, hover: MeasurePoint | null, unit: 'in' | 'ft' | 'cm' | 'mm'): MeasureHint {
+  if (!a) {
+    return {
+      step: 'Step 1 of 2', title: 'Tap the first point',
+      detail: hover ? `${snapPhrase(hover.kind)}. Lift to place it.` : 'Touch and slide to aim. Snaps to corners, edges and faces.',
+    };
+  }
+  if (!b) {
+    return {
+      step: 'Step 2 of 2', title: 'Tap the second point',
+      detail: hover ? `${snapPhrase(hover.kind)} · ${formatLength(dist(a, hover), unit)}. Lift to place it.` : 'Touch and slide to aim at the other end.',
+    };
+  }
+  return { step: 'Result', title: formatLength(dist(a, b), unit), detail: 'Pin it to keep it on the model, or measure again.' };
+}
 
 /** Top-bar text for each step of the tape measure. */
 export function measureStepText(a: MeasurePoint | null, b: MeasurePoint | null, unit: 'in' | 'ft' | 'cm' | 'mm'): string {

@@ -13,6 +13,9 @@ interface MeasureState {
   /** Pinned dimension tapped in the scene (shows Delete). */
   selectedId: string | null;
   showTip: boolean;
+  /** Touch aiming: the finger and the aim point above it (client px), so the finger doesn't hide the point. */
+  aim: { fx: number; fy: number; x: number; y: number } | null;
+  setAim: (a: MeasureState['aim']) => void;
   start: () => void;
   stop: () => void;
   setHover: (p: MeasurePoint | null) => void;
@@ -30,15 +33,17 @@ export const useMeasure = create<MeasureState>((set, get) => ({
   hover: null,
   selectedId: null,
   showTip: false,
-  start: () => set({ active: true, a: null, b: null, hover: null, selectedId: null, showTip: !tipSeen() }),
-  stop: () => set({ active: false, a: null, b: null, hover: null }),
+  aim: null,
+  setAim: (aim) => set({ aim }),
+  start: () => set({ active: true, a: null, b: null, hover: null, aim: null, selectedId: null, showTip: !tipSeen() }),
+  stop: () => set({ active: false, a: null, b: null, hover: null, aim: null }),
   setHover: (p) => set({ hover: p }),
   place: (p) => {
     const { a, b } = get();
-    if (!a || b) set({ a: p, b: null, hover: null });
-    else set({ b: p, hover: null });
+    if (!a || b) set({ a: p, b: null, hover: null, aim: null });
+    else set({ b: p, hover: null, aim: null });
   },
-  reset: () => set({ a: null, b: null, hover: null }),
+  reset: () => set({ a: null, b: null, hover: null, aim: null }),
   select: (id) => set({ selectedId: id }),
   dismissTip: () => {
     try { localStorage.setItem(TIP_KEY, '1'); } catch { /* private mode */ }
