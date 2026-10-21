@@ -17,7 +17,7 @@ import { ObjectInspector } from './components/inspector/ObjectInspector';
 import { CutListDrawer } from './components/modals/CutListDrawer';
 import { BuiltInSheet } from './builtins/BuiltInSheet';
 import { GroupBar } from './components/layout/GroupBar';
-import { MeasureBar } from './measure/MeasureBar';
+import { MeasureAimGuide, MeasureBar } from './measure/MeasureBar';
 import { useMeasure } from './measure/useMeasure';
 import { HoleModeBar } from './components/layout/HoleModeBar';
 import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
@@ -157,5 +157,5 @@ export default App;
 /** The tape measure (or a selected dimension) takes the top bar; otherwise groups. */
 function MeasureOrGroupBar() {
   const busy = useMeasure((m) => m.active || Boolean(m.selectedId));
-  return busy ? <MeasureBar /> : <GroupBar />;
+  return busy ? <><MeasureBar /><MeasureAimGuide /></> : <GroupBar />;
 }

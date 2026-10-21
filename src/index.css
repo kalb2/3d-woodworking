@@ -3090,15 +3090,17 @@ html, body, #root {
 .dim-label.is-selected { background: #fff7ed; }
 
 /* Tape measure: big, screen-space markers and labels */
-.dim-end { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(15,23,42,0.35); }
-.dim-label { font-size: 15px !important; min-height: 44px; min-width: 44px; padding: 0 14px !important; display: inline-flex; align-items: center; justify-content: center; border-width: 2px !important; background: #fff; }
-.snap-marker-wrap { position: relative; width: 26px; height: 26px; }
-.snap-marker { position: absolute; inset: 0; box-sizing: border-box; border: 3px solid #f97316; background: rgba(249,115,22,0.18); }
+.dim-end { width: 28px; height: 28px; box-sizing: border-box; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 2px 8px rgba(15,23,42,0.4); display: flex; align-items: center; justify-content: center; }
+.dim-end > span { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+.dim-label { font-size: 17px !important; min-height: 44px; min-width: 44px; padding: 0 14px !important; display: inline-flex; align-items: center; justify-content: center; border-width: 2px !important; background: #fff; }
+.snap-marker-wrap { position: relative; width: 40px; height: 40px; }
+.snap-marker { position: absolute; inset: 0; box-sizing: border-box; border: 4px solid #f97316; background: rgba(249,115,22,0.2); box-shadow: 0 0 0 2px #fff; }
+.snap-marker.is-edge { inset: 6px 0; border-radius: 6px; }
 .snap-marker.is-vertex { border-radius: 3px; }
 .snap-marker.is-midpoint { transform: rotate(45deg) scale(0.85); border-radius: 2px; }
 .snap-marker.is-face { border-radius: 50%; }
-.snap-marker.is-surface, .snap-marker.is-floor { border-radius: 50%; inset: 7px; border-width: 2px; }
-.snap-chip { position: absolute; left: 32px; top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 3px 8px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 12px; font-weight: 700; }
+.snap-marker.is-surface, .snap-marker.is-floor { border-radius: 50%; inset: 8px; border-width: 3px; }
+.snap-chip { position: absolute; left: 48px; top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 5px 11px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 14px; font-weight: 700; }
 .measure-tip { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; max-width: 520px; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(15,23,42,0.12); font-size: 13px; color: #334155; line-height: 1.35; }
 
 .snap-hint { display: inline-block; transform: translateY(-34px); padding: 4px 10px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px rgba(15,23,42,0.2); }
@@ -3247,3 +3249,16 @@ html, body, #root {
 .tpl-warn { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: #ffedd5; color: #9a3412; font-size: 15px; font-weight: 600; line-height: 1.35; }
 .tpl-more > span:not(.tpl-more-hint) { white-space: nowrap; flex-shrink: 0; }
 .tpl-more-hint { min-width: 0; }
+/* Tape measure step card */
+.measure-card { pointer-events: auto; display: flex; flex-direction: column; gap: 8px; width: min(420px, calc(100vw - 24px)); box-sizing: border-box; padding: 12px 14px; border-radius: 18px; background: rgba(15, 23, 42, 0.9); color: #fff; box-shadow: 0 10px 28px rgba(15,23,42,0.25); }
+.measure-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.measure-step { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #fdba74; }
+.measure-title { font-size: 18px; font-weight: 700; }
+.measure-card.is-result .measure-title { font-size: 26px; font-variant-numeric: tabular-nums; }
+.measure-detail { font-size: 14px; color: #cbd5e1; line-height: 1.3; white-space: normal; }
+.measure-actions { display: flex; gap: 8px; }
+.measure-actions .group-bar-btn { flex: 1; min-height: 44px; font-size: 15px; }
+.measure-aim { position: fixed; inset: 0; pointer-events: none; z-index: 224; }
+.measure-aim-line { position: absolute; width: 0; border-left: 2px dashed rgba(249,115,22,0.9); transform: translateX(-1px); }
+.measure-aim-ring { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 2px #f97316; }
+.measure-aim-finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 2px solid rgba(249,115,22,0.7); background: rgba(249,115,22,0.12); }
