@@ -2,7 +2,8 @@ import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
 import { buildSharePayload } from './share';
 import { unitScale } from './units';
-import { jointHardware, jointNotes } from '../joinery/joints';
+import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
+import { builtInHardware } from '../builtins/builtIns';
 export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
@@ -78,6 +79,13 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
     .map(({ sortKey: _s, ...item }) => item);
 }
 
+/** Everything to buy besides stock: joint screws/dowels plus template hinges, slides, shelf pins and pulls. */
+export function projectHardware(project: Pick<FurnitureProject, 'objects' | 'joints'>): HardwareItem[] {
+  const tally = new Map<string, number>();
+  for (const h of [...jointHardware(project), ...builtInHardware(project.objects)]) tally.set(h.name, (tally.get(h.name) ?? 0) + h.quantity);
+  return [...tally].map(([name, quantity]) => ({ name, quantity })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Cut list rows grouped by material, in list order. */
 export function cutListByMaterial(items: CutListItem[]): { material: string; items: CutListItem[] }[] {
   const out: { material: string; items: CutListItem[] }[] = [];
@@ -108,7 +116,7 @@ export function exportCutListCSV(project: FurnitureProject) {
   for (const item of items) {
     csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${item.quantity},${q(item.notes ?? '')}\n`;
   }
-  const hardware = jointHardware(project);
+  const hardware = projectHardware(project);
   if (hardware.length) {
     csv += '\nHardware,,,,,,Quantity\n';
     for (const h of hardware) csv += `${q(h.name)},,,,,,${h.quantity}\n`;

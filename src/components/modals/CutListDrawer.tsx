@@ -1,8 +1,7 @@
 import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { generateCutList, exportCutListCSV, cutListByMaterial } from '../../utils/exportUtils';
-import { jointHardware } from '../../joinery/joints';
+import { generateCutList, exportCutListCSV, cutListByMaterial, projectHardware } from '../../utils/exportUtils';
 
 interface CutListDrawerProps {
   isOpen: boolean;
@@ -16,7 +15,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   if (!isOpen || !currentProject) return null;
 
   const cutList = generateCutList(currentProject);
-  const hardware = jointHardware(currentProject);
+  const hardware = projectHardware(currentProject);
 
   return (
     <div style={{

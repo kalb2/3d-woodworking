@@ -18,6 +18,7 @@ import { JointRows } from '../../joinery/JoinSheet';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { partsFromSelection, useUserTemplates } from '../../templates/userTemplates';
 import { ActionRow, Row, Section, Seg } from '../properties/rows';
+import { templateName, templateSummary } from '../../builtins/builtIns';
 import { ProjectSection } from '../properties/ProjectSection';
 
 /** Clean number: at most 2 decimals, no trailing zeros (24, 23.5, 0.75). */
@@ -158,16 +159,22 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
         </Section>
       )}
 
+      {editTarget?.builtIn && (
+        <Section title="Template" testId="props-template">
+          <Row label={templateName(editTarget)}><span className="props-readout" data-testid="template-summary">{templateSummary(editTarget, unit)}</span></Row>
+          <ActionRow label="Edit template" icon={<SlidersHorizontal size={18} />} testId="menu-edit-template" onTap={() => {
+            close();
+            useBuiltInFlow.getState().startEdit(editTarget!.id, editTarget!.builtIn!.template, editTarget!.builtIn!.wallId);
+          }} />
+        </Section>
+      )}
+
       <Section title="Selection" testId="props-selection">
         <ActionRow label="Select more" icon={<BoxSelect size={18} />} testId="menu-select-area" onTap={() => {
           const st = useProjectStore.getState();
           if (!st.multiSelect) st.toggleMultiSelect();
           close();
         }} />
-        {editTarget?.builtIn && <ActionRow label="Edit template" icon={<SlidersHorizontal size={18} />} testId="menu-edit-template" onTap={() => {
-          close();
-          useBuiltInFlow.getState().startEdit(editTarget!.id, editTarget!.builtIn!.template, editTarget!.builtIn!.wallId);
-        }} />}
         {canSaveTemplate && <ActionRow label="Save as template" icon={<BookmarkPlus size={18} />} testId="menu-save-template" onTap={() => {
           const parts = partsFromSelection(project.objects, object.id);
           if (parts.length === 0) { window.alert('Nothing to save in this selection.'); return; }
