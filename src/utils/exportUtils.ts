@@ -1,10 +1,10 @@
 import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
 import { buildSharePayload } from './share';
-import { saveFile, type SaveResult } from '../native/fileExport';
 import { unitScale } from './units';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
+import { saveFile, type SaveResult } from '../native/fileExport';
 export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
@@ -98,8 +98,8 @@ export function cutListByMaterial(items: CutListItem[]): { material: string; ite
   return out;
 }
 
-/** Save a file: share sheet + Files on iOS, a download on the web. */
-export function downloadFile(filename: string, content: string, contentType: string): Promise<SaveResult> {
+export function downloadFile(filename: string, content: string, contentType: string) {
+  // Share sheet + Files on iOS (a WebView can't download), a download on the web.
   return saveFile(filename, content, contentType);
 }
 
