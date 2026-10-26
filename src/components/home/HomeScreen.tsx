@@ -26,6 +26,8 @@ import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectSt
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportProjectJSON, importProjectFromJSON } from '../../utils/exportUtils';
+import { openProjectFile, openedMessage } from '../../utils/projectFile';
+import { saveMessage } from '../../native/fileExport';
 import { listDeviceShares, removeDeviceShare, type DeviceShare } from '../../utils/share';
 import type { FurnitureObject, PresetTemplate } from '../../types/furniture';
 import { NewProjectSheet } from '../modals/NewProjectSheet';
@@ -67,6 +69,7 @@ export const HomeScreen: React.FC = () => {
     duplicateProject,
     deleteProject,
     importProject,
+    addProjects,
     createProjectFromTemplate,
   } = useProjectStore();
 
@@ -121,8 +124,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleExportJSON = (e: React.MouseEvent, proj: any) => {
     e.stopPropagation();
-    exportProjectJSON(proj);
-    showToast(`Exported "${proj.name}.json"`);
+    void exportProjectJSON(proj).then((result) => { if (result !== 'shared') showToast(saveMessage(result, `${proj.name}.json`)); });
   };
 
   const handleShare = (event: React.MouseEvent, project: typeof projects[number]) => {
@@ -186,17 +188,20 @@ export const HomeScreen: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      if (content) {
-        const imported = importProjectFromJSON(content);
-        if (imported) {
-          importProject(imported);
-          setIsImportSheetOpen(false);
-          showToast(`Imported "${imported.name}" successfully!`);
-          handleOpenProject(imported.id);
-        } else {
-          showToast('Failed to parse project JSON file.');
-        }
+      if (!content) return;
+      const opened = openProjectFile(content, useProjectStore.getState().projects);
+      if (!opened) {
+        showToast('That file is not a Workbench project or backup.');
+        return;
       }
+      setIsImportSheetOpen(false);
+      if (opened.kind === 'project') {
+        importProject(opened.projects[0]);
+        handleOpenProject(opened.projects[0].id);
+      } else {
+        addProjects(opened.projects);
+      }
+      showToast(openedMessage(opened));
     };
     reader.readAsText(file);
     if (fileInputRef.current) {
@@ -875,7 +880,7 @@ export const HomeScreen: React.FC = () => {
               </button>
             </div>
             <p className="home-import-sheet-copy">
-              Choose a saved project JSON file to add it to your library.
+              Choose a project or backup file (.json) from Files or iCloud Drive. A backup restores every project in it.
             </p>
             <button
               type="button"

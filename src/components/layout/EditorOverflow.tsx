@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Camera, FileCode, FileSpreadsheet, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
+import { Archive, Camera, FileCode, FileSpreadsheet, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
+import { backUpProjects } from '../../utils/projectFile';
+import { saveFile, saveMessage, type SaveResult } from '../../native/fileExport';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -31,14 +33,22 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
   const currentProject = projects.find((project) => project.id === activeProjectId);
   const [copied, setCopied] = useState(false);
 
+  /** The share sheet is the feedback on iOS; only say something when saving failed. */
+  const report = (result: SaveResult) => { if (result === 'failed') window.alert(saveMessage(result, '')); };
   const snapshot = () => {
     const canvas = document.querySelector('canvas');
     if (canvas) {
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `${currentProject?.name.toLowerCase().replace(/\s+/g, '_') || 'workbench'}_render.png`;
-      link.click();
+      const png = canvas.toDataURL('image/png').split(',')[1] ?? '';
+      void saveFile(`${currentProject?.name.trim() || 'Workbench'} snapshot.png`, png, 'image/png', { base64: true, title: currentProject?.name }).then(report);
     }
+    onClose();
+  };
+  const exportFile = () => {
+    if (currentProject) void exportProjectJSON(currentProject).then(report);
+    onClose();
+  };
+  const backUp = () => {
+    void backUpProjects(projects).then(report);
     onClose();
   };
   const copyJson = () => {
@@ -57,10 +67,11 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <MenuRow icon={<Share2 size={18} />} label="Share project" testId="menu-share" onTap={() => { onClose(); onShareProject(); }} />
       <MenuRow icon={<FileSpreadsheet size={18} />} label="Export cut list (CSV)" testId="menu-export-csv" onTap={() => { if (currentProject) exportCutListCSV(currentProject); onClose(); }} />
       <MenuRow icon={<Camera size={18} />} label="Snapshot image" testId="menu-export-png" onTap={snapshot} />
-      <MenuRow icon={<FileCode size={18} />} label="Export project file" testId="menu-export-json" onTap={() => { if (currentProject) exportProjectJSON(currentProject); onClose(); }} />
+      <MenuRow icon={<FileCode size={18} />} label="Export project file" testId="menu-export-json" onTap={exportFile} />
       <MenuRow icon={<Copy size={18} />} label={copied ? 'Copied' : 'Copy project JSON'} testId="menu-copy-json" onTap={copyJson} />
       <h3 className="menu-kicker">Across projects</h3>
       <MenuRow icon={<LayoutTemplate size={18} />} label="Templates" testId="menu-templates" onTap={() => { onClose(); setSidebarPanel('templates'); openOverlay('sidebar'); }} />
+      <MenuRow icon={<Archive size={18} />} label="Back up all projects" testId="menu-backup" onTap={backUp} />
     </div>
   );
 };
