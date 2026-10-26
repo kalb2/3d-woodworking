@@ -1,7 +1,8 @@
+import { formatLens, formatSmallLen } from './lengthFormat';
 import * as THREE from 'three';
 import { create } from 'zustand';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
-import type { BoardHole, Dimensions3D, FurnitureObject, HoleAnchor, ShapeType } from '../types/furniture';
+import type { BoardHole, Dimensions3D, FurnitureObject, HoleAnchor, LengthUnit, ShapeType } from '../types/furniture';
 import { isOutlineHole } from './boardGeometry';
 
 /** Shapes that can take holes (box-like solids). */
@@ -272,17 +273,19 @@ const EDGE_NAMES: Record<NonNullable<BoardHole['face']>, Record<NonNullable<Boar
   side: { 'u-': 'Back edge', 'u+': 'Front edge', 'v-': 'Bottom edge', 'v+': 'Top edge' },
 };
 
-export function describeHole(h: BoardHole, unit: string, scale: number): string {
-  const c = (v: number) => String(Math.round(v * scale * 100) / 100);
+/** One line for the hole list, e.g. 'Round Ø 1/2" · Top · 3/8" deep' (sizes as the project shows them). */
+export function describeHole(h: BoardHole, unit: LengthUnit): string {
+  const one = (v: number) => formatSmallLen(v, unit);
   const face = (h.face ?? 'top');
+  const deep = h.depth !== undefined ? ` · ${one(h.depth)} deep` : '';
   if ((h.kind ?? 'round') === 'notch') {
     const edge = EDGE_NAMES[face][h.edge ?? 'v+'];
-    return `Notch ${c(h.diameter)} × ${c(h.height ?? h.diameter / 2)} ${unit} · ${face === 'top' ? '' : `${face[0].toUpperCase() + face.slice(1)} `}${edge}${h.depth !== undefined ? ` · ${c(h.depth)} deep` : ''}`;
+    return `Notch ${formatLens([h.diameter, h.height ?? h.diameter / 2], unit)} · ${face === 'top' ? '' : `${face[0].toUpperCase() + face.slice(1)} `}${edge}${deep}`;
   }
   const size = (h.kind ?? 'round') === 'rect'
-    ? `Square ${c(h.diameter)}${(h.height ?? h.diameter) !== h.diameter ? `×${c(h.height!)}` : ''} ${unit}`
-    : `Round Ø ${c(h.diameter)} ${unit}`;
-  return `${size} · ${face[0].toUpperCase() + face.slice(1)}${h.depth !== undefined ? ` · ${c(h.depth)} deep` : ''}`;
+    ? `Square ${(h.height ?? h.diameter) !== h.diameter ? formatLens([h.diameter, h.height!], unit) : one(h.diameter)}`
+    : `Round Ø ${one(h.diameter)}`;
+  return `${size} · ${face[0].toUpperCase() + face.slice(1)}${deep}`;
 }
 
 /** Subtract joinery cutters (grooves, dowel/pocket holes) given in part-local space. */

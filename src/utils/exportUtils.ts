@@ -1,7 +1,7 @@
 import { shapeLabel } from '../catalog/shapeCatalog';
 import type { FurnitureProject } from '../types/furniture';
 import { buildSharePayload } from './share';
-import { unitScale } from './units';
+import { formatSmallLen } from './lengthFormat';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
 export type { HardwareItem } from '../joinery/joints';
@@ -21,12 +21,9 @@ export interface CutListItem {
 
 const BOX_SHAPES = new Set(['board', 'cube', 'cushion', 'bevel_top', 'wedge']);
 
-/** Stored inches shown in the project unit: clean decimals (0.75, 23.25, 19.05 cm). */
+/** A cut size as the shop reads it: inches to 1/16 (23 5/8", also for feet projects), else mm / cm. */
 export function formatCutSize(inches: number, unit: FurnitureProject['unit']): string {
-  const v = inches * unitScale(unit);
-  const digits = unit === 'mm' ? 0 : unit === 'ft' ? 3 : unit === 'cm' ? 1 : 3;
-  const n = Number(v.toFixed(digits));
-  return `${n} ${unit}`;
+  return formatSmallLen(inches, unit);
 }
 
 /**

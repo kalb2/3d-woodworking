@@ -24,7 +24,7 @@ describe('cut list', () => {
     expect(items).toHaveLength(2);
     const sides = items.find((i) => i.material === 'Plywood')!;
     expect(sides.quantity).toBe(2);
-    expect([sides.length, sides.width, sides.height]).toEqual(['30 in', '24 in', '0.75 in']);
+    expect([sides.length, sides.width, sides.height]).toEqual(['30"', '24"', '3/4"']);
     expect(items.find((i) => i.material === 'MDF')!.quantity).toBe(2);
     expect(cutListByMaterial(items).map((g) => g.material)).toEqual(['MDF', 'Plywood']);
   });

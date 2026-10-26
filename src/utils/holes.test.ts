@@ -71,7 +71,9 @@ describe('hole mode helpers', () => {
     const h = { id: 'a', x: 2, z: 1, diameter: 1 };
     expect(hitsHole(h, 'top', { x: 2.3, z: 1.2 })).toBe(true);
     expect(hitsHole(h, 'front', { x: 2, z: 1 })).toBe(false);
-    expect(describeHole(h, 'in', 1)).toBe('Round Ø 1 in · Top');
+    expect(describeHole(h, 'in')).toBe('Round Ø 1" · Top');
+    expect(describeHole({ ...h, diameter: 0.375, depth: 0.5 }, 'in')).toBe('Round Ø 3/8" · Top · 1/2" deep');
+    expect(describeHole({ ...h, diameter: 0.5 }, 'mm')).toBe('Round Ø 13 mm · Top');
   });
 });
 
@@ -82,7 +84,7 @@ describe('notches', () => {
     const n = newHole(obj, 0, 'notch', 'top');
     expect(n).toMatchObject({ kind: 'notch', diameter: 1.5, height: 0.75, edge: 'v+', x: 0, z: 5.625 });
     expect(n.depth).toBeUndefined();
-    expect(describeHole(n, 'in', 1)).toBe('Notch 1.5 × 0.75 in · Back edge');
+    expect(describeHole(n, 'in')).toBe('Notch 1 1/2" × 3/4" · Back edge');
   });
   it('snaps to the nearest edge and slides along it', () => {
     const n = newHole(obj, 0, 'notch', 'top');
