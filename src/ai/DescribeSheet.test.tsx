@@ -68,14 +68,16 @@ describe('Describe it', () => {
     expect(objs().some((o) => o.id === group.id)).toBe(false);
   });
 
-  it('without the server route it says it is not set up yet and adds nothing', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Not found.' }), { status: 404 })));
+  it('without Apple Intelligence it says so, calls no server (1.0: on-device only) and adds nothing', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ error: 'Not found.' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchSpy);
     act(() => { s().createProject('AI off', 'in'); useDescribeFlow.getState().openNew(); });
     const before = objs().length;
     const r = render(<DescribeSheet />);
     type(r.getByTestId('describe-input'), 'a bench');
     tap(r.getByTestId('describe-generate'));
-    await waitFor(() => expect(r.getByRole('alert').textContent).toMatch(/isn't set up yet/));
+    await waitFor(() => expect(r.getByRole('alert').textContent).toMatch(/^Describe it needs Apple Intelligence on this device\./));
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(objs()).toHaveLength(before);
     expect(r.getByTestId('describe-generate').textContent).toBe('Generate');
   });

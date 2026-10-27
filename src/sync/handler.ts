@@ -3,6 +3,7 @@ import type { Account, AuthConfig, IdentityResolver, SyncDatabase, SyncRecord } 
 import { API_PREFIX } from './types.ts';
 import { handleAiDescribe, type AiConfig } from '../ai/aiHandler.ts';
 import type { AiSpec } from '../ai/spec.ts';
+import type { AppleRevokeResult } from './appleRevoke.ts';
 
 export interface SyncHandlerOptions {
   db: SyncDatabase;
@@ -10,6 +11,12 @@ export interface SyncHandlerOptions {
   config: AuthConfig;
   /** "Describe it" (POST /ai/describe). Absent: the route answers "not set up". */
   ai?: { config: AiConfig; requireSignIn: boolean; mockSpec?: (prompt: string, current: AiSpec | null) => AiSpec };
+  /**
+   * Sign in with Apple token revocation on account deletion (see appleRevoke.ts).
+   * Called for Apple accounts with the authorization code the app sends in the
+   * DELETE /me body. Absent (dev server): deletion skips revocation.
+   */
+  appleRevoke?: (account: Account, authorizationCode: string | undefined) => Promise<AppleRevokeResult>;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -160,14 +167,32 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
   if (request.method === 'DELETE' && path === '/me') {
     const account = await requireAccount(request, db);
     if (account instanceof Response) return account;
+    let authorizationCode: string | undefined;
+    try {
+      const raw = await request.text();
+      if (raw) {
+        const body = JSON.parse(raw) as { authorizationCode?: unknown };
+        if (typeof body.authorizationCode === 'string') authorizationCode = body.authorizationCode;
+      }
+    } catch {
+      // No body or not JSON: delete without revoking.
+    }
+    // Revoke first (it needs nothing from the database), but never let it block deletion.
+    let appleRevoked = false;
+    if (account.provider === 'apple' && options.appleRevoke) {
+      const result = await options.appleRevoke(account, authorizationCode).catch(() => null);
+      appleRevoked = Boolean(result?.revoked);
+      if (result && !result.revoked) console.warn(`apple revoke skipped: ${result.reason}`);
+    }
     await db.deleteSessionsForAccount(account.id);
     await db.deleteAccount(account.id);
-    return json({
-      deleted: true,
-      message: account.provider === 'apple'
-        ? 'Workbench projects and this session were deleted. Your Apple ID stays in iOS Settings.'
-        : 'Workbench projects and this session were deleted.',
-    });
+    let message = 'Workbench projects and this session were deleted.';
+    if (account.provider === 'apple') {
+      message = appleRevoked
+        ? 'Workbench projects and this session were deleted, and The Workbench was removed from Sign in with Apple.'
+        : 'Workbench projects and this session were deleted. To stop using Sign in with Apple here, open Settings → your name → Sign in with Apple.';
+    }
+    return json({ deleted: true, appleRevoked, message });
   }
 
   if (request.method === 'GET' && path === '/projects') {

@@ -110,9 +110,14 @@ On Kalb-Mini, after pulling this branch:
 
 `capacitor.config.json` `appId` is `com.antigravity.furniture3d`, the same id as the Xcode target. Do not delete `ios/` or run `npx cap add ios`. `npx cap sync ios` refreshes the gitignored native config copy and leaves `PRODUCT_BUNDLE_IDENTIFIER` alone. The identity-token audience is `com.antigravity.furniture3d`.
 
+## Sign in with Apple revocation on account deletion
+
+Profile → Delete account… → Delete cloud account. For an Apple account the app first shows the Apple sheet to confirm (cancelling keeps the account) and sends the one-time `authorizationCode` with `DELETE /api/v1/me`. The Worker (`src/sync/appleRevoke.ts`) signs an ES256 client secret with the Sign in with Apple `.p8` key, exchanges the code at `https://appleid.apple.com/auth/token`, checks the returned `sub` is this account, and revokes the refresh token at `https://appleid.apple.com/auth/revoke`. Revocation never blocks deletion: if the secrets are missing or Apple fails, the account is still deleted and the message points to Settings → Sign in with Apple.
+
+Worker secrets (`npx wrangler secret put …`): `APPLE_TEAM_ID` (ZNKG8BKXAT), `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (contents of `AuthKey_<KEY_ID>.p8`), optional `APPLE_CLIENT_ID` (defaults to `com.antigravity.furniture3d`).
+
 ## Not in this cut
 
 - StoreKit / IAP products (Pro is decided as Apple IAP; see `docs/monetization.md`)
 - Stripe or a web checkout
-- Apple account revocation (deleting the Workbench account does not revoke the Apple ID)
 - Remote community (shares stay on the device)

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Archive, Box, Camera, FileCode, FileSpreadsheet, FileText, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
+import { Archive, Box, Camera, FileCode, FileSpreadsheet, FileText, Layers, LayoutTemplate, LifeBuoy, Share2, ShieldCheck, Copy } from 'lucide-react';
+import { PRIVACY_POLICY_URL, SUPPORT_URL, openExternal } from '../../config/links';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
@@ -25,8 +26,9 @@ const MenuRow: React.FC<{ icon: React.ReactNode; label: string; testId: string; 
 };
 
 /**
- * ••• is for getting things out of the project (export / share) and things that span
- * projects (templates). This project's own settings live in Properties › Project.
+ * ••• is for getting things out of the project (export / share), things that span
+ * projects (templates), and app-wide links (privacy policy, support). This
+ * project's own settings live in Properties › Project.
  */
 export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCutList, onShareProject, onClose }) => {
   const { openOverlay, setSidebarPanel } = useAppStore();
@@ -98,6 +100,9 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <h3 className="menu-kicker">Across projects</h3>
       <MenuRow icon={<LayoutTemplate size={18} />} label="Templates" testId="menu-templates" onTap={() => { onClose(); setSidebarPanel('templates'); openOverlay('sidebar'); }} />
       <MenuRow icon={<Archive size={18} />} label="Back up all projects" testId="menu-backup" onTap={backUp} />
+      <h3 className="menu-kicker">About</h3>
+      <MenuRow icon={<ShieldCheck size={18} />} label="Privacy Policy" testId="menu-privacy" onTap={() => { onClose(); openExternal(PRIVACY_POLICY_URL); }} />
+      <MenuRow icon={<LifeBuoy size={18} />} label="Support" testId="menu-support" onTap={() => { onClose(); openExternal(SUPPORT_URL); }} />
     </div>
   );
 };

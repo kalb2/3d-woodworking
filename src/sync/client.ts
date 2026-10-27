@@ -102,8 +102,16 @@ export function signOutRequest(token: string): Promise<{ ok: boolean }> {
   return request('/auth/signout', { method: 'POST', headers: authHeaders(token) });
 }
 
-export function deleteAccountRequest(token: string): Promise<{ deleted: boolean; message: string }> {
-  return request('/me', { method: 'DELETE', headers: authHeaders(token) });
+/** `authorizationCode` (Apple accounts): lets the Worker revoke the Sign in with Apple tokens. */
+export function deleteAccountRequest(
+  token: string,
+  authorizationCode?: string,
+): Promise<{ deleted: boolean; message: string; appleRevoked?: boolean }> {
+  return request('/me', {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    ...(authorizationCode ? { body: JSON.stringify({ authorizationCode }) } : {}),
+  });
 }
 
 export function fetchRecords(token: string): Promise<{ records: SyncRecord[] }> {
