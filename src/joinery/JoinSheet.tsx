@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
-import { NumberField, cleanNumber } from '../components/ui/NumberField';
+import { NumberField } from '../components/ui/NumberField';
+import { LengthField } from '../components/ui/LengthField';
 import { Row, Section, Seg, SwitchRow } from '../components/properties/rows';
-import { unitScale } from '../utils/units';
-import { formatLength } from '../utils/measure';
 import type { ButtFasten, FurnitureObject, FurnitureProject, Joint, JointType, LengthUnit } from '../types/furniture';
 import { useJoinFlow, type JoinView } from './useJoinFlow';
 import {
@@ -14,8 +13,6 @@ import {
 import { fitCheck, type FitResult } from './fitCheck';
 import { JointDiagram } from './JointDiagram';
 
-/** Joint sizes are shown in inches for in/ft projects, else the metric unit. */
-const fieldUnit = (u: LengthUnit): LengthUnit => (u === 'ft' ? 'in' : u);
 const SHORT_LABEL: Record<JointType, string> = { butt: 'Butt', dado: 'Dado', rabbet: 'Rabbet', pocket: 'Pocket', dowel: 'Dowels' };
 
 const Btn: React.FC<{ label: string; onTap: () => void; testId: string; tone?: 'primary' | 'danger' | 'plain'; active?: boolean; style?: React.CSSProperties }> = ({ label, onTap, testId, tone = 'plain', active, style }) => {
@@ -28,13 +25,10 @@ const Btn: React.FC<{ label: string; onTap: () => void; testId: string; tone?: '
 
 /** Length input: fractions in inches, plain numbers in metric. Commits on blur / Done. */
 const LenField: React.FC<{ label: string; value: number; unit: LengthUnit; testId: string; min?: number; onCommit: (inches: number) => void; onPreview?: (inches: number | null) => void }> = ({ label, value, unit, testId, min = 0.01, onCommit, onPreview }) => {
-  const fu = fieldUnit(unit), k = unitScale(fu), imperial = fu === 'in';
   return (
     <Row label={label}>
-      <NumberField className="props-input is-number" testId={testId} aria-label={label} fractions={imperial} min={min * k}
-        value={value * k} format={() => (imperial ? formatLength(value, 'in').replace(/ in$/, '"') : `${cleanNumber(value * k, 1)}`)}
-        onCommit={(n) => onCommit(n / k)} onPreview={onPreview ? (n) => onPreview(n === null ? null : n / k) : undefined} />
-      {!imperial && <span className="props-unit">{fu}</span>}
+      <LengthField className="props-input is-number" testId={testId} aria-label={label} inches={value} unit={unit} min={min}
+        onCommit={onCommit} onPreview={onPreview} />
     </Row>
   );
 };

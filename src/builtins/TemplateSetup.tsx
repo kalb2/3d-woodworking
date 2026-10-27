@@ -2,9 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
-import { NumberField, cleanNumber } from '../components/ui/NumberField';
-import { unitScale } from '../utils/units';
-import { formatLength } from '../utils/measure';
+import { LengthField } from '../components/ui/LengthField';
 import { cameraTarget } from '../templates/userTemplates';
 import { buildModule, normalizeModuleInput, type ModuleField, type ModuleId } from '../generators/modules';
 import type { BuiltInTemplateId, FurnitureObject, LengthUnit, RoomWall } from '../types/furniture';
@@ -13,8 +11,6 @@ import { useBuiltInFlow } from './useBuiltInFlow';
 
 type Values = Record<string, number | string>;
 
-/** Template sizes are shown in inches (fractions) for in/ft projects, else the metric unit. */
-const fieldUnit = (u: LengthUnit): LengthUnit => (u === 'ft' ? 'in' : u);
 
 const Btn: React.FC<{ label: string; onTap: () => void; testId: string; tone?: 'primary' | 'plain'; ariaLabel?: string; className?: string }> = ({ label, onTap, testId, tone = 'plain', ariaLabel, className }) => {
   const tap = useReliableTap(onTap);
@@ -48,14 +44,10 @@ export const Stepper: React.FC<{ label: string; value: number; min: number; max:
 };
 
 const LenInput: React.FC<{ label: string; inches: number; min?: number; max?: number; unit: LengthUnit; testId: string; onCommit: (inches: number) => void }> = ({ label, inches, min, max, unit, testId, onCommit }) => {
-  const fu = fieldUnit(unit), k = unitScale(fu), imperial = fu === 'in';
   return (
     <span className="tpl-len">
-      <NumberField className="props-input is-number" testId={testId} aria-label={label} fractions={imperial}
-        min={min !== undefined ? min * k : 0} max={max !== undefined ? max * k : undefined}
-        value={inches * k} format={() => (imperial ? formatLength(inches, 'in').replace(/ in$/, '"') : cleanNumber(inches * k, 1))}
-        onCommit={(n) => onCommit(n / k)} />
-      {!imperial && <span className="props-unit">{fu}</span>}
+      <LengthField className="props-input is-number" testId={testId} aria-label={label} inches={inches} unit={unit}
+        min={min ?? 0} max={max} onCommit={onCommit} />
     </span>
   );
 };

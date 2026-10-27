@@ -1,5 +1,5 @@
 import type { FurnitureObject, Joint, LengthUnit } from '../types/furniture';
-import { formatLength } from '../utils/measure';
+import { formatSmallLen } from '../utils/lengthFormat';
 import {
   DEFAULT_SCREW_LENGTH, JOINT_LABEL, dowelDiameter, dowelLength, hardwareSpots, jointGeometry, type JointGeometry,
 } from './joints';
@@ -20,10 +20,7 @@ export interface FitResult {
   issues: string[];
 }
 
-const len = (n: number, unit: LengthUnit) => {
-  const s = formatLength(n, unit === 'ft' ? 'in' : unit);
-  return s.endsWith(' in') ? `${s.slice(0, -3)}"` : s;
-};
+const len = (n: number, unit: LengthUnit) => formatSmallLen(n, unit);
 
 /** '1/3', '1/4', '1/2' … for simple ratios, else a percent. */
 export function ratioLabel(r: number): string {

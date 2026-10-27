@@ -1,13 +1,10 @@
 import React from 'react';
 import type { FurnitureObject, Joint, LengthUnit } from '../types/furniture';
-import { formatLength } from '../utils/measure';
+import { formatSmallLen } from '../utils/lengthFormat';
 import { DEFAULT_SCREW_LENGTH, dowelDiameter, dowelLength, jointGeometry } from './joints';
 
 const W = 320, H = 150, PAD = 22;
-const len = (n: number, unit: LengthUnit) => {
-  const s = formatLength(n, unit === 'ft' ? 'in' : unit);
-  return s.endsWith(' in') ? `${s.slice(0, -3)}"` : s;
-};
+const len = (n: number, unit: LengthUnit) => formatSmallLen(n, unit);
 
 /**
  * Cross-section through the joint: the board that takes the cut below, the

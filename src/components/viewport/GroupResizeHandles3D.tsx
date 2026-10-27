@@ -9,8 +9,7 @@ import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
 import { faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, rayAxisParam, type Face } from '../../utils/pushPull';
 import { stretchBox } from '../../utils/groupStretch';
-import { NumberField } from '../ui/NumberField';
-import { unitScale } from '../../utils/units';
+import { LengthField } from '../ui/LengthField';
 import { FaceHighlight } from './ResizeHandles3D';
 
 const FACES: Face[] = ['+x', '-x', '+y', '-y', '+z', '-z'];
@@ -106,7 +105,6 @@ export const GroupResizeHandles3D: React.FC<{ ids: string[] }> = ({ ids }) => {
   };
   const shown = dragFace ?? focusFace;
   const readoutAt = shown ? faceCenterWorld(box, shown).add(faceNormalWorld(box, shown).multiplyScalar(1.5)) : null;
-  const scale = unitScale(unit);
 
   return (
     <>
@@ -127,18 +125,19 @@ export const GroupResizeHandles3D: React.FC<{ ids: string[] }> = ({ ids }) => {
         <group position={readoutAt}>
           <Html center zIndexRange={[30, 0]} wrapperClass="rotate-readout-anchor">
             <div className="rotate-readout pushpull-readout" data-testid="group-pushpull-readout" style={{ borderColor: GIZMO_AXIS[faceAxis(shown)] }}>
-              <NumberField
+              <LengthField
                 testId="group-pushpull-size"
                 aria-label="Exact size"
-                min={0.25 * scale}
-                value={box.dimensions[faceDim(shown)] * scale}
+                min={0.25}
+                inches={box.dimensions[faceDim(shown)]}
+                unit={unit}
+                unitClassName="pushpull-unit"
                 onCommit={(n) => {
-                  stretchSelection(ids, shown, n / scale, undefined, true);
+                  stretchSelection(ids, shown, n, undefined, true);
                   pushHistoryState();
                   saveCurrentProject();
                 }}
               />
-              <span className="pushpull-unit">{unit}</span>
             </div>
           </Html>
         </group>

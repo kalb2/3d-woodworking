@@ -22,9 +22,9 @@ describe('tape measure', () => {
 
   it('distance and clean woodworking formatting', () => {
     expect(measureDistance({ x: 0, y: 0, z: 0 }, { x: 3, y: 4, z: 0 })).toBe(5);
-    expect(formatLength(23.25, 'in')).toBe('23 1/4 in');
-    expect(formatLength(0.75, 'in')).toBe('3/4 in');
-    expect(formatLength(24, 'in')).toBe('24 in');
+    expect(formatLength(23.25, 'in')).toBe('23 1/4"');
+    expect(formatLength(0.75, 'in')).toBe('3/4"');
+    expect(formatLength(24, 'in')).toBe('24"');
     expect(formatLength(30.5, 'ft')).toBe(`2' 6 1/2"`);
     expect(formatLength(24, 'mm')).toBe('610 mm');
   });
@@ -37,7 +37,7 @@ describe('tape measure guidance', async () => {
     const b = { x: 23.25, y: 0, z: 0, kind: 'face' as const };
     expect(measureStepText(null, null, 'in')).toBe('Step 1 of 2: Tap where to measure from');
     expect(measureStepText(a, null, 'in')).toBe('Step 2 of 2: Tap where to measure to');
-    expect(measureStepText(a, b, 'in')).toBe('Distance 23 1/4 in');
+    expect(measureStepText(a, b, 'in')).toBe('Distance 23 1/4"');
   });
   it('empty floor snaps to the grid at y = 0; snap labels', () => {
     expect(snapFloorPoint({ x: 3.2, z: -7.8 }, 0.5)).toEqual({ x: 3, y: 0, z: -8, kind: 'floor' });

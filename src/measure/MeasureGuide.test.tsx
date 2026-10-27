@@ -38,7 +38,7 @@ describe('snapping names what it found', () => {
     expect(measureHint(null, null, null, 'in')).toMatchObject({ step: 'Step 1 of 2', title: 'Tap the first point' });
     expect(measureHint(null, null, corner, 'in').detail).toBe('Snapped to corner. Lift to place it.');
     const h = measureHint(corner, null, { x: 23.25, y: 0, z: 0, kind: 'edge' }, 'in');
-    expect(h).toMatchObject({ step: 'Step 2 of 2', title: 'Tap the second point', detail: 'Snapped to edge · 23 1/4 in. Lift to place it.' });
+    expect(h).toMatchObject({ step: 'Step 2 of 2', title: 'Tap the second point', detail: 'Snapped to edge · 23 1/4". Lift to place it.' });
     expect(measureHint(corner, { x: 30.5, y: 0, z: 0, kind: 'face' }, null, 'ft').title).toBe(`2' 6 1/2"`);
   });
 });
@@ -57,7 +57,7 @@ describe('Tape measure banner', () => {
     expect(r.getByTestId('measure-label').textContent).toBe('Tap the second point');
     act(() => m().place({ x: 0, y: 0, z: 23.25, kind: 'midpoint' }));
     expect(r.getByTestId('measure-step').textContent).toBe('Result');
-    expect(r.getByTestId('measure-label').textContent).toBe('23 1/4 in');
+    expect(r.getByTestId('measure-label').textContent).toBe('23 1/4"');
     expect(['measure-pin', 'measure-again', 'measure-done'].map((t) => r.getByTestId(t).textContent)).toEqual(['Pin it', 'Measure again', 'Done']);
     fireEvent.click(r.getByTestId('measure-pin'));
     expect(proj().measurements).toHaveLength(1);

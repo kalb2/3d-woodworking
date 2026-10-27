@@ -1,4 +1,6 @@
 import { NumberField } from '../components/ui/NumberField';
+import { LengthField } from '../components/ui/LengthField';
+import { formatLen } from '../utils/lengthFormat';
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, LockOpen, MoreHorizontal, X } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
@@ -30,6 +32,7 @@ function useProject() {
 /** Media wall form; fitted to a wall when `wall` is given. */
 const MediaWallForm: React.FC<{ wall?: RoomWall; existing?: FurnitureObject; onDone: () => void }> = ({ wall, existing, onDone }) => {
   const insertBuiltIn = useProjectStore((s) => s.insertBuiltIn);
+  const unit = useProject()?.unit ?? 'in';
   const prev = (existing?.builtIn?.input ?? {}) as Record<string, number | string>;
   const num = (k: string, d: number) => (typeof prev[k] === 'number' ? (prev[k] as number) : d);
   const [tvSize, setTvSize] = useState(num('tvSize', MEDIA_WALL_DEFAULTS.tvSize));
@@ -56,13 +59,19 @@ const MediaWallForm: React.FC<{ wall?: RoomWall; existing?: FurnitureObject; onD
       <NumberField testId={testId} value={value} min={0} onCommit={set} style={inputStyle} />
     </label>
   );
+  const lenField = (label: string, value: number, set: (n: number) => void, testId: string) => (
+    <label style={fieldStyle}>
+      <span>{label}</span>
+      <span><LengthField testId={testId} aria-label={label} inches={value} unit={unit} min={0} onCommit={set} style={inputStyle} /></span>
+    </label>
+  );
   return (
     <div data-testid="media-wall-form" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {field(wall ? `Width (in, max ${maxWidth})` : 'Wall width (in)', wallWidth, setWallWidth, 'mw-width')}
-      {field('Height (in)', wallHeight, setWallHeight, 'mw-height')}
+      {lenField(wall ? `Width (max ${formatLen(maxWidth, unit)})` : 'Wall width', wallWidth, setWallWidth, 'mw-width')}
+      {lenField('Height', wallHeight, setWallHeight, 'mw-height')}
       {field('TV size (in)', tvSize, setTvSize, 'mw-tv')}
       {field('Base cabinets', baseCount ?? autoBaseCount(width), (n) => setBaseCount(n), 'mw-count')}
-      {field('Base depth (in)', baseDepth, setBaseDepth, 'mw-depth')}
+      {lenField('Base depth', baseDepth, setBaseDepth, 'mw-depth')}
       <div style={fieldStyle}>
         <span>Uppers</span>
         <div style={{ display: 'flex', gap: 6 }}>

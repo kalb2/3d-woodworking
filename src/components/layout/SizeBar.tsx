@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Info, Link2, RotateCcw, Unlink2 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { unitScale } from '../../utils/units';
+import { fieldUnit } from '../../utils/lengthFormat';
 import type { Dimensions3D, LengthUnit } from '../../types/furniture';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { NumberField } from '../ui/NumberField';
+import { LengthField } from '../ui/LengthField';
 import { stretchBox } from '../../utils/groupStretch';
 
 const AXES: { key: keyof Dimensions3D; color: string; testId: string }[] = [
@@ -13,13 +15,6 @@ const AXES: { key: keyof Dimensions3D; color: string; testId: string }[] = [
   { key: 'width', color: GIZMO_AXIS.z, testId: 'size-z' },
 ];
 
-function formatSize(inches: number, unit: LengthUnit) {
-  const value = inches * unitScale(unit);
-  if (unit === 'mm') return String(Math.round(value));
-  if (unit === 'ft') return value.toFixed(2);
-  // Clean inches/cm: 44, 44.25, 0.75 (no trailing zeros).
-  return String(Math.round(value * 100) / 100);
-}
 
 function useSelectedPart() {
   const store = useProjectStore();
@@ -96,7 +91,8 @@ export const MoveFloorRow: React.FC = () => {
 
   const scale = unitScale(project.unit);
   const gapInches = Math.max(object.position.y - object.dimensions.height / 2, 0);
-  const step = project.unit === 'mm' ? 1 : project.unit === 'ft' ? 0.01 : 0.1;
+  // Imperial drags in 1/16" so the field always reads a clean fraction.
+  const step = project.unit === 'mm' ? 1 : project.unit === 'cm' ? 0.1 : scale / 16;
   const display = gapInches * scale;
   const maxDisplay = Math.max(96, gapInches + 24) * scale;
 
@@ -113,16 +109,17 @@ export const MoveFloorRow: React.FC = () => {
   return (
     <div className="size-inline floor-distance" data-testid="floor-distance" role="group" aria-label="Distance from the floor">
       <span className="floor-distance-label">Floor</span>
-      <NumberField
+      <LengthField
         className="size-figure"
         testId="floor-distance-input"
         min={0}
-        aria-label={`Distance from the floor in ${project.unit}`}
+        unitSuffix={false}
+        aria-label={`Distance from the floor in ${fieldUnit(project.unit)}`}
         style={{ color: GIZMO_AXIS.y, borderBottomColor: GIZMO_AXIS.y }}
-        value={display}
-        format={() => formatSize(gapInches, project.unit)}
+        inches={gapInches}
+        unit={project.unit}
         onCommit={(n) => {
-          write(n);
+          write(n * scale);
           commit();
         }}
       />
@@ -167,17 +164,18 @@ export const ResizeSizeRow: React.FC = () => {
   return (
     <div className="size-inline" data-testid="size-bar" role="group" aria-label="Part size">
       {AXES.map((axis) => (
-        <NumberField
+        <LengthField
           key={axis.key}
           className="size-figure"
           testId={axis.testId}
-          min={0.05 * scale}
-          aria-label={`${axis.key} in ${project.unit}`}
+          min={0.05}
+          unitSuffix={false}
+          aria-label={`${axis.key} in ${fieldUnit(project.unit)}`}
           style={{ color: axis.color, borderBottomColor: axis.color }}
-          value={object.dimensions[axis.key] * scale}
-          format={() => formatSize(object.dimensions[axis.key], project.unit)}
+          inches={object.dimensions[axis.key]}
+          unit={project.unit}
           onCommit={(n) => {
-            write(axis.key, n);
+            write(axis.key, n * scale);
             commitSize(pushHistoryState, saveCurrentProject);
           }}
         />
@@ -205,21 +203,21 @@ const GroupSizeRow: React.FC = () => {
   if (!box) return null;
   const size = { length: box.max.x - box.min.x, height: box.max.y - box.min.y, width: box.max.z - box.min.z };
   const face = { length: '+x', height: '+y', width: '+z' } as const;
-  const scale = unitScale(project.unit);
   return (
     <div className="size-inline" data-testid="group-size-bar" role="group" aria-label="Group size">
       {AXES.map((axis) => (
-        <NumberField
+        <LengthField
           key={axis.key}
           className="size-figure"
           testId={`group-${axis.testId}`}
-          min={0.25 * scale}
-          aria-label={`Group ${axis.key} in ${project.unit}`}
+          min={0.25}
+          unitSuffix={false}
+          aria-label={`Group ${axis.key} in ${fieldUnit(project.unit)}`}
           style={{ color: axis.color, borderBottomColor: axis.color }}
-          value={size[axis.key] * scale}
-          format={() => formatSize(size[axis.key], project.unit)}
+          inches={size[axis.key]}
+          unit={project.unit}
           onCommit={(n) => {
-            stretchSelection(ids, face[axis.key], n / scale, undefined, true);
+            stretchSelection(ids, face[axis.key], n, undefined, true);
             commitSize(pushHistoryState, saveCurrentProject);
           }}
         />

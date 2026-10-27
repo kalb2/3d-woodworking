@@ -9,18 +9,24 @@ export function isPartialNumber(text: string, allowNegative = true): boolean {
 }
 
 /** Text that is a fraction in progress: '3/', '1 1/4', '1-1/', '3/4"'. */
-export function isPartialFraction(text: string): boolean {
-  return /^\d*(\.\d*)?([ -]?\d*(\/\d*)?)?"?$/.test(text.trim());
+export function isPartialFraction(text: string, allowNegative = true): boolean {
+  const t = text.trim();
+  if (!allowNegative && t.startsWith('-')) return false;
+  const body = t.replace(/^-/, '');
+  return /^\d*(\.\d*)?([ -]?\d*(\/\d*)?)?"?$/.test(body);
 }
 
 /** '3/4' → 0.75, '1 1/4' or '1-1/4' → 1.25, '1.5"' → 1.5; null when not a number. */
 export function parseFraction(text: string): number | null {
-  const t = text.trim().replace(/"$/, '').trim().replace(',', '.');
+  let t = text.trim().replace(/"$/, '').trim().replace(',', '.');
+  const neg = /^-\s*\d/.test(t) && t.includes('/');
+  if (neg) t = t.replace(/^-\s*/, '');
   const m = /^(?:(\d+)[ -])?(\d+)\/(\d+)$/.exec(t);
   if (m) {
     const den = Number(m[3]);
     if (!den) return null;
-    return (m[1] ? Number(m[1]) : 0) + Number(m[2]) / den;
+    const v = (m[1] ? Number(m[1]) : 0) + Number(m[2]) / den;
+    return neg ? -v : v;
   }
   if (t === '' || t === '-' || t === '.' || t === '-.') return null;
   const n = Number(t);
@@ -90,6 +96,8 @@ export const NumberField: React.FC<NumberFieldProps> = ({
 }) => {
   const [draft, setDraft] = useState<string | null>(null);
   const skipCommit = useRef(false);
+  /** The text shown when editing began: committing it unchanged must not round the value (e.g. to 1/16). */
+  const startText = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const setRef = (el: HTMLInputElement | null) => {
     inputRef.current = el;
@@ -104,6 +112,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({
     setDraft(null);
     onPreview?.(null);
     if (text === null) return;
+    if (text === startText.current) return;
     const n = parseCommit(text, { min, max, integer, fractions });
     if (n === null) return;
     if (Math.abs(n - value) > 1e-9) onCommit(n);
@@ -133,6 +142,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({
       value={draft ?? shown}
       onFocus={(e) => {
         setDraft(shown);
+        startText.current = shown;
         const el = e.currentTarget;
         // Select all so the first keystroke replaces the value (iOS needs a tick).
         el.select();
@@ -141,7 +151,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({
       }}
       onChange={(e) => {
         const t = e.target.value;
-        const okText = fractions ? isPartialFraction(t.replace(',', '.')) : isPartialNumber(t.replace(',', '.'), allowNegative);
+        const okText = fractions ? isPartialFraction(t.replace(',', '.'), allowNegative) : isPartialNumber(t.replace(',', '.'), allowNegative);
         if (!okText) return;
         setDraft(t);
         if (onPreview) {

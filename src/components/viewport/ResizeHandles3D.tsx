@@ -9,8 +9,7 @@ import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
 import { DEFAULT_RESIZE_STEP } from '../../utils/resizeRules';
 import { BOX_FACE_SHAPES, faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, faceSign, pushPull, rayAxisParam, setFaceSize, type Face } from '../../utils/pushPull';
-import { NumberField } from '../ui/NumberField';
-import { unitScale } from '../../utils/units';
+import { LengthField } from '../ui/LengthField';
 
 const FACES: Face[] = ['+x', '-x', '+y', '-y', '+z', '-z'];
 const ACCENT = '#f97316';
@@ -120,7 +119,6 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
   const isBox = BOX_FACE_SHAPES.has(object.shape);
   const shown = dragFace ?? focusFace;
   const readoutAt = shown ? faceCenterWorld(object, shown).add(faceNormalWorld(object, shown).multiplyScalar(1.5)) : null;
-  const scale = unitScale(unit);
 
   return (
     <>
@@ -149,18 +147,19 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
         <group position={readoutAt}>
           <Html center zIndexRange={[30, 0]} wrapperClass="rotate-readout-anchor">
             <div className="rotate-readout pushpull-readout" data-testid="pushpull-readout" style={{ borderColor: GIZMO_AXIS[faceAxis(shown)] }}>
-              <NumberField
+              <LengthField
                 testId="pushpull-size"
                 aria-label="Exact size"
-                min={0.25 * scale}
-                value={object.dimensions[faceDim(shown)] * scale}
+                min={0.25}
+                inches={object.dimensions[faceDim(shown)]}
+                unit={unit}
+                unitClassName="pushpull-unit"
                 onCommit={(n) => {
-                  updateObject(object.id, setFaceSize(object, shown, n / scale, floorOn), true);
+                  updateObject(object.id, setFaceSize(object, shown, n, floorOn), true);
                   pushHistoryState();
                   saveCurrentProject();
                 }}
               />
-              <span className="pushpull-unit">{unit}</span>
             </div>
           </Html>
         </group>
