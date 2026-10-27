@@ -4,7 +4,8 @@ import { useProjectStore } from '../state/useProjectStore';
 import { useBuiltInFlow } from '../builtins/useBuiltInFlow';
 import { useReliableTap } from '../utils/reliableTap';
 import { currentSpec } from './build';
-import { AiRequestError, requestSpec } from './client';
+import { AiRequestError } from './client';
+import { AI_SOURCE_LABEL, describeSpec, type AiSource } from './route';
 import { MAX_PROMPT } from './spec';
 import { useDescribeFlow } from './useDescribeFlow';
 
@@ -22,7 +23,7 @@ const Button: React.FC<{ label: string; onTap: () => void; style: React.CSSPrope
   );
 };
 
-interface Result { groupId: string; name: string; notes: string[]; changed: boolean }
+interface Result { groupId: string; name: string; notes: string[]; changed: boolean; source: AiSource }
 
 /**
  * Describe it: type (or dictate with the keyboard mic) a piece, get it built as
@@ -55,14 +56,14 @@ export const DescribeSheet: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      const spec = await requestSpec(prompt, target ? currentSpec(target) : null);
+      const { spec, source } = await describeSpec(prompt, target ? currentSpec(target) : null);
       if (mine !== ticket.current) return;
       const asked = target?.ai ? `${target.ai.prompt}; ${prompt}`.slice(-MAX_PROMPT) : prompt;
       const placed = insertAiPiece(spec, asked, target?.id ?? null);
       if (!placed) throw new AiRequestError('bad_json', 'Nothing buildable came back. Try describing it differently.');
       const g = useProjectStore.getState().projects.find((p) => p.id === useProjectStore.getState().activeProjectId)?.objects.find((o) => o.id === placed.groupId);
       if (g) useBuiltInFlow.getState().requestFocus(g.position, Math.hypot(g.dimensions.length, g.dimensions.height, g.dimensions.width) / 2);
-      setResult({ groupId: placed.groupId, name: g?.name ?? spec.name, notes: placed.notes, changed: Boolean(target) });
+      setResult({ groupId: placed.groupId, name: g?.name ?? spec.name, notes: placed.notes, changed: Boolean(target), source });
       setText('');
     } catch (e) {
       if (mine !== ticket.current) return;
@@ -77,6 +78,7 @@ export const DescribeSheet: React.FC = () => {
   if (result) {
     body = (
       <>
+        <p data-testid="describe-source" style={{ ...hintStyle, fontSize: 11, textAlign: 'center' }}>{AI_SOURCE_LABEL[result.source]}</p>
         {result.notes.length > 0 ? (
           <div data-testid="describe-notes" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <p style={{ ...hintStyle, fontWeight: 600 }}>Fixed for you:</p>

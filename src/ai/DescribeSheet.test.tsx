@@ -45,6 +45,7 @@ describe('Describe it', () => {
     expect(r.getByTestId('describe-generate').textContent).toBe('Generating…');
     await waitFor(() => expect(r.getByRole('heading', { level: 2 }).textContent).toBe('Bookshelf added'), { timeout: 3000 });
     expect(r.getByTestId('describe-notes').textContent).toContain('Set it on the floor');
+    expect(r.getByTestId('describe-source').textContent).toBe('Sample design (mock mode)');
     const group = objs().find((o) => o.shape === 'group')!;
     expect(group.ai?.prompt).toBe('a bookshelf about 30 in wide and 4 ft tall');
     expect(objs().filter((o) => o.parentId === group.id)).toHaveLength(7);

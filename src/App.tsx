@@ -51,6 +51,16 @@ export const App: React.FC = () => {
     void loadSession();
   }, [loadProjects, loadPreferences, loadSession]);
 
+  // Debug builds launched with WB_AI_SELFTEST=1 run one on-device Describe it check (logs only).
+  useEffect(() => {
+    void import('./native/onDeviceAi').then(async (m) => {
+      const bridge = m.onDeviceBridge();
+      if (!bridge || !(await m.aiSelfTestRequested())) return;
+      const { runAiSelfTest } = await import('./ai/selfTest');
+      await runAiSelfTest(bridge);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (currentView !== 'editor') return;
     resetOverlaysForLayout(isPhone);

@@ -2,18 +2,22 @@ import { D1SyncDb, type D1Like } from './d1Db.ts';
 import { handleSyncRequest } from './handler.ts';
 import { createIdentityResolver } from './identity.ts';
 import { APPLE_AUDIENCE } from './types.ts';
-import type { RateLimiter } from '../ai/aiHandler.ts';
+import type { RateLimiter, WorkersAiBinding } from '../ai/aiHandler.ts';
 import { mockDescribe } from '../ai/mock.ts';
 
 export interface WorkerEnv {
   DB?: D1Like;
   ALLOW_DEV_AUTH?: string;
   APPLE_AUDIENCE?: string;
-  /** Describe it: secret. Without it the route answers "not set up". */
+  /** Describe it: Workers AI binding ([ai] in wrangler.toml). Free daily allowance, no key. */
+  AI?: WorkersAiBinding;
+  /** Workers AI model (default @cf/meta/llama-3.3-70b-instruct-fp8-fast). */
+  WORKERS_AI_MODEL?: string;
+  /** Optional, off by default: an OpenAI-compatible provider key (secret), used alone or as a fallback. */
   AI_API_KEY?: string;
-  /** OpenAI-compatible base URL (default https://api.x.ai/v1). */
+  /** OpenAI-compatible base URL (default https://api.x.ai/v1). Only with AI_API_KEY. */
   AI_BASE_URL?: string;
-  /** Default grok-4.7. */
+  /** OpenAI-compatible model (default grok-4.7). Only with AI_API_KEY. */
   AI_MODEL?: string;
   /** reasoning_effort sent with structured output (default "low" on xAI; "none" to omit). */
   AI_REASONING_EFFORT?: string;
@@ -39,6 +43,8 @@ export default {
       config: { devSignIn: allowDev, mode: 'cloud', appleAudience: audience },
       ai: {
         config: {
+          workersAi: env.AI,
+          workersAiModel: env.WORKERS_AI_MODEL,
           apiKey: env.AI_API_KEY,
           baseUrl: env.AI_BASE_URL,
           model: env.AI_MODEL,

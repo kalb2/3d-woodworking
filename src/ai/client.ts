@@ -3,19 +3,21 @@ import { API_PREFIX } from '../sync/types';
 import { mockDescribe } from './mock';
 import { MAX_PROMPT, parseSpec, type AiSpec } from './spec';
 
-/** App side of "Describe it": one POST to the sync Worker, plain errors. */
+/** App side of the cloud path for "Describe it": one POST to the sync Worker, plain errors. */
 
-export type AiClientError = 'not_configured' | 'timeout' | 'bad_json' | 'rate_limited' | 'sign_in' | 'too_long' | 'network' | 'server';
+export type AiClientError = 'not_configured' | 'timeout' | 'bad_json' | 'rate_limited' | 'quota' | 'sign_in' | 'too_long' | 'network' | 'server' | 'unavailable';
 
 export const AI_ERROR_TEXT: Record<AiClientError, string> = {
-  not_configured: 'Describe it isn\'t set up yet. It needs the AI key on the Workbench server.',
+  not_configured: 'The Workbench cloud AI isn\'t set up yet.',
   timeout: 'That took too long. Try again, or keep the description shorter.',
   bad_json: 'The AI\'s answer couldn\'t be turned into a piece. Try rewording it.',
   rate_limited: 'That\'s a lot of requests. Wait a minute and try again.',
-  sign_in: 'Sign in (Settings → Account) to use Describe it.',
+  quota: 'Today\'s free cloud AI allowance is used up. It resets at midnight UTC.',
+  sign_in: 'Sign in (Settings → Account) to use the cloud AI.',
   too_long: `Keep the description under ${MAX_PROMPT} characters.`,
   network: 'Couldn\'t reach the Workbench server. Check your connection.',
   server: 'Something went wrong on the server. Try again.',
+  unavailable: 'No AI is available for Describe it right now.',
 };
 
 export class AiRequestError extends Error {
@@ -37,7 +39,7 @@ const CLIENT_TIMEOUT_MS = 60_000;
 
 const SERVER_CODES: Record<string, AiClientError> = {
   not_configured: 'not_configured', timeout: 'timeout', bad_json: 'bad_json', rate_limited: 'rate_limited',
-  sign_in: 'sign_in', too_long: 'too_long',
+  sign_in: 'sign_in', too_long: 'too_long', quota: 'quota', busy: 'rate_limited',
 };
 
 /** Ask for a design (or a change to `current`). Throws AiRequestError. */
