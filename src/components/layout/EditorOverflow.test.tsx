@@ -5,7 +5,14 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 const saveFile = vi.fn(async (..._a: unknown[]) => 'shared' as const);
 vi.mock('../../native/fileExport', async (orig) => ({ ...(await orig<object>()), saveFile: (...a: unknown[]) => saveFile(...a) }));
 
-afterEach(() => { cleanup(); saveFile.mockClear(); });
+const exportDesignFile = vi.fn(async (..._a: unknown[]) => 'shared' as const);
+vi.mock('../../utils/modelExport', () => ({
+  exportDesignFile: (...a: unknown[]) => exportDesignFile(...a),
+  designParts: (project: { objects: { visible?: boolean; shape: string; generator?: string; reference?: boolean }[] }) =>
+    project.objects.filter((o) => o.visible !== false && o.shape !== 'group' && o.generator !== 'room-scan' && !o.reference),
+}));
+
+afterEach(() => { cleanup(); saveFile.mockClear(); exportDesignFile.mockClear(); });
 
 const { useProjectStore } = await import('../../state/useProjectStore');
 const { EditorOverflowList } = await import('./EditorOverflow');
@@ -50,6 +57,36 @@ describe('••• project files', () => {
     await act(async () => {});
     expect(saveFile).toHaveBeenCalledWith('Bench snapshot.png', 'iVBORw0KGgo=', 'image/png', expect.objectContaining({ base64: true }));
     canvas.remove();
+  });
+});
+
+describe('••• 3D model', () => {
+  it('exports the open project as USDZ or GLB', () => {
+    act(() => s().createProject('Bench', 'in'));
+    const project = s().projects.find((p) => p.id === s().activeProjectId);
+    const onClose = vi.fn();
+    const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={onClose} />);
+    fireEvent.click(r.getByTestId('menu-export-usdz'));
+    fireEvent.click(r.getByTestId('menu-export-glb'));
+    expect(exportDesignFile).toHaveBeenNthCalledWith(1, project, 'usdz');
+    expect(exportDesignFile).toHaveBeenNthCalledWith(2, project, 'glb');
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(r.getByText('Export 3D model (USDZ)')).toBeTruthy();
+    expect(r.getByText('Export 3D model (GLB)')).toBeTruthy();
+  });
+
+  it('does not export when the project has no parts', () => {
+    act(() => s().createProject('Bare', 'in'));
+    const id = s().activeProjectId;
+    act(() => useProjectStore.setState({
+      projects: s().projects.map((p) => (p.id === id ? { ...p, objects: [] } : p)),
+    }));
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={() => {}} />);
+    fireEvent.click(r.getByTestId('menu-export-glb'));
+    expect(exportDesignFile).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledWith('Nothing to export yet.');
+    alert.mockRestore();
   });
 });
 
