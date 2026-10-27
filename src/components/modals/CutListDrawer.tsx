@@ -17,7 +17,7 @@ interface CutListDrawerProps {
 }
 
 const cell: React.CSSProperties = { padding: '10px 12px', verticalAlign: 'top' };
-const sub: React.CSSProperties = { fontSize: 12, fontWeight: 400, color: '#9ca3af', marginTop: 2 };
+const sub: React.CSSProperties = { fontSize: 12, fontWeight: 400, color: '#475569', marginTop: 2 };
 
 /** L × W × T; may wrap between dimensions on a phone, never inside one (23 5/8"). */
 export function cutSizeText(item: Pick<CutListItem, 'lengthIn' | 'widthIn' | 'thicknessIn'>, unit: FurnitureProject['unit']): string {
@@ -69,7 +69,7 @@ const BuyList: React.FC<{ buys: StickBuy[]; unit: FurnitureProject['unit'] }> = 
         {buys.filter((b) => b.sticks.length).map((b) => (
           <li key={`${b.material}-${b.profile}`} data-testid="cut-buy-line" style={{ padding: '3px 0' }}>
             <strong>{b.sticks.length} × {b.profile}</strong> at {stickFeet(b.stockLength)}
-            <span style={{ color: '#9ca3af' }}> · {b.material}</span>
+            <span style={{ color: '#475569' }}> · {b.material}</span>
           </li>
         ))}
       </ul>
@@ -83,7 +83,7 @@ const BuyList: React.FC<{ buys: StickBuy[]; unit: FurnitureProject['unit'] }> = 
           {buys.flatMap((b) => b.sticks.map((st, i) => (
             <li key={`${b.material}-${b.profile}-${i}`} data-testid="cut-layout-stick" style={{ padding: '3px 0', lineHeight: 1.45 }}>
               <span style={{ fontWeight: 600 }}>{b.profile} #{i + 1}</span> ({stickFeet(st.length)}): {st.cuts.map(len).join(' + ')}
-              <span style={{ color: '#9ca3af' }}> · {len(st.left)} left</span>
+              <span style={{ color: '#475569' }}> · {len(st.left)} left</span>
             </li>
           )))}
         </ol>
@@ -202,7 +202,7 @@ const SheetList: React.FC<{ sections: Array<CutListSection & { sheets: SheetNest
         {sections.filter((s) => s.sheets.sheets).map((s) => (
           <li key={s.title} data-testid="cut-sheet-line" style={{ padding: '3px 0' }}>
             <strong>{s.sheets.sheets} × {s.title}</strong> 4×8
-            <span style={{ color: '#9ca3af' }}> · {Math.round(s.sheets.yield * 100)}% used</span>
+            <span style={{ color: '#475569' }}> · {Math.round(s.sheets.yield * 100)}% used</span>
           </li>
         ))}
       </ul>
@@ -273,14 +273,14 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Layers size={24} color="#e09f3e" />
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Cut List & Bill of Materials</h2>
-              <span style={{ fontSize: 12, color: '#9ca3af' }}>{currentProject.name}</span>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Cut list</h2>
+              <span style={{ fontSize: 12, color: '#475569' }}>{currentProject.name}</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" className="glass-button active" data-testid="cut-export-csv" onClick={tapExport} onPointerUp={tapExport}>
-              <FileSpreadsheet size={16} /> Export CSV
+            <button type="button" className="glass-button active" data-testid="cut-export-csv" aria-label="Export cut list as CSV" style={{ whiteSpace: 'nowrap' }} onClick={tapExport} onPointerUp={tapExport}>
+              <FileSpreadsheet size={16} /> CSV
             </button>
 
             <button
@@ -313,7 +313,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
             <tbody>
               {cutList.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={3} style={{ padding: 24, textAlign: 'center', color: '#475569' }}>
                     No 3D objects in canvas yet. Add shapes to view cut list.
                   </td>
                 </tr>

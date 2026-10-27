@@ -227,3 +227,12 @@ describe('sheet layouts', () => {
     }
   });
 });
+
+describe('lumberStock: thick solid stock', () => {
+  it('names stock past 16/4 as a glued-up blank at its real thickness, board feet unchanged', () => {
+    expect(lumberStock({ species: 'birch' }, 12, 12).label).toBe('12" glued-up blank');
+    expect(lumberStock({ species: 'oak' }, 6, 5.5).label).toBe('5 1/2" glued-up blank');
+    expect(lumberStock({ species: 'oak' }, 6, 3.5).label).toBe('16/4');
+    expect(boardFeet(12, 12, 12)).toBeCloseTo((12 * 12 * (49 / 4)) / 144, 6);
+  });
+});

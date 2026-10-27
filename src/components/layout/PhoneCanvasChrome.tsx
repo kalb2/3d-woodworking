@@ -133,7 +133,7 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
 
   return (
     <div
-      className={`phone-tool-sheet${contentOpen ? ' is-expanded' : ''}`}
+      className={`phone-tool-sheet${contentOpen ? ' is-expanded' : ''}${overlays.sidebar ? ' is-add' : ''}`}
       data-testid="phone-canvas-dock"
     >
       <div className="phone-tool-sheet-handle" aria-hidden="true" />
