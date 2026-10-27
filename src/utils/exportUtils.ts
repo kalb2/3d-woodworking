@@ -8,6 +8,7 @@ import {
 } from './stock';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
+import { saveFile, type SaveResult } from '../native/fileExport';
 export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
@@ -193,15 +194,8 @@ export function projectHardware(project: Pick<FurnitureProject, 'objects' | 'joi
 }
 
 export function downloadFile(filename: string, content: string, contentType: string) {
-  const blob = new Blob([content], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Share sheet + Files on iOS (a WebView can't download), a download on the web.
+  return saveFile(filename, content, contentType);
 }
 
 /** The cut list as CSV: parts (with board feet for lumber), a buying summary per section, then hardware. */
@@ -231,13 +225,10 @@ export function exportCutListCSV(project: FurnitureProject) {
   downloadFile(`${project.name.toLowerCase().replace(/\s+/g, '_')}_cut_list.csv`, cutListCSV(project), 'text/csv');
 }
 
-export function exportProjectJSON(project: FurnitureProject) {
+/** The project as a .json file (share sheet + Files on iOS, a download on the web). */
+export function exportProjectJSON(project: FurnitureProject): Promise<SaveResult> {
   const json = JSON.stringify(buildSharePayload(project), null, 2);
-  downloadFile(
-    `${project.name.toLowerCase().replace(/\s+/g, '_')}.json`,
-    json,
-    'application/json'
-  );
+  return saveFile(`${project.name.trim() || 'Project'}.json`, json, 'application/json', { title: project.name });
 }
 
 export async function copyProjectToClipboard(project: FurnitureProject): Promise<boolean> {
@@ -265,52 +256,76 @@ export async function copyProjectToClipboard(project: FurnitureProject): Promise
   }
 }
 
+let importSeq = 0;
+const freshId = (prefix: string) => `${prefix}_${Date.now()}_${(importSeq++).toString(36)}${Math.random().toString(36).substring(2, 5)}`;
+
+/**
+ * A project from a file as a new project here: fresh project and part ids
+ * (so it never collides with what's on this device), with groups, joints,
+ * measurements and the scanned room kept and re-linked to the new ids.
+ * `keepIds` (restoring a backup onto a device that doesn't have it) keeps
+ * the original ids and dates instead.
+ * Returns null when it isn't a Workbench project.
+ */
+export function importProjectData(projectData: any, options: { suffix?: string; keepIds?: boolean } = {}): FurnitureProject | null {
+  if (!projectData || !projectData.name || !Array.isArray(projectData.objects) || !projectData.snapSettings) return null;
+
+  const idMap = new Map<string, string>();
+  const fresh = (projectData.objects as any[]).map((obj) => {
+    const id = options.keepIds && typeof obj.id === 'string' ? obj.id : freshId('obj');
+    if (typeof obj.id === 'string') idMap.set(obj.id, id);
+    return { ...obj, id };
+  });
+  const objects = fresh.map((obj) => {
+    if (!obj.parentId) return obj;
+    const parentId = idMap.get(obj.parentId);
+    if (parentId) return { ...obj, parentId };
+    const { parentId: _gone, ...rest } = obj;
+    return rest;
+  });
+  const joints = Array.isArray(projectData.joints)
+    ? (projectData.joints as any[])
+      .filter((j) => idMap.has(j.receiverId) && idMap.has(j.materId))
+      .map((j) => ({ ...j, receiverId: idMap.get(j.receiverId)!, materId: idMap.get(j.materId)! }))
+    : [];
+
+  const keep = !!options.keepIds && typeof projectData.id === 'string';
+  const suffix = options.suffix ?? (keep ? '' : ' (Imported)');
+  return {
+    id: keep ? projectData.id : freshId('proj'),
+    name: `${projectData.name}${suffix}`,
+    createdAt: keep && typeof projectData.createdAt === 'number' ? projectData.createdAt : Date.now(),
+    updatedAt: keep && typeof projectData.updatedAt === 'number' ? projectData.updatedAt : Date.now(),
+    unit: projectData.unit || 'in',
+    objects,
+    snapSettings: projectData.snapSettings || {
+      enabled: true,
+      faceSnap: true,
+      gridSnap: true,
+      gridSize: 0.5,
+      floorCollision: true
+    },
+    showFloor: projectData.showFloor ?? true,
+    floorOpacity: projectData.floorOpacity ?? 0.4,
+    backgroundColor: projectData.backgroundColor,
+    ...(joints.length ? { joints } : {}),
+    ...(Array.isArray(projectData.measurements) && projectData.measurements.length ? { measurements: projectData.measurements } : {}),
+    ...(projectData.scannedRoom ? { scannedRoom: projectData.scannedRoom } : {}),
+    ...(typeof projectData.roomLocked === 'boolean' ? { roomLocked: projectData.roomLocked } : {}),
+    // Keeps the exported style; older files without one get the style for new projects on import.
+    ...(projectData.viewStyle === 'clean' || projectData.viewStyle === 'realistic' ? { viewStyle: projectData.viewStyle } : {}),
+  };
+}
+
 export function importProjectFromJSON(jsonString: string): FurnitureProject | null {
   try {
     const parsed = JSON.parse(jsonString);
-
     // Support both wrapped format { project: ... } and raw project
-    const projectData = parsed.project || parsed;
-
-    // Validate required fields
-    if (
-      !projectData.name ||
-      !Array.isArray(projectData.objects) ||
-      !projectData.snapSettings
-    ) {
-      console.warn('Invalid project JSON: missing required fields');
-      return null;
-    }
-
-    // Re-generate ID to avoid conflicts
-    const imported: FurnitureProject = {
-      id: `proj_${Date.now()}`,
-      name: `${projectData.name} (Imported)`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      unit: projectData.unit || 'in',
-      objects: (projectData.objects || []).map((obj: any) => ({
-        ...obj,
-        id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`
-      })),
-      snapSettings: projectData.snapSettings || {
-        enabled: true,
-        faceSnap: true,
-        gridSnap: true,
-        gridSize: 0.5,
-        floorCollision: true
-      },
-      showFloor: projectData.showFloor ?? true,
-      floorOpacity: projectData.floorOpacity ?? 0.4,
-      backgroundColor: projectData.backgroundColor,
-      // Keeps the exported style; older files without one get the style for new projects on import.
-      ...(projectData.viewStyle === 'clean' || projectData.viewStyle === 'realistic' ? { viewStyle: projectData.viewStyle } : {}),
-    };
-
+    const imported = importProjectData(parsed?.project || parsed);
+    if (!imported) console.warn('Invalid project JSON: missing required fields');
     return imported;
   } catch (err) {
     console.warn('Failed to parse project JSON:', err);
     return null;
   }
 }
-

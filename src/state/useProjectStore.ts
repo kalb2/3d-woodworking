@@ -169,6 +169,8 @@ interface ProjectState {
   deleteProject: (id: string) => void;
   switchProject: (id: string) => void;
   importProject: (project: FurnitureProject) => void;
+  /** Add several projects (a restored backup) without opening any of them. */
+  addProjects: (projects: FurnitureProject[]) => void;
   /** Clean or Realistic for the open project (saved and synced with it). */
   setViewStyle: (style: ViewStyle) => void;
 
@@ -480,6 +482,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       historyStack: [seedHistory(proj.objects, proj.joints)],
       historyIndex: 0
     });
+  },
+
+  addProjects: (incoming) => {
+    if (!incoming.length) return;
+    const projects = [...get().projects, ...normalizeProjects(incoming)];
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+    } catch (err) {
+      console.warn('Failed to save restored projects:', err);
+    }
+    set({ projects });
+    notifyProjectPersist({ type: 'save' });
   },
 
   importProject: (raw: FurnitureProject) => {

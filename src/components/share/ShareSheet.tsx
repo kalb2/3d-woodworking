@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Check, Copy, Download, Link2, Share2, Smartphone, Users, X } from 'lucide-react';
 import type { FurnitureProject } from '../../types/furniture';
 import { copyProjectToClipboard, exportProjectJSON } from '../../utils/exportUtils';
+import { saveMessage } from '../../native/fileExport';
 import { canUseSystemShare, publishDeviceShare, systemShareProject } from '../../utils/share';
 
 interface ShareSheetProps {
@@ -74,12 +75,13 @@ export const ShareSheet: React.FC<ShareSheetProps> = ({ project, onClose, onPubl
           className="glass-button home-import-sheet-pick"
           data-testid="share-download"
           onClick={() => {
-            exportProjectJSON(project);
-            flash('Downloaded a .json file you can AirDrop or save to Files.');
+            void exportProjectJSON(project).then((result) => {
+              flash(result === 'shared' ? 'Project file sent.' : saveMessage(result, `${project.name}.json`));
+            });
           }}
         >
           <Download size={18} />
-          <span>Download .json</span>
+          <span>Save project file</span>
         </button>
 
         <button
