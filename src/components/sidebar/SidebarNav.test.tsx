@@ -75,3 +75,20 @@ describe('Add menu lumber', () => {
     expect(r.getByTestId('preset-pine_2x4_8ft').getAttribute('aria-label')).toBe('2×4 Pine (8 ft)');
   });
 });
+
+describe('iPad Add sidebar layout', () => {
+  it('ends above the floating Properties + Undo stack so the last Lumber row stays visible', async () => {
+    const { IPAD_SIDEBAR_BOTTOM } = await import('./SidebarNav');
+    expect(IPAD_SIDEBAR_BOTTOM).toContain('132px');
+    expect(IPAD_SIDEBAR_BOTTOM).toContain('safe-area-inset-bottom');
+    const r = open();
+    expect(r.getByTestId('overlay-sidebar').getAttribute('style') ?? '').toMatch(/bottom:\s*calc\(132px/);
+  });
+
+  it('unselected stock-length toggles use dark text, not faint white', () => {
+    const r = open();
+    const idle = r.getByTestId('lumber-length-10ft');
+    expect(idle.getAttribute('aria-checked')).toBe('false');
+    expect(idle.style.color).toBe('rgb(30, 41, 59)');
+  });
+});

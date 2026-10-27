@@ -44,7 +44,7 @@ const LengthChoice: React.FC<{ inches: number; selected: boolean; isPhone: boole
   const tap = useReliableTap(() => onPick(inches));
   const idle = isPhone
     ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
-    : { background: 'rgba(255,255,255,0.06)', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.18)' };
+    : { background: '#ffffff', color: '#1e293b', border: '1px solid #94a3b8' };
   return (
     <button
       type="button"
@@ -67,6 +67,9 @@ const LengthChoice: React.FC<{ inches: number; selected: boolean; isPhone: boole
     </button>
   );
 };
+
+/** iPad sidebar bottom edge: clears the floating bottom-left cluster plus a 14px gap. */
+export const IPAD_SIDEBAR_BOTTOM = 'calc(132px + env(safe-area-inset-bottom, 0px))';
 
 export const SidebarNav: React.FC = () => {
   const isPhone = useIsPhone();
@@ -129,7 +132,9 @@ export const SidebarNav: React.FC = () => {
         position: 'absolute',
         top: 'var(--ipad-panel-top)',
         left: 16,
-        bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+        // End above the bottom-left Properties + Undo/Redo stack (22 + 48 + 8 + 40px)
+        // so the last Add row (Lumber 2×6) is never hidden behind it.
+        bottom: IPAD_SIDEBAR_BOTTOM,
         width: 280,
         borderRadius: 16,
         zIndex: 40,
