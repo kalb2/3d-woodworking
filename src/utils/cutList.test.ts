@@ -61,6 +61,19 @@ describe('cut list', () => {
     expect(sec.summary).toBe('2.4 bd ft of 8/4 · buy 2.8 with 15% waste');
   });
 
+  it('dimensional pine counts as lumber at nominal board feet', () => {
+    const pine = { ...PRESET_WOOD_MATERIALS.pine };
+    const stick = (id: string, w: number, t: number) => part(id, [96, t, w], { shape: 'cube', material: pine });
+    const items = generateCutList(project([stick('a', 1.5, 0.75), stick('b', 1.5, 1.5), stick('c', 3.5, 1.5), stick('d', 3.5, 1.5), stick('e', 5.5, 1.5)]));
+    expect(items.every((i) => i.kind === 'lumber')).toBe(true);
+    const [sec] = cutListSections(items, 'in');
+    expect(sec.pieces).toBe(5);
+    expect(sec.boardFeet).toBeCloseTo(4 / 3 + 8 / 3 + 2 * 16 / 3 + 8, 6);
+    expect(sec.summary).toBe('22.7 bd ft of 1×2, 2×2, 2×4, 2×6 · buy 26.1 with 15% waste');
+    const csv = cutListCSV(project([stick('stud', 3.5, 1.5)]));
+    expect(csv).toContain('"stud","Box","96""","3 1/2""","1 1/2""","Rustic Pine",Lumber,1,5.3,');
+  });
+
   it('notes shaping and the assemblies a part is used in', () => {
     const holes = [{ id: 'h1', x: 0, z: 0, diameter: 1 }, { id: 'h2', x: 2, z: 0, diameter: 1 }];
     const items = generateCutList(project([

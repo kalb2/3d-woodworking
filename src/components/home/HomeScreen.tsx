@@ -23,6 +23,7 @@ import {
   LayoutTemplate,
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
+import { inchFraction } from '../../utils/lengthFormat';
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportProjectJSON, importProjectFromJSON } from '../../utils/exportUtils';
@@ -694,9 +695,9 @@ export const HomeScreen: React.FC = () => {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-muted)', borderTop: '1px solid var(--panel-border)', paddingTop: 10 }}>
-                      <span>L: <strong style={{ color: '#ef4444' }}>{preset.dimensions.length}"</strong></span>
-                      <span>W: <strong style={{ color: '#3b82f6' }}>{preset.dimensions.width}"</strong></span>
-                      <span>H: <strong style={{ color: '#10b981' }}>{preset.dimensions.height}"</strong></span>
+                      <span>L: <strong style={{ color: '#ef4444' }}>{inchFraction(preset.dimensions.length)}"</strong></span>
+                      <span>W: <strong style={{ color: '#3b82f6' }}>{inchFraction(preset.dimensions.width)}"</strong></span>
+                      <span>H: <strong style={{ color: '#10b981' }}>{inchFraction(preset.dimensions.height)}"</strong></span>
                       <span>Finish: <strong style={{ color: 'var(--accent-primary)' }}>{preset.material.name}</strong></span>
                     </div>
                   </div>

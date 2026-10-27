@@ -3,7 +3,7 @@ import type { FurnitureObject, FurnitureProject, WoodSpecies } from '../types/fu
 import { buildSharePayload } from './share';
 import { formatSmallLen } from './lengthFormat';
 import {
-  LUMBER_WASTE, boardFeet, formatBoardFeet, nestSheets, roughQuarters, sheetHasGrain, stockKind,
+  LUMBER_WASTE, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, sheetHasGrain, stockKind,
   type SheetNest, type StockKind,
 } from './stock';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
@@ -155,6 +155,9 @@ export interface CutListSection {
   summary: string;
 }
 
+/** One lumber row's board feet (one piece): nominal for dimensional lumber, else rough thickness. */
+const itemBoardFeet = (it: CutListItem) => lumberBoardFeet({ species: it.species }, it.lengthIn, it.widthIn, it.thicknessIn);
+
 /** Cut list rows as buying sections: each sheet material + thickness, each lumber species, then other. */
 export function cutListSections(items: CutListItem[], unit: FurnitureProject['unit']): CutListSection[] {
   const sections: CutListSection[] = [];
@@ -177,10 +180,11 @@ export function cutListSections(items: CutListItem[], unit: FurnitureProject['un
       if (nest.oversize) parts.push(`${nest.oversize} ${nest.oversize === 1 ? 'part is' : 'parts are'} bigger than a sheet`);
       s.summary = parts.join(' · ');
     } else if (s.kind === 'lumber') {
-      const bf = s.items.reduce((n, it) => n + it.quantity * boardFeet(it.lengthIn, it.widthIn, it.thicknessIn), 0);
+      const bf = s.items.reduce((n, it) => n + it.quantity * itemBoardFeet(it), 0);
       s.boardFeet = bf;
-      const quarters = [...new Set(s.items.map((it) => roughQuarters(it.thicknessIn)))].sort((x, y) => x - y).map((q) => `${q}/4`);
-      s.summary = `${formatBoardFeet(bf)} bd ft of ${quarters.join(', ')} · buy ${formatBoardFeet(bf * (1 + LUMBER_WASTE))} with ${Math.round(LUMBER_WASTE * 100)}% waste`;
+      const stock = new Map(s.items.map((it) => { const st = lumberStock({ species: it.species }, it.widthIn, it.thicknessIn); return [st.label, st.order] as const; }));
+      const labels = [...stock].sort((x, y) => x[1] - y[1]).map(([label]) => label);
+      s.summary = `${formatBoardFeet(bf)} bd ft of ${labels.join(', ')} · buy ${formatBoardFeet(bf * (1 + LUMBER_WASTE))} with ${Math.round(LUMBER_WASTE * 100)}% waste`;
     }
   }
   return sections;
@@ -204,7 +208,7 @@ export function cutListCSV(project: FurnitureProject): string {
   const q = (t: string) => `"${t.replace(/"/g, '""')}"`;
   let csv = 'Name,Shape,Length (grain),Width,Thickness,Material,Stock,Quantity,Board feet,Notes,Used in\n';
   for (const item of items) {
-    const bf = item.kind === 'lumber' ? formatBoardFeet(item.quantity * boardFeet(item.lengthIn, item.widthIn, item.thicknessIn)) : '';
+    const bf = item.kind === 'lumber' ? formatBoardFeet(item.quantity * itemBoardFeet(item)) : '';
     const stock = item.kind === 'sheet' ? 'Sheet' : item.kind === 'lumber' ? 'Lumber' : 'Other';
     csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${stock},${item.quantity},${bf},${q(item.notes ?? '')},${q(item.usedIn ?? '')}\n`;
   }

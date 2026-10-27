@@ -156,7 +156,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
             <p data-testid="cut-footnote" style={{ ...sub, padding: '12px 12px 0', lineHeight: 1.5 }}>
               Finished sizes, joinery included. Length runs with the grain.
               {hasSheets && ' Sheets: parts nested on 4×8 with a 1/8" kerf; plywood keeps its grain on the 8\' side.'}
-              {hasLumber && ` Board feet use rough thickness (3/4" from 4/4); buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
+              {hasLumber && ` Board feet use nominal size for 1×2, 2×4 and other dimensional pine, rough thickness for other lumber (3/4" from 4/4); buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
             </p>
           )}
         </div>

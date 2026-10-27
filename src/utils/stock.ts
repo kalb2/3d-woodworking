@@ -43,6 +43,41 @@ export function boardFeet(length: number, width: number, thickness: number): num
   return (length * width * (roughQuarters(thickness) / 4)) / 144;
 }
 
+/** Surfaced softwood sizes and the nominal size they're sold as (3/4" is a 1×, 1 1/2" a 2×, 5 1/2" a 6). */
+const NOMINAL: Array<[number, number]> = [[0.75, 1], [1.5, 2], [2.5, 3], [3.5, 4], [5.5, 6], [7.25, 8], [9.25, 10], [11.25, 12]];
+const NOMINAL_THICKNESSES = new Set([1, 2, 4]);
+const nominalOf = (actual: number) => NOMINAL.find(([a]) => Math.abs(a - actual) < 1 / 32)?.[1];
+
+/**
+ * Pine at a standard surfaced cross-section is dimensional lumber, bought by its
+ * nominal size: 1 1/2" × 3 1/2" is a 2×4. Returns null for anything else.
+ */
+export function dimensionalNominal(
+  material: { species?: WoodMaterial['species'] } | undefined, thickness: number, width: number,
+): { thickness: number; width: number } | null {
+  if (material?.species !== 'pine') return null;
+  const t = nominalOf(Math.min(thickness, width)), w = nominalOf(Math.max(thickness, width));
+  if (!t || !w || !NOMINAL_THICKNESSES.has(t)) return null;
+  return { thickness: t, width: w };
+}
+
+/**
+ * Board feet as the lumberyard counts them: dimensional lumber by nominal size
+ * (an 8' 2×4 is 5 1/3 bd ft), other lumber by rough thickness.
+ */
+export function lumberBoardFeet(material: { species?: WoodMaterial['species'] } | undefined, length: number, width: number, thickness: number): number {
+  const n = dimensionalNominal(material, thickness, width);
+  return n ? (length * n.width * n.thickness) / 144 : boardFeet(length, width, thickness);
+}
+
+/** What the stock is called when buying it: '2×4' for dimensional lumber, else rough thickness ('8/4'). */
+export function lumberStock(material: { species?: WoodMaterial['species'] } | undefined, width: number, thickness: number): { label: string; order: number } {
+  const n = dimensionalNominal(material, thickness, width);
+  if (n) return { label: `${n.thickness}×${n.width}`, order: n.thickness * 4 * 100 + n.width };
+  const q = roughQuarters(thickness);
+  return { label: `${q}/4`, order: q * 100 };
+}
+
 export interface SheetPart { length: number; width: number; quantity: number }
 export interface SheetNest {
   /** 4×8 sheets needed for the parts that fit. */
