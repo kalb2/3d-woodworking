@@ -131,3 +131,28 @@ describe('addProjects', () => {
     expect(saved.some((p: { id: string }) => p.id === 'restored_1')).toBe(true);
   });
 });
+
+describe('••• About links', () => {
+  it('Privacy Policy and Support are labeled rows that open the site in Safari and close the menu', async () => {
+    const { PRIVACY_POLICY_URL, SUPPORT_URL } = await import('../../config/links');
+    expect(PRIVACY_POLICY_URL).toMatch(/^https:\/\/.+\/privacy$/);
+    expect(SUPPORT_URL).toMatch(/^https:\/\/.+\/support$/);
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      const onClose = vi.fn();
+      const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={onClose} />);
+      expect(r.getByTestId('menu-privacy').textContent).toBe('Privacy Policy');
+      expect(r.getByTestId('menu-support').textContent).toBe('Support');
+      // reliableTap: pointerup + click from one tap opens once.
+      fireEvent.pointerUp(r.getByTestId('menu-privacy'));
+      fireEvent.click(r.getByTestId('menu-privacy'));
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenLastCalledWith(PRIVACY_POLICY_URL, '_blank', 'noopener');
+      fireEvent.click(r.getByTestId('menu-support'));
+      expect(open).toHaveBeenLastCalledWith(SUPPORT_URL, '_blank', 'noopener');
+      expect(onClose).toHaveBeenCalledTimes(2);
+    } finally {
+      open.mockRestore();
+    }
+  });
+});

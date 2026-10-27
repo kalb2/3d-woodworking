@@ -22,6 +22,19 @@ database_id = "e87ee84f-66b3-4e33-9aad-ca20e995534c"
 # Optional override:
 #   npx wrangler secret put APPLE_AUDIENCE
 
+# Sign in with Apple token revocation on account deletion (DELETE /api/v1/me,
+# src/sync/appleRevoke.ts). Without these three the Worker still deletes the
+# account but skips revocation. Key: Apple Developer → Keys → a key with
+# "Sign in with Apple" enabled for the App ID com.antigravity.furniture3d.
+#   npx wrangler secret put APPLE_TEAM_ID       # 10-char Team ID
+#   npx wrangler secret put APPLE_KEY_ID        # 10-char Key ID of that key
+#   npx wrangler secret put APPLE_PRIVATE_KEY   # full contents of AuthKey_<KEY_ID>.p8
+# Optional (defaults to APPLE_AUDIENCE, i.e. the bundle id):
+#   npx wrangler secret put APPLE_CLIENT_ID     # com.antigravity.furniture3d
+
+# Describe it cloud route is OFF for 1.0 (DESCRIBE_CLOUD_ENABLED in src/config/features.ts):
+# the Worker doesn't mount POST /api/v1/ai/describe, so the [ai] binding and AI_* settings
+# below are unused until that flag is turned on.
 # Describe it (POST /api/v1/ai/describe): 10 requests a minute per signed-in account.
 # Needs wrangler 4.36+. Without this binding the worker falls back to a per-isolate limit.
 [[ratelimits]]

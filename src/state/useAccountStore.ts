@@ -13,7 +13,7 @@ import {
   syncServerConfigured,
   writeStoredSession,
 } from '../sync/client.ts';
-import { appleSignInAvailable, authorizeWithApple } from '../sync/appleSignIn.ts';
+import { appleSignInAvailable, authorizeWithApple, isAppleCancel } from '../sync/appleSignIn.ts';
 import { createDevIdentityToken } from '../sync/identity.ts';
 import {
   claimStarterProjectId,
@@ -368,9 +368,23 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   deleteAccount: async () => {
     const { token, account } = get();
     if (!token || !account) return;
-    set({ syncStatus: 'syncing', lastError: null });
+    set({ syncStatus: 'syncing', lastError: null, notice: null });
+    // Apple accounts confirm with the Apple sheet; its one-time code lets the
+    // Worker revoke Sign in with Apple for this app (appleid.apple.com/auth/revoke).
+    let authorizationCode: string | undefined;
+    if (account.provider === 'apple' && appleSignInAvailable()) {
+      try {
+        authorizationCode = (await authorizeWithApple()).authorizationCode;
+      } catch (error) {
+        if (isAppleCancel(error)) {
+          set({ syncStatus: 'idle', notice: 'Account not deleted. Confirm with Apple to delete it.' });
+          return;
+        }
+        // Apple sheet failed for another reason: still delete; the server skips revocation.
+      }
+    }
     try {
-      const result = await deleteAccountRequest(token);
+      const result = await deleteAccountRequest(token, authorizationCode);
       writeStoredSession(null);
       localStorage.removeItem(migrationStorageKey(account.id));
       const buckets = loadTombstones();

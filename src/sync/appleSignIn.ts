@@ -4,6 +4,8 @@ import { APPLE_AUDIENCE } from './types.ts';
 
 export interface AppleCredential {
   identityToken: string;
+  /** Single-use, ~5 minutes. Sent with account deletion so the Worker can revoke the Apple tokens. */
+  authorizationCode?: string;
   email?: string;
   displayName?: string;
 }
@@ -37,7 +39,14 @@ export async function authorizeWithApple(): Promise<AppleCredential> {
   const displayName = `${given} ${family}`.trim();
   return {
     identityToken: token,
+    authorizationCode: result.response.authorizationCode || undefined,
     email: result.response.email?.trim() || undefined,
     displayName: displayName || undefined,
   };
+}
+
+/** The Apple sheet was dismissed (ASAuthorizationError.canceled, 1001). */
+export function isAppleCancel(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /\b1001\b|cancel/i.test(message);
 }

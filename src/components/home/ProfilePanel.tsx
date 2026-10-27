@@ -271,7 +271,7 @@ export const ProfilePanel: React.FC = () => {
               <strong>Delete Workbench account</strong>
               <p>
                 {account.provider === 'apple'
-                  ? 'This deletes cloud projects and sessions for this Workbench account. Your Apple ID stays in iOS Settings. Projects already saved on this device stay until you delete them in the app.'
+                  ? 'This deletes cloud projects and sessions for this Workbench account and removes The Workbench from Sign in with Apple. Apple asks you to confirm first. Your Apple ID itself is not affected. Projects already saved on this device stay until you delete them in the app.'
                   : 'This deletes cloud projects and sessions for this username. Projects already saved on this device stay until you delete them in the app.'}
               </p>
               {confirmDelete ? (

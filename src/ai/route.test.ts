@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiRequestError } from './client';
 import type { OnDeviceBridge } from './onDevice';
-import { AI_SOURCE_LABEL, generateSpec } from './route';
+import { AI_SOURCE_LABEL, NEEDS_APPLE_INTELLIGENCE, cloudStep, describeSpec, generateSpec } from './route';
+import { DESCRIBE_CLOUD_ENABLED } from '../config/features';
 import type { AiSpec } from './spec';
 
 const cloudSpec: AiSpec = { kind: 'template', name: 'Cloud shelf', template: 'bookshelf', params: {} };
@@ -57,5 +58,47 @@ describe('generateSpec routing', () => {
     expect(r.source).toBe('mock');
     expect(d.status).not.toHaveBeenCalled();
     await expect(generateSpec('a'.repeat(601), null, { onDevice: d, cloud: cloudOk(), mock: false })).rejects.toMatchObject({ code: 'too_long' });
+  });
+});
+
+describe('Describe it on-device only (1.0: cloud flag off)', () => {
+  it('ships with the cloud fallback off', () => {
+    expect(DESCRIBE_CLOUD_ENABLED).toBe(false);
+    expect(cloudStep(false)).toBeNull();
+    expect(cloudStep(false, true)).toBeTypeOf('function');
+    expect(cloudStep(true)).toBeTypeOf('function');
+  });
+
+  it('still uses Apple Intelligence when it is available', async () => {
+    const r = await generateSpec('a shelf', null, { onDevice: device(), cloud: null, mock: false });
+    expect(r).toMatchObject({ source: 'on-device', spec: { name: 'Device shelf' } });
+  });
+
+  it('shows one clear message instead of calling the network when Apple Intelligence is unavailable', async () => {
+    const off = device({ status: vi.fn(async () => ({ available: false, reason: 'device_not_eligible' as const })) });
+    const e = await generateSpec('a shelf', null, { onDevice: off, cloud: null, mock: false }).catch((x) => x);
+    expect(e).toMatchObject({ code: 'unavailable' });
+    expect(e.message.startsWith(NEEDS_APPLE_INTELLIGENCE)).toBe(true);
+    expect(e.message).not.toMatch(/cloud|server|Sign in/i);
+    const web = await generateSpec('a shelf', null, { onDevice: null, cloud: null, mock: false }).catch((x) => x);
+    expect(web.message.startsWith(NEEDS_APPLE_INTELLIGENCE)).toBe(true);
+  });
+
+  it('reports an on-device failure as is, without a cloud retry', async () => {
+    const failed = device({ plan: vi.fn(async () => { throw Object.assign(new Error('The on-device model declined that request.'), { code: 'guardrail' }); }) });
+    const e = await generateSpec('a shelf', null, { onDevice: failed, cloud: null, mock: false }).catch((x) => x);
+    expect(e).toMatchObject({ code: 'unavailable', message: 'The on-device model declined that request.' });
+  });
+
+  it('the app wiring makes no network request (web build, no Apple Intelligence)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}'));
+    try {
+      const e = await describeSpec('a shelf', null).catch((x) => x);
+      expect(e).toMatchObject({ code: 'unavailable' });
+      expect(e.message.startsWith(NEEDS_APPLE_INTELLIGENCE)).toBe(true);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
