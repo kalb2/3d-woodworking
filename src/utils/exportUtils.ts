@@ -3,8 +3,8 @@ import type { FurnitureObject, FurnitureProject, WoodSpecies } from '../types/fu
 import { buildSharePayload } from './share';
 import { formatSmallLen } from './lengthFormat';
 import {
-  LUMBER_WASTE, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, sheetHasGrain, stockKind,
-  type SheetNest, type StockKind,
+  LUMBER_WASTE, dimensionalNominal, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, planSticks, sheetHasGrain, stickFeet, stockKind,
+  type SheetNest, type StickPlan, type StockKind,
 } from './stock';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
@@ -153,6 +153,47 @@ export interface CutListSection {
   boardFeet?: number;
   /** What to buy, e.g. '2 sheets (4×8) · 71% used' or '6.2 bd ft · buy 7.1 with 15% waste'. */
   summary: string;
+  /** Dimensional lumber: sticks to buy per profile (2×4, 2×6…), packed from the parts. */
+  sticks?: StickBuy[];
+}
+
+/** Sticks of one profile (nominal size + finish) to buy, and which cuts come from each. */
+export interface StickBuy extends StickPlan {
+  /** '2×4' */
+  profile: string;
+  /** The finish, e.g. 'Rustic Pine'. */
+  material: string;
+  /** '3 × 2×4 at 8 ft' (plus any parts too long for 12 ft stock). */
+  text: string;
+}
+
+/** '3 × 2×4 at 8 ft' · '1 2×6 part is longer than 12 ft'. */
+function stickBuyText(profile: string, plan: StickPlan): string {
+  const parts: string[] = [];
+  if (plan.sticks.length) parts.push(`${plan.sticks.length} × ${profile} at ${stickFeet(plan.stockLength)}`);
+  if (plan.oversize.length) parts.push(`${plan.oversize.length} ${profile} ${plan.oversize.length === 1 ? 'part is' : 'parts are'} longer than 12 ft`);
+  return parts.join(', ');
+}
+
+/** Pack a lumber section's dimensional parts onto stock sticks, one plan per profile. */
+function sectionSticks(items: CutListItem[]): StickBuy[] {
+  const byProfile = new Map<string, { order: number; lengths: number[]; material: string }>();
+  for (const it of items) {
+    if (!dimensionalNominal({ species: it.species }, it.thicknessIn, it.widthIn)) continue;
+    const { label, order } = lumberStock({ species: it.species }, it.widthIn, it.thicknessIn);
+    const g = byProfile.get(label) ?? { order, lengths: [], material: it.material };
+    for (let i = 0; i < it.quantity; i++) g.lengths.push(it.lengthIn);
+    byProfile.set(label, g);
+  }
+  return [...byProfile].sort((a, b) => a[1].order - b[1].order).map(([profile, g]) => {
+    const plan = planSticks(g.lengths);
+    return { ...plan, profile, material: g.material, text: stickBuyText(profile, plan) };
+  });
+}
+
+/** Every stick to buy across the cut list, e.g. for '3 × 2×4 at 8 ft, 1 × 2×6 at 10 ft'. */
+export function lumberBuyList(sections: CutListSection[]): StickBuy[] {
+  return sections.flatMap((s) => s.sticks ?? []);
 }
 
 /** One lumber row's board feet (one piece): nominal for dimensional lumber, else rough thickness. */
@@ -184,7 +225,13 @@ export function cutListSections(items: CutListItem[], unit: FurnitureProject['un
       s.boardFeet = bf;
       const stock = new Map(s.items.map((it) => { const st = lumberStock({ species: it.species }, it.widthIn, it.thicknessIn); return [st.label, st.order] as const; }));
       const labels = [...stock].sort((x, y) => x[1] - y[1]).map(([label]) => label);
-      s.summary = `${formatBoardFeet(bf)} bd ft of ${labels.join(', ')} · buy ${formatBoardFeet(bf * (1 + LUMBER_WASTE))} with ${Math.round(LUMBER_WASTE * 100)}% waste`;
+      const sticks = sectionSticks(s.items);
+      if (sticks.length) s.sticks = sticks;
+      // All dimensional: the stick count is what to buy. Otherwise add waste on the board feet.
+      const allSticks = s.items.every((it) => dimensionalNominal({ species: it.species }, it.thicknessIn, it.widthIn));
+      s.summary = allSticks
+        ? `${formatBoardFeet(bf)} bd ft of ${labels.join(', ')}`
+        : `${formatBoardFeet(bf)} bd ft of ${labels.join(', ')} · buy ${formatBoardFeet(bf * (1 + LUMBER_WASTE))} with ${Math.round(LUMBER_WASTE * 100)}% waste`;
     }
   }
   return sections;
@@ -212,10 +259,22 @@ export function cutListCSV(project: FurnitureProject): string {
     const stock = item.kind === 'sheet' ? 'Sheet' : item.kind === 'lumber' ? 'Lumber' : 'Other';
     csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${stock},${item.quantity},${bf},${q(item.notes ?? '')},${q(item.usedIn ?? '')}\n`;
   }
-  const buy = cutListSections(items, project.unit).filter((s) => s.summary);
-  if (buy.length) {
+  const sections = cutListSections(items, project.unit);
+  const buy = sections.filter((s) => s.summary);
+  const sticks = lumberBuyList(sections);
+  if (buy.length || sticks.length) {
     csv += '\nBuy,What\n';
     for (const s of buy) csv += `${q(s.title)},${q(s.summary)}\n`;
+    for (const b of sticks) csv += `${q(`${b.material} · ${b.profile}`)},${q(b.text)}\n`;
+  }
+  if (sticks.some((b) => b.sticks.length || b.oversize.length)) {
+    csv += '\nStick,Stock,Cuts,Left over\n';
+    for (const b of sticks) {
+      b.sticks.forEach((st, i) => {
+        csv += `${q(`${b.profile} #${i + 1}`)},${q(stickFeet(st.length))},${q(st.cuts.map((c) => formatCutSize(c, project.unit)).join(' + '))},${q(formatCutSize(st.left, project.unit))}\n`;
+      });
+      for (const o of b.oversize) csv += `${q(`${b.profile} (too long)`)},${q('over 12 ft')},${q(formatCutSize(o, project.unit))},""\n`;
+    }
   }
   const hardware = projectHardware(project);
   if (hardware.length) {

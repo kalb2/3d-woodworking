@@ -1,9 +1,9 @@
 import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { generateCutList, exportCutListCSV, cutListSections, projectHardware, type CutListItem } from '../../utils/exportUtils';
+import { generateCutList, exportCutListCSV, cutListSections, lumberBuyList, projectHardware, type CutListItem, type StickBuy } from '../../utils/exportUtils';
 import { formatLens, formatSmallLen } from '../../utils/lengthFormat';
-import { LUMBER_WASTE } from '../../utils/stock';
+import { LUMBER_WASTE, stickFeet } from '../../utils/stock';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureProject } from '../../types/furniture';
 
@@ -39,6 +39,55 @@ const PartRow: React.FC<{ item: CutListItem; unit: FurnitureProject['unit'] }> =
   );
 };
 
+/** Sticks to buy ('3 × 2×4 at 8 ft'), with which cuts come from each stick on request. */
+const BuyList: React.FC<{ buys: StickBuy[]; unit: FurnitureProject['unit'] }> = ({ buys, unit }) => {
+  const [showLayout, setShowLayout] = React.useState(false);
+  const tapLayout = useReliableTap(() => setShowLayout((v) => !v));
+  const len = (n: number) => formatSmallLen(n, unit).replace(/ /g, '\u00a0');
+  const oversize = buys.filter((b) => b.oversize.length);
+  return (
+    <section data-testid="cut-buy-list" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ fontWeight: 700, color: '#e09f3e' }}>Lumber to buy</div>
+        <button
+          type="button"
+          className="glass-button"
+          data-testid="cut-layout-toggle"
+          aria-expanded={showLayout}
+          onClick={tapLayout}
+          onPointerUp={tapLayout}
+          style={{ fontSize: 12, padding: '4px 10px', minHeight: 'auto' }}
+        >
+          {showLayout ? 'Hide cut layout' : 'Show cut layout'}
+        </button>
+      </div>
+      <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, fontSize: 14 }}>
+        {buys.filter((b) => b.sticks.length).map((b) => (
+          <li key={`${b.material}-${b.profile}`} data-testid="cut-buy-line" style={{ padding: '3px 0' }}>
+            <strong>{b.sticks.length} × {b.profile}</strong> at {stickFeet(b.stockLength)}
+            <span style={{ color: '#9ca3af' }}> · {b.material}</span>
+          </li>
+        ))}
+      </ul>
+      {oversize.map((b) => (
+        <div key={`over-${b.material}-${b.profile}`} data-testid="cut-buy-oversize" role="alert" style={{ fontSize: 13, color: '#f87171', marginTop: 4 }}>
+          {b.oversize.length} {b.profile} {b.oversize.length === 1 ? 'part is' : 'parts are'} longer than 12 ft ({b.oversize.map(len).join(', ')}): splice it or special-order the stock.
+        </div>
+      ))}
+      {showLayout && (
+        <ol data-testid="cut-layout" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, fontSize: 12, color: '#d1d5db' }}>
+          {buys.flatMap((b) => b.sticks.map((st, i) => (
+            <li key={`${b.material}-${b.profile}-${i}`} data-testid="cut-layout-stick" style={{ padding: '3px 0', lineHeight: 1.45 }}>
+              <span style={{ fontWeight: 600 }}>{b.profile} #{i + 1}</span> ({stickFeet(st.length)}): {st.cuts.map(len).join(' + ')}
+              <span style={{ color: '#9ca3af' }}> · {len(st.left)} left</span>
+            </li>
+          )))}
+        </ol>
+      )}
+    </section>
+  );
+};
+
 export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose }) => {
   const { projects, activeProjectId } = useProjectStore();
   const currentProject = projects.find(p => p.id === activeProjectId);
@@ -51,6 +100,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   const cutList = generateCutList(currentProject);
   const sections = cutListSections(cutList, unit);
   const hardware = projectHardware(currentProject);
+  const buys = lumberBuyList(sections);
   const hasSheets = sections.some((s) => s.kind === 'sheet');
   const hasLumber = sections.some((s) => s.kind === 'lumber');
 
@@ -107,6 +157,8 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           </div>
         </div>
 
+        {buys.length > 0 && <BuyList buys={buys} unit={unit} />}
+
         {/* Table */}
         <div style={{ overflowX: 'auto', flex: 1 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
@@ -156,7 +208,9 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
             <p data-testid="cut-footnote" style={{ ...sub, padding: '12px 12px 0', lineHeight: 1.5 }}>
               Finished sizes, joinery included. Length runs with the grain.
               {hasSheets && ' Sheets: parts nested on 4×8 with a 1/8" kerf; plywood keeps its grain on the 8\' side.'}
-              {hasLumber && ` Board feet use nominal size for 1×2, 2×4 and other dimensional pine, rough thickness for other lumber (3/4" from 4/4); buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
+              {hasLumber && ` Board feet use nominal size for 1×2, 2×4 and other dimensional pine, rough thickness for other lumber (3/4" from 4/4).`}
+              {buys.length > 0 && ' Dimensional lumber is packed longest-first onto 8, 10 or 12 ft sticks with a 1/8" kerf, picking the length that wastes least.'}
+              {sections.some((s) => s.kind === 'lumber' && s.summary.includes('waste')) && ` Other lumber: buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
             </p>
           )}
         </div>

@@ -43,6 +43,10 @@ export interface WoodPreset {
   material: WoodMaterial;
   shape: ShapeType;
   category: PresetCategory;
+  /** Lumber: stock lengths it's sold in (inches); the first is the default. */
+  stockLengths?: number[];
+  /** Lumber: nominal size, '2×4'. */
+  nominal?: string;
 }
 
 export type PresetCategory = 'Plywood sheets' | 'MDF sheets' | 'Lumber';
@@ -65,6 +69,8 @@ const DIMENSIONAL_LUMBER: Array<[string, number, number]> = [
   ['2×4', 1.5, 3.5],
   ['2×6', 1.5, 5.5],
 ];
+/** Lengths dimensional lumber is sold in: 8 ft (default), 10 ft, 12 ft. */
+export const LUMBER_LENGTHS = [96, 120, 144];
 const lumber = ([nominal, t, w]: [string, number, number]): WoodPreset => ({
   id: `pine_${nominal.replace('×', 'x')}_8ft`,
   label: `${nominal} Pine (8 ft)`,
@@ -73,7 +79,21 @@ const lumber = ([nominal, t, w]: [string, number, number]): WoodPreset => ({
   material: PRESET_WOOD_MATERIALS.pine,
   shape: 'cube',
   category: 'Lumber',
+  stockLengths: LUMBER_LENGTHS,
+  nominal,
 });
+
+/** A lumber preset cut to one of its stock lengths ('2×4 Pine (10 ft)', 120" long); others unchanged. */
+export function presetAtLength(preset: WoodPreset, length?: number): WoodPreset {
+  if (length === undefined || !preset.nominal || !preset.stockLengths?.includes(length) || length === preset.dimensions.length) return preset;
+  const { width, height } = preset.dimensions;
+  return {
+    ...preset,
+    label: `${preset.nominal} Pine (${length / 12} ft)`,
+    description: `${length}" × ${inchFraction(width)}" × ${inchFraction(height)}"`,
+    dimensions: { ...preset.dimensions, length },
+  };
+}
 
 export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
   ...THICKNESSES.map((t) => sheet('plywood', t)),
@@ -202,7 +222,8 @@ interface ProjectState {
   /** Turn the selection 90° about a world axis through its center (one undo step). */
   turnSelection90: (axis: TurnAxis, sign?: 1 | -1) => void;
   addObject: (shape: ShapeType, name?: string) => void;
-  addWoodPreset: (presetId: string) => void;
+  /** Add a stock part; lumber takes an optional stock length (inches), default 8 ft. */
+  addWoodPreset: (presetId: string, length?: number) => void;
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
   /** Adds a built-in (or regenerates `editId`); returns its group id. */
@@ -705,9 +726,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     saveCurrentProject();
   },
 
-  addWoodPreset: (presetId: string) => {
-    const preset = STANDARD_WOOD_PRESETS.find(p => p.id === presetId);
-    if (!preset) return;
+  addWoodPreset: (presetId: string, length?: number) => {
+    const base = STANDARD_WOOD_PRESETS.find(p => p.id === presetId);
+    if (!base) return;
+    const preset = presetAtLength(base, length);
 
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);

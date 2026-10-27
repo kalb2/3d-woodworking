@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FurnitureObject, FurnitureProject } from '../types/furniture';
-import { cutListByMaterial, cutListCSV, cutListSections, generateCutList } from './exportUtils';
+import { cutListByMaterial, cutListCSV, cutListSections, generateCutList, lumberBuyList } from './exportUtils';
 import { PRESET_WOOD_MATERIALS } from './woodTextureGenerator';
 
 const part = (id: string, dims: [number, number, number], extra: Partial<FurnitureObject> = {}): FurnitureObject => ({
@@ -69,9 +69,62 @@ describe('cut list', () => {
     const [sec] = cutListSections(items, 'in');
     expect(sec.pieces).toBe(5);
     expect(sec.boardFeet).toBeCloseTo(4 / 3 + 8 / 3 + 2 * 16 / 3 + 8, 6);
-    expect(sec.summary).toBe('22.7 bd ft of 1×2, 2×2, 2×4, 2×6 · buy 26.1 with 15% waste');
+    expect(sec.summary).toBe('22.7 bd ft of 1×2, 2×2, 2×4, 2×6'); // stick counts say what to buy
+    expect(sec.sticks!.map((b) => b.text)).toEqual(['1 × 1×2 at 8 ft', '1 × 2×2 at 8 ft', '2 × 2×4 at 8 ft', '1 × 2×6 at 8 ft']);
     const csv = cutListCSV(project([stick('stud', 3.5, 1.5)]));
     expect(csv).toContain('"stud","Box","96""","3 1/2""","1 1/2""","Rustic Pine",Lumber,1,5.3,');
+  });
+
+  it('buy list: packs each profile onto 8, 10 or 12 ft sticks', () => {
+    const pine = { ...PRESET_WOOD_MATERIALS.pine };
+    const stick = (id: string, len: number, w: number, t = 1.5) => part(id, [len, t, w], { shape: 'cube', material: pine });
+    const items = generateCutList(project([
+      stick('rail', 30, 3.5), stick('rail', 30, 3.5), stick('rail', 30, 3.5), stick('rail', 30, 3.5),
+      stick('top', 100, 5.5),
+      stick('cleat', 20, 1.5, 0.75),
+    ]));
+    const buys = lumberBuyList(cutListSections(items, 'in'));
+    expect(buys.map((b) => [b.profile, b.material, b.text])).toEqual([
+      ['1×2', 'Rustic Pine', '1 × 1×2 at 8 ft'],
+      ['2×4', 'Rustic Pine', '1 × 2×4 at 12 ft'], // 4 × 30" + kerfs fit one 12 ft stick: less waste than two 8 ft
+      ['2×6', 'Rustic Pine', '1 × 2×6 at 10 ft'],
+    ]);
+    expect(buys[1].sticks.map((s) => s.cuts)).toEqual([[30, 30, 30, 30]]);
+  });
+
+  it('buy list: different finishes are different profiles; hardwood and sheets get none', () => {
+    const pine = { ...PRESET_WOOD_MATERIALS.pine };
+    const painted = { ...PRESET_WOOD_MATERIALS.pine, name: 'Painted Pine' };
+    const secs = cutListSections(generateCutList(project([
+      part('a', [60, 1.5, 3.5], { shape: 'cube', material: pine }),
+      part('b', [60, 1.5, 3.5], { shape: 'cube', material: painted }),
+      part('leg', [29.25, 1.5, 1.5], { material: { ...PRESET_WOOD_MATERIALS.oak } }),
+      part('side', [0.75, 30, 24]),
+    ])), 'in');
+    expect(lumberBuyList(secs).map((b) => `${b.material}: ${b.text}`).sort()).toEqual(['Painted Pine: 1 × 2×4 at 8 ft', 'Rustic Pine: 1 × 2×4 at 8 ft']);
+    expect(secs.find((s) => s.title === 'Natural Oak')!.sticks).toBeUndefined();
+    expect(secs.find((s) => s.kind === 'sheet')!.sticks).toBeUndefined();
+  });
+
+  it('buy list: flags parts longer than 12 ft', () => {
+    const pine = { ...PRESET_WOOD_MATERIALS.pine };
+    const [b] = lumberBuyList(cutListSections(generateCutList(project([
+      part('beam', [168, 1.5, 5.5], { shape: 'cube', material: pine }),
+      part('short', [40, 1.5, 5.5], { shape: 'cube', material: pine }),
+    ])), 'in'));
+    expect(b.oversize).toEqual([168]);
+    expect(b.text).toBe('1 × 2×6 at 8 ft, 1 2×6 part is longer than 12 ft');
+  });
+
+  it('CSV Buy block lists sticks and the per-stick cut layout, keeping board feet', () => {
+    const pine = { ...PRESET_WOOD_MATERIALS.pine };
+    const rail = (id: string) => part(id, [30, 1.5, 3.5], { shape: 'cube', material: pine });
+    const csv = cutListCSV(project([rail('r1'), rail('r2'), rail('r3'), part('beam', [168, 1.5, 5.5], { shape: 'cube', material: pine })]));
+    expect(csv).toContain('"Rustic Pine","19 bd ft of 2×4, 2×6"');
+    expect(csv).toContain('"Rustic Pine · 2×4","1 × 2×4 at 8 ft"');
+    expect(csv).toContain('"Rustic Pine · 2×6","1 2×6 part is longer than 12 ft"');
+    expect(csv).toContain('\nStick,Stock,Cuts,Left over\n"2×4 #1","8 ft","30"" + 30"" + 30""","5 3/4"""\n');
+    expect(csv).toContain('"2×6 (too long)","over 12 ft","168""",""');
   });
 
   it('notes shaping and the assemblies a part is used in', () => {

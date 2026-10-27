@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardFeet, dimensionalNominal, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, roughQuarters, sheetHasGrain, stockKind } from './stock';
+import { boardFeet, dimensionalNominal, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, packSticks, planSticks, roughQuarters, sheetHasGrain, stickFeet, stockKind } from './stock';
 
 describe('stock kinds', () => {
   it('sheet goods, lumber, metal; paint-grade by thickness', () => {
@@ -79,5 +79,57 @@ describe('dimensional lumber', () => {
     expect(lumberStock(pine, 3.5, 1.5).label).toBe('2×4');
     expect(lumberStock({ species: 'oak' }, 3.5, 1.5).label).toBe('8/4');
     expect(lumberStock(pine, 1.5, 0.75).order).toBeLessThan(lumberStock(pine, 3.5, 1.5).order);
+  });
+});
+
+describe('stick packing (first-fit decreasing, 1/8" kerf)', () => {
+  it('fits cuts on one stick with a kerf between them', () => {
+    const { sticks, oversize } = packSticks([30, 30, 30], 96);
+    expect(oversize).toEqual([]);
+    expect(sticks).toHaveLength(1);
+    expect(sticks[0].cuts).toEqual([30, 30, 30]);
+    expect(sticks[0].left).toBeCloseTo(96 - 90 - 2 / 8, 6);
+  });
+
+  it('the kerf can force another stick: two 48" parts need two 8 ft sticks', () => {
+    expect(packSticks([48, 48], 96).sticks).toHaveLength(2);
+    expect(packSticks([48, 47.875], 96).sticks).toHaveLength(1);
+  });
+
+  it('a part exactly the stock length fits with no kerf', () => {
+    const { sticks } = packSticks([96, 96], 96);
+    expect(sticks.map((s) => s.left)).toEqual([0, 0]);
+  });
+
+  it('places longest first, each into the first stick with room', () => {
+    const { sticks } = packSticks([20, 70, 25], 96);
+    expect(sticks.map((s) => s.cuts)).toEqual([[70, 25], [20]]);
+  });
+
+  it('picks the stock length that wastes least', () => {
+    const two60 = planSticks([60, 60]);
+    expect([two60.stockLength, two60.sticks.length]).toEqual([144, 1]);
+    expect(two60.waste).toBe(24);
+    expect(planSticks([100]).stockLength).toBe(120); // 8 ft can't hold it
+    expect(planSticks([40]).stockLength).toBe(96); // ties go to the shorter stock
+    const five48 = planSticks([48, 48, 48, 48, 48]);
+    expect([five48.stockLength, five48.sticks.length]).toEqual([120, 3]);
+  });
+
+  it('equal waste goes to fewer sticks', () => {
+    const plan = planSticks([45, 45], [50, 100]);
+    expect([plan.stockLength, plan.sticks.length]).toEqual([100, 1]);
+  });
+
+  it('flags parts longer than 12 ft and packs the rest', () => {
+    const plan = planSticks([150, 30, 200]);
+    expect(plan.oversize).toEqual([200, 150]);
+    expect([plan.stockLength, plan.sticks.length]).toEqual([96, 1]);
+    const none = planSticks([200]);
+    expect([none.stockLength, none.sticks.length, none.oversize]).toEqual([0, 0, [200]]);
+  });
+
+  it('names stock lengths in feet', () => {
+    expect([96, 120, 144].map(stickFeet)).toEqual(['8 ft', '10 ft', '12 ft']);
   });
 });
