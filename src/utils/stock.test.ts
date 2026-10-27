@@ -28,7 +28,7 @@ describe('board feet', () => {
   });
 });
 
-describe('sheet nesting (rip-first, 1/8" kerf)', () => {
+describe('sheet nesting (guillotine, 1/8" kerf)', () => {
   it('fits six 30 × 23 7/8 parts on one sheet, a seventh needs a second', () => {
     const p = (quantity: number) => [{ length: 30, width: 23.875, quantity }];
     expect(nestSheets(p(6), true).sheets).toBe(1);
@@ -51,8 +51,11 @@ describe('sheet nesting (rip-first, 1/8" kerf)', () => {
   it('mixes widths: narrow parts fill a wide strip\'s leftovers before opening a new sheet', () => {
     // Two 23 7/8" rips fill the width; each leaves 35 7/8" of strip, enough for a 30" rail.
     expect(nestSheets([{ length: 60, width: 23.875, quantity: 2 }, { length: 30, width: 6, quantity: 2 }], true).sheets).toBe(1);
-    // A third rail has nowhere to go (and two 24" rips plus a kerf don't fit 48").
-    expect(nestSheets([{ length: 60, width: 23.875, quantity: 2 }, { length: 30, width: 6, quantity: 3 }], true).sheets).toBe(2);
+    // Rails stack in the 35 7/8" × 48" offcut beside the rips: 7 fit (7 × 6 1/8" ≤ 48"), the 8th needs a sheet.
+    // (The old rip-first nester said 3 rails needed 2 sheets.)
+    expect(nestSheets([{ length: 60, width: 23.875, quantity: 2 }, { length: 30, width: 6, quantity: 7 }], true).sheets).toBe(1);
+    expect(nestSheets([{ length: 60, width: 23.875, quantity: 2 }, { length: 30, width: 6, quantity: 8 }], true).sheets).toBe(2);
+    // Two 24" rips plus a kerf don't fit 48".
     expect(nestSheets([{ length: 60, width: 24, quantity: 2 }], true).sheets).toBe(2);
   });
 });
@@ -131,5 +134,96 @@ describe('stick packing (first-fit decreasing, 1/8" kerf)', () => {
 
   it('names stock lengths in feet', () => {
     expect([96, 120, 144].map(stickFeet)).toEqual(['8 ft', '10 ft', '12 ft']);
+  });
+});
+
+describe('sheet layouts', () => {
+  const KERF = 1 / 8;
+  /** Every panel inside the sheet, and no two panels closer than a kerf. */
+  function checkLayout(nest: ReturnType<typeof nestSheets>) {
+    for (const l of nest.layouts) {
+      for (const p of l.panels) {
+        expect(p.x).toBeGreaterThanOrEqual(-1e-9);
+        expect(p.y).toBeGreaterThanOrEqual(-1e-9);
+        expect(p.x + p.w).toBeLessThanOrEqual(96 + 1e-6);
+        expect(p.y + p.h).toBeLessThanOrEqual(48 + 1e-6);
+        expect([p.w, p.h]).toEqual(p.rotated ? [p.width, p.length] : [p.length, p.width]);
+      }
+      for (let i = 0; i < l.panels.length; i++) for (let j = i + 1; j < l.panels.length; j++) {
+        const a = l.panels[i], b = l.panels[j];
+        const apart = a.x + a.w + KERF <= b.x + 1e-6 || b.x + b.w + KERF <= a.x + 1e-6 || a.y + a.h + KERF <= b.y + 1e-6 || b.y + b.h + KERF <= a.y + 1e-6;
+        expect(apart).toBe(true);
+      }
+      for (const o of l.offcuts) for (const p of l.panels) {
+        const overlap = o.x < p.x + p.w - 1e-6 && p.x < o.x + o.w - 1e-6 && o.y < p.y + p.h - 1e-6 && p.y < o.y + o.h - 1e-6;
+        expect(overlap).toBe(false);
+      }
+    }
+  }
+
+  it('places every panel with its name and reports per-sheet use', () => {
+    const nest = nestSheets([{ name: 'Side', length: 30, width: 23.875, quantity: 6 }, { name: 'Shelf', length: 34.5, width: 11.25, quantity: 3 }], true);
+    checkLayout(nest);
+    const placed = nest.layouts.flatMap((l) => l.panels);
+    expect(placed.filter((p) => p.name === 'Side')).toHaveLength(6);
+    expect(placed.filter((p) => p.name === 'Shelf')).toHaveLength(3);
+    expect(nest.sheets).toBe(nest.layouts.length);
+    const covered = nest.layouts.reduce((n, l) => n + l.used, 0) / nest.sheets;
+    expect(covered).toBeCloseTo(nest.yield, 6);
+  });
+
+  it('plywood never turns a panel; MDF turns one when that is the only way it fits', () => {
+    const ply = nestSheets([{ length: 40, width: 30, quantity: 5 }], true);
+    expect(ply.layouts.flatMap((l) => l.panels).some((p) => p.rotated)).toBe(false);
+    const mdf = nestSheets([{ name: 'Wide', length: 40, width: 60, quantity: 1 }], false);
+    expect(mdf.layouts[0].panels[0]).toMatchObject({ rotated: true, w: 60, h: 40 });
+    checkLayout(mdf);
+  });
+
+  it('MDF turning panels can save a sheet', () => {
+    // 44 × 30: two fit the grain way (2 × 44" along 8'), three once turned (3 × 30 1/8" along 8', 44" deep).
+    const parts = [{ length: 44, width: 30, quantity: 3 }];
+    expect(nestSheets(parts, true).sheets).toBe(2);
+    const mdf = nestSheets(parts, false);
+    expect(mdf.sheets).toBe(1);
+    expect(mdf.layouts[0].panels.every((p) => p.rotated)).toBe(true);
+    checkLayout(mdf);
+  });
+
+  it('a panel exactly the sheet size fills it with no offcut', () => {
+    const nest = nestSheets([{ length: 96, width: 48, quantity: 2 }], true);
+    expect(nest.sheets).toBe(2);
+    expect(nest.layouts[0]).toMatchObject({ used: 1, offcuts: [] });
+  });
+
+  it('lists the oversize panels by name', () => {
+    const nest = nestSheets([{ name: 'Top', length: 100, width: 30, quantity: 2 }, { name: 'Side', length: 30, width: 20, quantity: 1 }], false);
+    expect(nest.oversizeParts).toEqual([{ name: 'Top', length: 100, width: 30 }, { name: 'Top', length: 100, width: 30 }]);
+    expect([nest.oversize, nest.sheets]).toEqual([2, 1]);
+  });
+
+  it('keeps usable offcuts and drops slivers', () => {
+    const nest = nestSheets([{ length: 60, width: 48, quantity: 1 }], true);
+    expect(nest.layouts[0].offcuts).toEqual([{ x: 60.125, y: 0, w: 35.875, h: 48 }]);
+    const sliver = nestSheets([{ length: 94, width: 46, quantity: 1 }], true);
+    expect(sliver.layouts[0].offcuts).toEqual([]);
+  });
+
+  it('random cabinets: panels never overlap or leave the sheet, every piece is placed', () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let run = 0; run < 40; run++) {
+      const parts = Array.from({ length: 1 + Math.floor(rnd() * 8) }, (_, i) => {
+        const a = 4 + rnd() * 70, b = 2 + rnd() * 44;
+        return { name: `P${i}`, length: Math.max(a, b), width: Math.min(a, b), quantity: 1 + Math.floor(rnd() * 4) };
+      });
+      for (const grain of [true, false]) {
+        const nest = nestSheets(parts, grain);
+        checkLayout(nest);
+        const area = parts.reduce((n, p) => n + p.length * p.width * p.quantity, 0);
+        expect(nest.sheets).toBeGreaterThanOrEqual(Math.ceil(area / (96 * 48) - 1e-9));
+        expect(nest.layouts.flatMap((l) => l.panels)).toHaveLength(parts.reduce((n, p) => n + p.quantity, 0));
+      }
+    }
   });
 });

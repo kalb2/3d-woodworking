@@ -1,9 +1,9 @@
 import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { generateCutList, exportCutListCSV, cutListSections, lumberBuyList, projectHardware, type CutListItem, type StickBuy } from '../../utils/exportUtils';
+import { generateCutList, exportCutListCSV, cutListSections, lumberBuyList, panelText, projectHardware, sheetBuyList, type CutListItem, type CutListSection, type StickBuy } from '../../utils/exportUtils';
 import { formatLens, formatSmallLen } from '../../utils/lengthFormat';
-import { LUMBER_WASTE, stickFeet } from '../../utils/stock';
+import { LUMBER_WASTE, SHEET, sheetHasGrain, stickFeet, type SheetLayout, type SheetNest } from '../../utils/stock';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureProject } from '../../types/furniture';
 
@@ -88,6 +88,137 @@ const BuyList: React.FC<{ buys: StickBuy[]; unit: FurnitureProject['unit'] }> = 
   );
 };
 
+/** Label size in sheet inches; the diagram is at most 440px wide, so about 11–17px on screen. Thin strips drop to SMALL. */
+const LABEL = 3.8;
+const SMALL = 3;
+const fits = (text: string, w: number, fs: number) => text.length * fs * 0.52 <= w - 1;
+
+type Label = { fs: number; lines: string[] };
+/** The roomiest label that fits the panel: name over size, name over L × over W, one line, one small line; null → keyed by number. */
+function panelLabel(name: string, l: string, w: string, pw: number, ph: number): Label | null {
+  const size = `${l} × ${w}`;
+  const tiers: Label[] = [
+    { fs: LABEL, lines: [name, size] },
+    { fs: LABEL, lines: [name, `${l} ×`, w] },
+    { fs: LABEL, lines: [`${name} ${size}`] },
+    { fs: SMALL, lines: [name, size] },
+    { fs: SMALL, lines: [`${name} ${size}`] },
+  ];
+  return tiers.find((t) => ph >= t.fs * (t.lines.length * 1.2 + 0.3) && t.lines.every((line) => fits(line, pw, t.fs))) ?? null;
+}
+
+/** One 4×8 sheet drawn to scale: panels labeled with name and size (or a number keyed below), offcuts and waste shaded. */
+const SheetDiagram: React.FC<{ layout: SheetLayout; unit: FurnitureProject['unit']; caption: string }> = ({ layout, unit, caption }) => {
+  const hatch = `waste-${React.useId().replace(/:/g, '')}`;
+  const fmt = (n: number) => formatSmallLen(n, unit);
+  // Identical panels that need a key share one number.
+  const keys = new Map<string, number>();
+  const panels = layout.panels.map((p) => {
+    const label = panelLabel(p.name ?? '', fmt(p.length), fmt(p.width), p.w, p.h);
+    const text = `${p.name ? `${p.name} ` : ''}${fmt(p.length)} × ${fmt(p.width)}`;
+    let key = 0;
+    if (!label) { key = keys.get(text) ?? keys.size + 1; keys.set(text, key); }
+    return { p, label, key };
+  });
+  return (
+    <figure data-testid="sheet-diagram" style={{ margin: '10px 0 0' }}>
+      <figcaption style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{caption}</figcaption>
+      <svg
+        viewBox={`-0.5 -0.5 ${SHEET.length + 1} ${SHEET.width + 1}`}
+        role="img"
+        aria-label={`${caption}: ${layout.panels.map((p) => panelText(p, unit)).join(', ')}`}
+        style={{ width: '100%', maxWidth: 440, display: 'block', color: 'inherit' }}
+      >
+        <defs>
+          <pattern id={hatch} width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="3" stroke="currentColor" strokeOpacity="0.14" strokeWidth="0.6" />
+          </pattern>
+          {/* Hatch only the waste: the panels are cut out of it. */}
+          <mask id={`${hatch}-m`}>
+            <rect x={0} y={0} width={SHEET.length} height={SHEET.width} fill="white" />
+            {layout.panels.map((p, i) => <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} fill="black" />)}
+          </mask>
+        </defs>
+        <rect x={0} y={0} width={SHEET.length} height={SHEET.width} fill={`url(#${hatch})`} mask={`url(#${hatch}-m)`} />
+        <rect x={0} y={0} width={SHEET.length} height={SHEET.width} fill="none" stroke="currentColor" strokeOpacity="0.55" strokeWidth="0.4" />
+        {layout.offcuts.map((o, i) => (
+          <rect key={`o${i}`} data-testid="sheet-offcut" x={o.x} y={o.y} width={o.w} height={o.h} fill="currentColor" fillOpacity="0.05" stroke="currentColor" strokeOpacity="0.3" strokeWidth="0.25" strokeDasharray="1 1" />
+        ))}
+        {panels.map(({ p, label, key }, i) => {
+          const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+          const fs = label?.fs ?? Math.min(LABEL, p.h * 0.8, p.w * 0.8);
+          return (
+            <g key={i} data-testid="sheet-panel">
+              <rect x={p.x} y={p.y} width={p.w} height={p.h} fill="rgba(224,159,62,0.28)" stroke="#e09f3e" strokeWidth="0.35" />
+              <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={fs} fill="currentColor">
+                {label
+                  ? label.lines.map((line, j) => (
+                    <tspan key={j} x={cx} dy={j === 0 ? -((label.lines.length - 1) * fs * 1.2) / 2 : fs * 1.2} fontWeight={j === 0 && p.name && line.startsWith(p.name) ? 600 : 400}>{line}</tspan>
+                  ))
+                  : (fs >= 1.5 ? key : '')}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {keys.size > 0 && (
+        <div data-testid="sheet-key" style={{ ...sub, display: 'flex', flexWrap: 'wrap', gap: '2px 12px', marginTop: 4 }}>
+          {[...keys].map(([text, key]) => <span key={key}>{key}: {text}</span>)}
+        </div>
+      )}
+    </figure>
+  );
+};
+
+/** Sheets to buy per material and thickness, with each sheet's diagram on request. */
+const SheetList: React.FC<{ sections: Array<CutListSection & { sheets: SheetNest }>; unit: FurnitureProject['unit'] }> = ({ sections, unit }) => {
+  const [show, setShow] = React.useState(false);
+  const tap = useReliableTap(() => setShow((v) => !v));
+  const len = (n: number) => formatSmallLen(n, unit).replace(/ /g, '\u00a0');
+  const any = sections.some((s) => s.sheets.sheets);
+  return (
+    <section data-testid="cut-sheet-list" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ fontWeight: 700, color: '#e09f3e' }}>Sheets to buy</div>
+        {any && (
+          <button
+            type="button"
+            className="glass-button"
+            data-testid="sheet-layout-toggle"
+            aria-expanded={show}
+            onClick={tap}
+            onPointerUp={tap}
+            style={{ fontSize: 12, padding: '4px 10px', minHeight: 'auto' }}
+          >
+            {show ? 'Hide sheet layout' : 'Show sheet layout'}
+          </button>
+        )}
+      </div>
+      <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, fontSize: 14 }}>
+        {sections.filter((s) => s.sheets.sheets).map((s) => (
+          <li key={s.title} data-testid="cut-sheet-line" style={{ padding: '3px 0' }}>
+            <strong>{s.sheets.sheets} × {s.title}</strong> 4×8
+            <span style={{ color: '#9ca3af' }}> · {Math.round(s.sheets.yield * 100)}% used</span>
+          </li>
+        ))}
+      </ul>
+      {sections.filter((s) => s.sheets.oversize).map((s) => (
+        <div key={`over-${s.title}`} data-testid="cut-sheet-oversize" role="alert" style={{ fontSize: 13, color: '#f87171', marginTop: 4 }}>
+          {s.sheets.oversize} {s.title} {s.sheets.oversize === 1 ? 'panel is' : 'panels are'} bigger than a 4×8 sheet ({s.sheets.oversizeParts.map((o) => `${o.name ? `${o.name} ` : ''}${len(o.length)} × ${len(o.width)}`).join(', ')}): join smaller panels or buy oversize stock.
+        </div>
+      ))}
+      {show && sections.map((s) => s.sheets.layouts.map((l, i) => (
+        <SheetDiagram
+          key={`${s.title}-${i}`}
+          layout={l}
+          unit={unit}
+          caption={`${s.title} · sheet ${i + 1} of ${s.sheets.layouts.length} · ${Math.round(l.used * 100)}% used${sheetHasGrain({ species: s.items[0]?.species ?? 'plywood' }) ? ' · grain along 8 ft' : ''}`}
+        />
+      )))}
+    </section>
+  );
+};
+
 export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose }) => {
   const { projects, activeProjectId } = useProjectStore();
   const currentProject = projects.find(p => p.id === activeProjectId);
@@ -101,6 +232,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   const sections = cutListSections(cutList, unit);
   const hardware = projectHardware(currentProject);
   const buys = lumberBuyList(sections);
+  const sheetBuys = sheetBuyList(sections);
   const hasSheets = sections.some((s) => s.kind === 'sheet');
   const hasLumber = sections.some((s) => s.kind === 'lumber');
 
@@ -157,10 +289,11 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           </div>
         </div>
 
+        {/* Buy lists, then the table; all of it scrolls inside the panel */}
+        <div data-testid="cut-scroll" style={{ overflow: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {buys.length > 0 && <BuyList buys={buys} unit={unit} />}
-
-        {/* Table */}
-        <div style={{ overflowX: 'auto', flex: 1 }}>
+        {sheetBuys.length > 0 && <SheetList sections={sheetBuys} unit={unit} />}
+        <div style={{ overflowX: 'auto', flexShrink: 0 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#e09f3e' }}>
@@ -207,12 +340,13 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           {cutList.length > 0 && (
             <p data-testid="cut-footnote" style={{ ...sub, padding: '12px 12px 0', lineHeight: 1.5 }}>
               Finished sizes, joinery included. Length runs with the grain.
-              {hasSheets && ' Sheets: parts nested on 4×8 with a 1/8" kerf; plywood keeps its grain on the 8\' side.'}
+              {hasSheets && ' Sheets: panels nested on 4×8 with straight-through (guillotine) cuts and a 1/8" kerf; plywood keeps its grain on the 8\' side, MDF may turn.'}
               {hasLumber && ` Board feet use nominal size for 1×2, 2×4 and other dimensional pine, rough thickness for other lumber (3/4" from 4/4).`}
               {buys.length > 0 && ' Dimensional lumber is packed longest-first onto 8, 10 or 12 ft sticks with a 1/8" kerf, picking the length that wastes least.'}
               {sections.some((s) => s.kind === 'lumber' && s.summary.includes('waste')) && ` Other lumber: buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
             </p>
           )}
+        </div>
         </div>
       </div>
     </div>
