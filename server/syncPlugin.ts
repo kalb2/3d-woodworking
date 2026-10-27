@@ -5,6 +5,7 @@ import { FileSyncDb } from './fileSyncDb.ts';
 import { handleSyncRequest } from '../src/sync/handler.ts';
 import { createIdentityResolver } from '../src/sync/identity.ts';
 import { APPLE_AUDIENCE } from '../src/sync/types.ts';
+import { mockDescribe } from '../src/ai/mock.ts';
 
 function headersFrom(req: IncomingMessage): Headers {
   const headers = new Headers();
@@ -71,6 +72,18 @@ export function syncDevPlugin(): Plugin {
         db,
         identity,
         config: { devSignIn: true, mode: 'dev', appleAudience: APPLE_AUDIENCE },
+        // Describe it on the dev server: AI_API_KEY (and AI_BASE_URL/AI_MODEL) from the shell, or AI_MOCK=1.
+        ai: {
+          config: {
+            apiKey: process.env.AI_API_KEY,
+            baseUrl: process.env.AI_BASE_URL,
+            model: process.env.AI_MODEL,
+            reasoningEffort: process.env.AI_REASONING_EFFORT,
+            mock: process.env.AI_MOCK === '1',
+          },
+          requireSignIn: false,
+          mockSpec: mockDescribe,
+        },
       });
       res.statusCode = response.status;
       response.headers.forEach((value, key) => res.setHeader(key, value));

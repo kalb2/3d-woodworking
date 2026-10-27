@@ -16,6 +16,8 @@ import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, 
 import { defaultBoardOptions } from '../utils/boardGeometry';
 import { inchFraction } from '../utils/lengthFormat';
 import { PRESET_WOOD_MATERIALS, freshenFinish } from '../utils/woodTextureGenerator';
+import { placeAiPiece } from '../ai/build';
+import type { AiSpec } from '../ai/spec';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
 
 // Also refreshes finishes saved with the old, far-too-dark wood presets (walnut read as black).
@@ -230,6 +232,8 @@ interface ProjectState {
   insertBuiltIn: (req: BuiltInRequest) => string | null;
   /** Removes a built-in's group and all its parts. */
   deleteBuiltIn: (groupId: string) => void;
+  /** Describe it: add an AI design as one group, or rebuild `replaceId` from a changed one. One undo step. */
+  insertAiPiece: (spec: AiSpec, prompt: string, replaceId?: string | null) => { groupId: string; notes: string[] } | null;
   /** Insert a saved user template as one group (or a single part); one undo step. */
   insertUserTemplate: (template: UserTemplate, place: { at?: { x: number; z: number }; wallId?: string | null }) => boolean;
   /** Put a scanned room into the current project, replacing only an earlier room scan. */
@@ -810,6 +814,24 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     pushHistoryState();
     saveCurrentProject();
     return result.groupId;
+  },
+
+  insertAiPiece: (spec, prompt, replaceId) => {
+    const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return null;
+    const result = placeAiPiece(proj.objects, proj.joints ?? [], proj.scannedRoom, spec, prompt, { replaceId, groupMaterial: LIGHT_STARTING_WOOD });
+    if (!result) return null;
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects, joints: result.joints, updatedAt: Date.now() } : p)),
+      selectedObjectId: result.groupId,
+      selectedObjectIds: [result.groupId],
+      multiSelect: false,
+      editingGroupId: null,
+    }));
+    pushHistoryState();
+    saveCurrentProject();
+    return { groupId: result.groupId, notes: result.notes };
   },
 
   insertUserTemplate: (template, place) => {

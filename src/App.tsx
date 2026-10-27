@@ -25,6 +25,7 @@ import { HomeScreen } from './components/home/HomeScreen';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { ShareSheet } from './components/share/ShareSheet';
 import { JoinSheet } from './joinery/JoinSheet';
+import { DescribeSheet } from './ai/DescribeSheet';
 
 export const App: React.FC = () => {
   useUndoShortcuts();
@@ -49,6 +50,16 @@ export const App: React.FC = () => {
     loadPreferences();
     void loadSession();
   }, [loadProjects, loadPreferences, loadSession]);
+
+  // Debug builds launched with WB_AI_SELFTEST=1 run one on-device Describe it check (logs only).
+  useEffect(() => {
+    void import('./native/onDeviceAi').then(async (m) => {
+      const bridge = m.onDeviceBridge();
+      if (!bridge || !(await m.aiSelfTestRequested())) return;
+      const { runAiSelfTest } = await import('./ai/selfTest');
+      await runAiSelfTest(bridge);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (currentView !== 'editor') return;
@@ -136,6 +147,7 @@ export const App: React.FC = () => {
 
       <BuiltInSheet />
       <JoinSheet />
+      <DescribeSheet />
       <MeasureOrGroupBar />
       <HoleModeBar />
 
