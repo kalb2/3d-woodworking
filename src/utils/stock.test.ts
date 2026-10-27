@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardFeet, formatBoardFeet, nestSheets, roughQuarters, sheetHasGrain, stockKind } from './stock';
+import { boardFeet, dimensionalNominal, formatBoardFeet, lumberBoardFeet, lumberStock, nestSheets, roughQuarters, sheetHasGrain, stockKind } from './stock';
 
 describe('stock kinds', () => {
   it('sheet goods, lumber, metal; paint-grade by thickness', () => {
@@ -54,5 +54,30 @@ describe('sheet nesting (rip-first, 1/8" kerf)', () => {
     // A third rail has nowhere to go (and two 24" rips plus a kerf don't fit 48").
     expect(nestSheets([{ length: 60, width: 23.875, quantity: 2 }, { length: 30, width: 6, quantity: 3 }], true).sheets).toBe(2);
     expect(nestSheets([{ length: 60, width: 24, quantity: 2 }], true).sheets).toBe(2);
+  });
+});
+
+describe('dimensional lumber', () => {
+  const pine = { species: 'pine' as const };
+  it('pine at a surfaced cross-section is bought by nominal size', () => {
+    expect(dimensionalNominal(pine, 1.5, 3.5)).toEqual({ thickness: 2, width: 4 });
+    expect(dimensionalNominal(pine, 0.75, 1.5)).toEqual({ thickness: 1, width: 2 });
+    expect(dimensionalNominal(pine, 1.5, 1.5)).toEqual({ thickness: 2, width: 2 });
+    expect(dimensionalNominal(pine, 5.5, 1.5)).toEqual({ thickness: 2, width: 6 }); // either order
+    expect(dimensionalNominal(pine, 1.5, 3)).toBeNull(); // ripped to an odd width
+    expect(dimensionalNominal(pine, 1.25, 3.5)).toBeNull();
+    expect(dimensionalNominal({ species: 'oak' }, 1.5, 3.5)).toBeNull(); // hardwood: rough thickness
+  });
+  it('board feet of an 8\' stick: 1×2 1 1/3, 2×2 2 2/3, 2×4 5 1/3, 2×6 8', () => {
+    expect(lumberBoardFeet(pine, 96, 1.5, 0.75)).toBeCloseTo(4 / 3, 6);
+    expect(lumberBoardFeet(pine, 96, 1.5, 1.5)).toBeCloseTo(8 / 3, 6);
+    expect(lumberBoardFeet(pine, 96, 3.5, 1.5)).toBeCloseTo(16 / 3, 6);
+    expect(lumberBoardFeet(pine, 96, 5.5, 1.5)).toBeCloseTo(8, 6);
+    expect(lumberBoardFeet({ species: 'oak' }, 96, 6, 0.75)).toBe(boardFeet(96, 6, 0.75));
+  });
+  it('names the stock to buy', () => {
+    expect(lumberStock(pine, 3.5, 1.5).label).toBe('2×4');
+    expect(lumberStock({ species: 'oak' }, 3.5, 1.5).label).toBe('8/4');
+    expect(lumberStock(pine, 1.5, 0.75).order).toBeLessThan(lumberStock(pine, 3.5, 1.5).order);
   });
 });

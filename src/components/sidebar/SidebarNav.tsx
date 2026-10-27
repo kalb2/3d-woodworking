@@ -255,7 +255,7 @@ export const SidebarNav: React.FC = () => {
                     {preset.label}
                   </span>
                   <span style={{ fontSize: 10, color: '#9ca3af' }}>
-                    {preset.dimensions.length}" × {preset.dimensions.width}" × {preset.dimensions.height}"
+                    {preset.description}
                   </span>
                 </div>
               </button>

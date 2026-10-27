@@ -14,6 +14,7 @@ import { reanchorUpdate } from '../utils/holes';
 import type { Face } from '../utils/pushPull';
 import type { Joint, Position3D, FurnitureObject, FurnitureProject, LengthUnit, ScannedRoom, ShapeType, SnapSettings, WoodMaterial } from '../types/furniture';
 import { defaultBoardOptions } from '../utils/boardGeometry';
+import { inchFraction } from '../utils/lengthFormat';
 import { PRESET_WOOD_MATERIALS, freshenFinish } from '../utils/woodTextureGenerator';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
 
@@ -50,25 +51,34 @@ const THICKNESSES: Array<[string, number]> = [['1/4', 0.25], ['1/2', 0.5], ['3/4
 const sheet = (kind: 'plywood' | 'mdf', [label, t]: [string, number]): WoodPreset => ({
   id: `${kind}_4x8_${label.replace('/', '_')}`,
   label: `${kind === 'plywood' ? 'Plywood' : 'MDF'} 4×8 · ${label}"`,
-  description: `96" × 48" × ${t}"`,
+  description: `96" × 48" × ${inchFraction(t)}"`,
   dimensions: { length: 96, width: 48, height: t },
   material: kind === 'plywood' ? PRESET_WOOD_MATERIALS.plywood : PRESET_WOOD_MATERIALS.mdf,
   shape: 'board',
   category: kind === 'plywood' ? 'Plywood sheets' : 'MDF sheets',
 });
 
+/** Dimensional pine at its real (surfaced) size: nominal, thickness, width. Same 8' length and finish as the 2×4. */
+const DIMENSIONAL_LUMBER: Array<[string, number, number]> = [
+  ['1×2', 0.75, 1.5],
+  ['2×2', 1.5, 1.5],
+  ['2×4', 1.5, 3.5],
+  ['2×6', 1.5, 5.5],
+];
+const lumber = ([nominal, t, w]: [string, number, number]): WoodPreset => ({
+  id: `pine_${nominal.replace('×', 'x')}_8ft`,
+  label: `${nominal} Pine (8 ft)`,
+  description: `96" × ${inchFraction(w)}" × ${inchFraction(t)}"`,
+  dimensions: { length: 96, width: w, height: t },
+  material: PRESET_WOOD_MATERIALS.pine,
+  shape: 'cube',
+  category: 'Lumber',
+});
+
 export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
   ...THICKNESSES.map((t) => sheet('plywood', t)),
   ...THICKNESSES.map((t) => sheet('mdf', t)),
-  {
-    id: 'pine_2x4_8ft',
-    label: '2×4 Pine (8 ft)',
-    description: '96" × 3.5" × 1.5"',
-    dimensions: { length: 96, width: 3.5, height: 1.5 },
-    material: PRESET_WOOD_MATERIALS.pine,
-    shape: 'cube',
-    category: 'Lumber',
-  },
+  ...DIMENSIONAL_LUMBER.map(lumber),
 ];
 
 const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';

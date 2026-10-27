@@ -130,6 +130,23 @@ describe('boards and sheet presets', async () => {
     expect(ply.every((p) => p.material.species === 'plywood')).toBe(true);
     expect(mdf.every((p) => p.material.species === 'mdf')).toBe(true);
   });
+  it('lumber presets: 1×2, 2×2, 2×4, 2×6 pine at real sizes, 8 ft like the 2×4', () => {
+    const lumber = STANDARD_WOOD_PRESETS.filter((p) => p.category === 'Lumber');
+    expect(lumber.map((p) => p.label)).toEqual(['1×2 Pine (8 ft)', '2×2 Pine (8 ft)', '2×4 Pine (8 ft)', '2×6 Pine (8 ft)']);
+    expect(lumber.map((p) => [p.dimensions.height, p.dimensions.width])).toEqual([[0.75, 1.5], [1.5, 1.5], [1.5, 3.5], [1.5, 5.5]]);
+    expect(lumber.every((p) => p.dimensions.length === 96 && p.shape === 'cube' && p.material.species === 'pine')).toBe(true);
+    expect(lumber.find((p) => p.id === 'pine_2x4_8ft')!.description).toBe('96" × 3 1/2" × 1 1/2"');
+    expect(new Set(STANDARD_WOOD_PRESETS.map((p) => p.id)).size).toBe(STANDARD_WOOD_PRESETS.length);
+  });
+  it('inserting a 2×6 adds a pine stick resting on the floor', () => {
+    s().createProject('Lumber', 'in');
+    s().addWoodPreset('pine_2x6_8ft');
+    const o = objs()[objs().length - 1];
+    expect(o.dimensions).toEqual({ length: 96, width: 5.5, height: 1.5 });
+    expect(o.position.y).toBe(0.75);
+    expect(o.material.species).toBe('pine');
+    expect(o.name).toMatch(/^2×6 Pine/);
+  });
   it('inserting an MDF sheet applies the MDF finish', () => {
     s().createProject('Sheets', 'in');
     s().addWoodPreset('mdf_4x8_3_4');
