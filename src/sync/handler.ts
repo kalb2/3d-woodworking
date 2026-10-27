@@ -1,11 +1,15 @@
 import { hashPassword, normalizeUsername, passwordProblem, verifyPassword } from './password.ts';
 import type { Account, AuthConfig, IdentityResolver, SyncDatabase, SyncRecord } from './types.ts';
 import { API_PREFIX } from './types.ts';
+import { handleAiDescribe, type AiConfig } from '../ai/aiHandler.ts';
+import type { AiSpec } from '../ai/spec.ts';
 
 export interface SyncHandlerOptions {
   db: SyncDatabase;
   identity: IdentityResolver;
   config: AuthConfig;
+  /** "Describe it" (POST /ai/describe). Absent: the route answers "not set up". */
+  ai?: { config: AiConfig; requireSignIn: boolean; mockSpec?: (prompt: string, current: AiSpec | null) => AiSpec };
 }
 
 function json(body: unknown, status = 200): Response {
@@ -54,6 +58,18 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
   const { db, identity, config } = options;
 
   if (request.method === 'GET' && path === '/auth/config') return json(config);
+
+  if (request.method === 'POST' && path === '/ai/describe') {
+    const ai = options.ai;
+    if (!ai) return json({ error: 'Describe it isn\'t set up on the server yet.', code: 'not_configured' }, 503);
+    const token = bearer(request);
+    const account = token ? await db.accountForSession(token) : null;
+    return handleAiDescribe(request, ai.config, {
+      accountId: account?.id ?? null,
+      requireSignIn: ai.requireSignIn,
+      ip: request.headers.get('cf-connecting-ip'),
+    }, json, ai.mockSpec);
+  }
 
   if (request.method === 'POST' && (path === '/auth/signup' || path === '/auth/login')) {
     let body: { username?: string; password?: string };

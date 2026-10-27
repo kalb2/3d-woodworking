@@ -12,6 +12,7 @@ import {
   Layers,
   RectangleHorizontal,
   Blend,
+  Sparkles,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
 import { useProjectStore, STANDARD_WOOD_PRESETS, LUMBER_LENGTHS, presetAtLength } from '../../state/useProjectStore';
@@ -22,6 +23,7 @@ import { TemplatesTab } from './TemplatesTab';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
+import { useDescribeFlow } from '../../ai/useDescribeFlow';
 
 const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
   cube: Box,
@@ -175,6 +177,22 @@ export const SidebarNav: React.FC = () => {
         {/* SHAPES TAB */}
         {activeTab === 'shapes' && (
           <div style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <button
+              type="button"
+              data-testid="add-describe"
+              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+              onClick={addPart(() => useDescribeFlow.getState().openNew())}
+              onPointerUp={addPart(() => useDescribeFlow.getState().openNew())}
+              style={isPhone ? { marginBottom: 8 } : { justifyContent: 'flex-start', width: '100%', padding: '10px 12px', background: 'rgba(224, 159, 62, 0.06)', borderColor: 'rgba(224, 159, 62, 0.2)' }}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: isPhone ? '#f8fafc' : 'rgba(224, 159, 62, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 }}>
+                <Sparkles size={16} color={isPhone ? '#64748b' : '#e09f3e'} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Describe it</span>
+                <span style={{ fontSize: 10, color: '#9ca3af' }}>Say or type a piece and it gets built</span>
+              </div>
+            </button>
             {SHAPE_GROUPS.map((group) => {
               const entries = SHAPE_CATALOG.filter((entry) => entry.group === group);
               return (

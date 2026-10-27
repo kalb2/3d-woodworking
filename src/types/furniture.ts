@@ -1,3 +1,4 @@
+import type { AiSpec } from '../ai/spec.ts';
 export type ShapeType =
   | 'cube'
   | 'cylinder'
@@ -126,10 +127,17 @@ export interface FurnitureObject {
   builtIn?: BuiltInInfo;
   /** On a built-in's parts: the instance they belong to. */
   builtInId?: string;
+  /** On a group made by "Describe it": what was asked and the design, so "Change it" can rebuild it. */
+  ai?: AiInfo;
   /** On room-scan parts: the scanned wall id (walls and their openings). */
   wallId?: string;
   /** On room-scan opening parts: the scanned opening id. */
   openingId?: string;
+}
+
+export interface AiInfo {
+  prompt: string;
+  spec: AiSpec;
 }
 
 export type BuiltInTemplateId = 'media-wall' | 'base-cabinet' | 'upper-cabinet' | 'bookshelf' | 'window-bench';

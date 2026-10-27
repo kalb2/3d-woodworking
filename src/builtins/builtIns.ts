@@ -181,6 +181,7 @@ export function placeBuiltIn(
     generator: template.tag,
     builtIn: info,
   };
+  if (prev?.ai) group.ai = prev.ai;
   // Editing a nested built-in keeps it in its parent group.
   if (prev?.parentId) group.parentId = prev.parentId;
   const gone = new Set(objects.filter((o) => o.builtInId === id && !(o.parentId && o.parentId !== groupId)).map((o) => o.id));

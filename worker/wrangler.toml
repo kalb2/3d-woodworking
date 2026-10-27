@@ -21,3 +21,21 @@ database_id = "e87ee84f-66b3-4e33-9aad-ca20e995534c"
 # APPLE_AUDIENCE defaults to com.antigravity.furniture3d inside the worker.
 # Optional override:
 #   npx wrangler secret put APPLE_AUDIENCE
+
+# Describe it (POST /api/v1/ai/describe): 10 requests a minute per signed-in account.
+# Needs wrangler 4.36+. Without this binding the worker falls back to a per-isolate limit.
+[[ratelimits]]
+name = "AI_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+# Describe it settings. Without AI_API_KEY the route answers "not set up yet".
+#   npx wrangler secret put AI_API_KEY          # the provider key (xAI by default)
+# Optional (defaults in src/ai/aiHandler.ts):
+#   npx wrangler secret put AI_BASE_URL         # default https://api.x.ai/v1 (any OpenAI-compatible API)
+#   npx wrangler secret put AI_MODEL            # default grok-4.7
+#   npx wrangler secret put AI_REASONING_EFFORT # default "low" on xAI; "none" to omit
+#   AI_MOCK = "1" (var) returns a canned bookshelf without calling a provider.

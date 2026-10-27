@@ -16,7 +16,7 @@ export interface UserTemplate {
 const r = (n: number) => Math.round(n * 1000) / 1000;
 
 function strip(o: FurnitureObject): TemplatePart {
-  const { id: _id, parentId: _p, builtIn: _b, builtInId: _bi, wallId: _w, openingId: _o, generator: _g, locked: _l, reference: _r, ...rest } = o;
+  const { id: _id, parentId: _p, builtIn: _b, builtInId: _bi, wallId: _w, openingId: _o, generator: _g, locked: _l, reference: _r, ai: _ai, ...rest } = o;
   void _id; void _p; void _b; void _bi; void _w; void _o; void _g; void _l; void _r;
   return JSON.parse(JSON.stringify(rest));
 }

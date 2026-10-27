@@ -9,6 +9,7 @@ import type { FurnitureObject } from '../../types/furniture';
 import { pairContact } from '../../joinery/joints';
 import { useJoinFlow } from '../../joinery/useJoinFlow';
 import { useSelectTip } from '../../utils/longPress';
+import { useDescribeFlow } from '../../ai/useDescribeFlow';
 
 const groupLabel = (g: FurnitureObject) => (g.builtIn ? findBuiltInTemplate(g.builtIn.template)?.name ?? g.name : g.name);
 
@@ -76,7 +77,8 @@ export const GroupBar: React.FC = () => {
     bar = (
       <div className="group-bar" data-testid="group-bar">
         <span className="group-bar-label">{groupLabel(selected)}</span>
-        <Btn label="Open" testId="group-open" tone="primary" onTap={() => s.enterGroup(selected.id)} />
+        {selected.ai && <Btn label="Change it" testId="group-change-ai" tone="primary" onTap={() => useDescribeFlow.getState().openChange(selected.id)} />}
+        <Btn label="Open" testId="group-open" tone={selected.ai ? undefined : 'primary'} onTap={() => s.enterGroup(selected.id)} />
         <Btn label="Ungroup" testId="group-ungroup" onTap={() => s.ungroup(selected.id)} />
       </div>
     );
