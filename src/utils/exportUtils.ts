@@ -9,6 +9,8 @@ import {
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
 import { saveFile, type SaveResult } from '../native/fileExport';
+import { EXAMPLE_NOTE, FLAT_LABEL, cents, projectCost, sanitizePrices, type ProjectCost, type ResolvedPrices } from '../cost/cost';
+import { pricesFor } from '../cost/usePriceStore';
 export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
@@ -266,8 +268,25 @@ export function downloadFile(filename: string, content: string, contentType: str
   return saveFile(filename, content, contentType);
 }
 
-/** The cut list as CSV: parts (with board feet for lumber), a buying summary per section, then hardware. */
-export function cutListCSV(project: FurnitureProject): string {
+/** The project's buy list priced (sections and hardware as the cut list shows them). */
+export function costOf(project: FurnitureProject, prices: ResolvedPrices = pricesFor(project), sections = cutListSections(generateCutList(project), project.unit)): ProjectCost {
+  return projectCost(sections, projectHardware(project), prices);
+}
+
+/** The extras and total under the lines, as [label, amount] rows (zero extras left out). */
+export function costTotals(c: ProjectCost): Array<[string, number]> {
+  const out: Array<[string, number]> = [];
+  const extras = c.flat || c.waste || c.tax;
+  if (extras) out.push(['Subtotal', cents(c.subtotal - c.flat)]);
+  if (c.flat) out.push([FLAT_LABEL, c.flat]);
+  if (c.waste) out.push([`Waste / contingency ${c.wastePct}%`, c.waste]);
+  if (c.tax) out.push([`Tax ${c.taxPct}%`, c.tax]);
+  out.push(['Total', c.total]);
+  return out;
+}
+
+/** The cut list as CSV: parts (with board feet for lumber), a buying summary per section, hardware, then cost. */
+export function cutListCSV(project: FurnitureProject, prices: ResolvedPrices = pricesFor(project)): string {
   const items = generateCutList(project);
   const q = (t: string) => `"${t.replace(/"/g, '""')}"`;
   let csv = 'Name,Shape,Length (grain),Width,Thickness,Material,Stock,Quantity,Board feet,Notes,Used in\n';
@@ -312,8 +331,18 @@ export function cutListCSV(project: FurnitureProject): string {
     csv += '\nHardware,Quantity\n';
     for (const h of hardware) csv += `${q(h.name)},${h.quantity}\n`;
   }
+  const cost = costOf(project, prices, sections);
+  if (cost.lines.length) {
+    const m = (n: number | null) => (n == null ? '' : cents2(n));
+    csv += '\nCost,Quantity,Unit,Unit price,Line total\n';
+    for (const l of cost.lines) csv += `${q(l.label)},${l.quantity},${q(l.unit)},${m(l.unitPrice)},${l.total == null ? q('no price') : m(l.total)}\n`;
+    for (const [label, amount] of costTotals(cost)) csv += `${q(label)},,,,${m(amount)}\n`;
+    if (cost.anyExample) csv += `${q(EXAMPLE_NOTE)},,,,\n`;
+  }
   return csv;
 }
+
+const cents2 = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 
 export function exportCutListCSV(project: FurnitureProject) {
   downloadFile(`${project.name.toLowerCase().replace(/\s+/g, '_')}_cut_list.csv`, cutListCSV(project), 'text/csv');
@@ -407,6 +436,7 @@ export function importProjectData(projectData: any, options: { suffix?: string; 
     ...(projectData.scannedRoom ? { scannedRoom: projectData.scannedRoom } : {}),
     ...(typeof projectData.roomLocked === 'boolean' ? { roomLocked: projectData.roomLocked } : {}),
     // Keeps the exported style; older files without one get the style for new projects on import.
+    ...(() => { const prices = sanitizePrices(projectData.prices); return prices ? { prices } : {}; })(),
     ...(projectData.viewStyle === 'clean' || projectData.viewStyle === 'realistic' ? { viewStyle: projectData.viewStyle } : {}),
   };
 }

@@ -215,6 +215,13 @@ export interface FurnitureProject {
   joints?: Joint[];
   /** Render style for this project: Clean (flat + outlines) or Realistic (grain + shadows). */
   viewStyle?: 'clean' | 'realistic';
+  /** This project's own prices, over the device's price list (see cost/cost.ts). */
+  prices?: {
+    items?: Record<string, number>;
+    taxPct?: number;
+    wastePct?: number;
+    flat?: number;
+  };
 }
 
 export interface PinnedMeasurement {

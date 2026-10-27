@@ -205,6 +205,8 @@ interface ProjectState {
   addProjects: (projects: FurnitureProject[]) => void;
   /** Clean or Realistic for the open project (saved and synced with it). */
   setViewStyle: (style: ViewStyle) => void;
+  /** This project's own prices over the device's list (undefined clears them). Not an undo step. */
+  setProjectPrices: (prices: FurnitureProject['prices'] | undefined) => void;
 
   selectObject: (id: string | null, options?: { additive?: boolean }) => void;
   toggleMultiSelect: () => void;
@@ -1361,6 +1363,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!isViewStyle(style)) return;
     set((state) => ({ projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, viewStyle: style } : p)) }));
     // saveCurrentProject bumps updatedAt, so the change syncs like other project fields.
+    saveCurrentProject();
+  },
+
+  setProjectPrices: (prices) => {
+    const { activeProjectId, saveCurrentProject } = get();
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== activeProjectId) return p;
+        const { prices: _old, ...rest } = p;
+        return prices ? { ...rest, prices } : rest;
+      }),
+    }));
     saveCurrentProject();
   },
 
