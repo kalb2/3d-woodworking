@@ -1,7 +1,11 @@
 import { shapeLabel } from '../catalog/shapeCatalog';
-import type { FurnitureProject } from '../types/furniture';
+import type { FurnitureObject, FurnitureProject, WoodSpecies } from '../types/furniture';
 import { buildSharePayload } from './share';
 import { formatSmallLen } from './lengthFormat';
+import {
+  LUMBER_WASTE, boardFeet, formatBoardFeet, nestSheets, roughQuarters, sheetHasGrain, stockKind,
+  type SheetNest, type StockKind,
+} from './stock';
 import { jointHardware, jointNotes, type HardwareItem } from '../joinery/joints';
 import { builtInHardware } from '../builtins/builtIns';
 export type { HardwareItem } from '../joinery/joints';
@@ -10,13 +14,23 @@ export interface CutListItem {
   id: string;
   name: string;
   shape: string;
+  /** Along the grain (the part's longest side, the way grain is drawn). */
   length: string;
   width: string;
   height: string;
   material: string;
   quantity: number;
-  /** Joinery on this part, e.g. 'dado 3/4 x 1/4 @ 12"'. */
+  /** Joinery and shaping on this part, e.g. 'dado 3/4 x 1/4 @ 12"; 2 holes'. */
   notes?: string;
+  /** Finished size in inches (length along the grain, width, thickness). */
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  /** How it's bought: sheet goods, lumber, or other (metal). */
+  kind: StockKind;
+  species?: WoodSpecies;
+  /** Top-level assemblies the parts sit in, e.g. 'Base cabinet ×2, Bookshelf'. */
+  usedIn?: string;
 }
 
 const BOX_SHAPES = new Set(['board', 'cube', 'cushion', 'bevel_top', 'wedge']);
@@ -26,17 +40,43 @@ export function formatCutSize(inches: number, unit: FurnitureProject['unit']): s
   return formatSmallLen(inches, unit);
 }
 
+/** Shaping the shop needs to know about: rounded corners, routed edges, holes. */
+function shapingNotes(obj: FurnitureObject, unit: FurnitureProject['unit']): string[] {
+  const out: string[] = [];
+  const b = obj.board;
+  if (b?.cornerRadius && b.cornerRadius > 0) out.push(`${formatSmallLen(b.cornerRadius, unit)} radius corners`);
+  if (b?.edge && b.edge !== 'none') out.push(`${b.edge} edges${b.edgeSize ? ` ${formatSmallLen(b.edgeSize, unit)}` : ''}`);
+  const holes = (b?.holes ?? obj.holes ?? []).length;
+  if (holes) out.push(holes === 1 ? '1 hole' : `${holes} holes`);
+  return out;
+}
+
+/** The outermost group a part sits in (its assembly), if any. */
+function assemblyName(obj: FurnitureObject, byId: Map<string, FurnitureObject>): string | undefined {
+  let top: FurnitureObject | undefined;
+  let cur = obj.parentId ? byId.get(obj.parentId) : undefined;
+  for (let guard = 0; cur && guard < 64; guard++) {
+    top = cur;
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return top?.name;
+}
+
 /**
  * Stock to cut: every visible part (boards, sheets, blocks; parts inside
  * nested groups included, groups themselves skipped), excluding scanned room
- * and reference parts. Box parts are listed as length × width × thickness
- * (largest to smallest, so a board lying flat or standing on edge merges).
- * Identical parts merge with a quantity; sorted by material, then size.
+ * and reference parts. Sizes are the parts' true finished sizes, so joinery
+ * is already in them (a shelf set in a dado is drawn, and listed, long enough
+ * to reach the bottom of the groove). Box parts are listed as length (with
+ * the grain, the longest side) × width × thickness, so a board lying flat or
+ * standing on edge merges. Identical parts merge with a quantity; sorted by
+ * material, then thickness, then size.
  */
 export function generateCutList(project: FurnitureProject): CutListItem[] {
-  const map = new Map<string, CutListItem & { sortKey: number[] }>();
+  const map = new Map<string, CutListItem & { sortKey: number[]; uses: Map<string, number> }>();
   const unit = project.unit;
   const notesById = jointNotes(project);
+  const byId = new Map(project.objects.map((o) => [o.id, o]));
 
   for (const obj of project.objects) {
     if (obj.visible === false) continue;
@@ -49,14 +89,16 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
       ? [d.length, d.width, d.height].map(r4).sort((x, y) => y - x)
       : [d.length, d.width, d.height].map(r4);
     const materialName = obj.material?.name ?? 'Unknown';
-    const notes = (notesById.get(obj.id) ?? []).join('; ');
+    const notes = [...(notesById.get(obj.id) ?? []), ...shapingNotes(obj, unit)].join('; ');
     const key = `${obj.shape}_${a}_${b}_${c}_${materialName}_${notes}`;
+    const assembly = assemblyName(obj, byId);
 
-    const existing = map.get(key);
-    if (existing) {
-      existing.quantity += 1;
+    let row = map.get(key);
+    if (row) {
+      row.quantity += 1;
     } else {
-      map.set(key, {
+      const [ls, ws, ts] = BOX_SHAPES.has(obj.shape) ? [a, b, c] : [a, b, c].sort((x, y) => y - x);
+      row = {
         id: obj.id,
         name: obj.name,
         shape: shapeLabel(obj.shape),
@@ -66,21 +108,25 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
         material: materialName,
         quantity: 1,
         ...(notes ? { notes } : {}),
+        lengthIn: ls,
+        widthIn: ws,
+        thicknessIn: ts,
+        kind: stockKind(obj.material, ts),
+        ...(obj.material?.species ? { species: obj.material.species } : {}),
         sortKey: [a, b, c],
-      });
+        uses: new Map(),
+      };
+      map.set(key, row);
     }
+    if (assembly) row.uses.set(assembly, (row.uses.get(assembly) ?? 0) + 1);
   }
 
   return Array.from(map.values())
-    .sort((x, y) => x.material.localeCompare(y.material) || y.sortKey[2] - x.sortKey[2] || y.sortKey[0] - x.sortKey[0] || y.sortKey[1] - x.sortKey[1])
-    .map(({ sortKey: _s, ...item }) => item);
-}
-
-/** Everything to buy besides stock: joint screws/dowels plus template hinges, slides, shelf pins and pulls. */
-export function projectHardware(project: Pick<FurnitureProject, 'objects' | 'joints'>): HardwareItem[] {
-  const tally = new Map<string, number>();
-  for (const h of [...jointHardware(project), ...builtInHardware(project.objects)]) tally.set(h.name, (tally.get(h.name) ?? 0) + h.quantity);
-  return [...tally].map(([name, quantity]) => ({ name, quantity })).sort((a, b) => a.name.localeCompare(b.name));
+    .sort((x, y) => x.material.localeCompare(y.material) || y.thicknessIn - x.thicknessIn || y.sortKey[0] - x.sortKey[0] || y.sortKey[1] - x.sortKey[1] || y.sortKey[2] - x.sortKey[2])
+    .map(({ sortKey: _s, uses, ...item }) => {
+      const usedIn = [...uses].map(([n, q]) => (q > 1 ? `${n} ×${q}` : n)).join(', ');
+      return usedIn ? { ...item, usedIn } : item;
+    });
 }
 
 /** Cut list rows grouped by material, in list order. */
@@ -92,6 +138,58 @@ export function cutListByMaterial(items: CutListItem[]): { material: string; ite
     else out.push({ material: it.material, items: [it] });
   }
   return out;
+}
+
+export interface CutListSection {
+  /** 'Plywood · 3/4"' for sheet goods (one sheet thickness each), else the material. */
+  title: string;
+  kind: StockKind;
+  items: CutListItem[];
+  pieces: number;
+  /** Sheet goods: 4×8 sheets nested. */
+  sheets?: SheetNest;
+  /** Lumber: rough board feet before waste. */
+  boardFeet?: number;
+  /** What to buy, e.g. '2 sheets (4×8) · 71% used' or '6.2 bd ft · buy 7.1 with 15% waste'. */
+  summary: string;
+}
+
+/** Cut list rows as buying sections: each sheet material + thickness, each lumber species, then other. */
+export function cutListSections(items: CutListItem[], unit: FurnitureProject['unit']): CutListSection[] {
+  const sections: CutListSection[] = [];
+  for (const it of items) {
+    const title = it.kind === 'sheet' ? `${it.material} · ${formatCutSize(it.thicknessIn, unit)}` : it.material;
+    const last = sections[sections.length - 1];
+    if (last && last.title === title && last.kind === it.kind) last.items.push(it);
+    else sections.push({ title, kind: it.kind, items: [it], pieces: 0, summary: '' });
+  }
+  for (const s of sections) {
+    s.pieces = s.items.reduce((n, it) => n + it.quantity, 0);
+    if (s.kind === 'sheet') {
+      const nest = nestSheets(
+        s.items.map((it) => ({ length: it.lengthIn, width: it.widthIn, quantity: it.quantity })),
+        sheetHasGrain({ species: s.items[0].species ?? 'plywood' }),
+      );
+      s.sheets = nest;
+      const parts = [`${nest.sheets} ${nest.sheets === 1 ? 'sheet' : 'sheets'} (4×8)`];
+      if (nest.sheets) parts.push(`${Math.round(nest.yield * 100)}% used`);
+      if (nest.oversize) parts.push(`${nest.oversize} ${nest.oversize === 1 ? 'part is' : 'parts are'} bigger than a sheet`);
+      s.summary = parts.join(' · ');
+    } else if (s.kind === 'lumber') {
+      const bf = s.items.reduce((n, it) => n + it.quantity * boardFeet(it.lengthIn, it.widthIn, it.thicknessIn), 0);
+      s.boardFeet = bf;
+      const quarters = [...new Set(s.items.map((it) => roughQuarters(it.thicknessIn)))].sort((x, y) => x - y).map((q) => `${q}/4`);
+      s.summary = `${formatBoardFeet(bf)} bd ft of ${quarters.join(', ')} · buy ${formatBoardFeet(bf * (1 + LUMBER_WASTE))} with ${Math.round(LUMBER_WASTE * 100)}% waste`;
+    }
+  }
+  return sections;
+}
+
+/** Everything to buy besides stock: joint screws/dowels plus template hinges, slides, shelf pins and pulls. */
+export function projectHardware(project: Pick<FurnitureProject, 'objects' | 'joints'>): HardwareItem[] {
+  const tally = new Map<string, number>();
+  for (const h of [...jointHardware(project), ...builtInHardware(project.objects)]) tally.set(h.name, (tally.get(h.name) ?? 0) + h.quantity);
+  return [...tally].map(([name, quantity]) => ({ name, quantity })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function downloadFile(filename: string, content: string, contentType: string) {
@@ -106,20 +204,31 @@ export function downloadFile(filename: string, content: string, contentType: str
   URL.revokeObjectURL(url);
 }
 
-export function exportCutListCSV(project: FurnitureProject) {
+/** The cut list as CSV: parts (with board feet for lumber), a buying summary per section, then hardware. */
+export function cutListCSV(project: FurnitureProject): string {
   const items = generateCutList(project);
   const q = (t: string) => `"${t.replace(/"/g, '""')}"`;
-  let csv = 'Name,Shape,Length,Width,Thickness,Material,Quantity,Joinery\n';
+  let csv = 'Name,Shape,Length (grain),Width,Thickness,Material,Stock,Quantity,Board feet,Notes,Used in\n';
   for (const item of items) {
-    csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${item.quantity},${q(item.notes ?? '')}\n`;
+    const bf = item.kind === 'lumber' ? formatBoardFeet(item.quantity * boardFeet(item.lengthIn, item.widthIn, item.thicknessIn)) : '';
+    const stock = item.kind === 'sheet' ? 'Sheet' : item.kind === 'lumber' ? 'Lumber' : 'Other';
+    csv += `${q(item.name)},${q(item.shape)},${q(item.length)},${q(item.width)},${q(item.height)},${q(item.material)},${stock},${item.quantity},${bf},${q(item.notes ?? '')},${q(item.usedIn ?? '')}\n`;
+  }
+  const buy = cutListSections(items, project.unit).filter((s) => s.summary);
+  if (buy.length) {
+    csv += '\nBuy,What\n';
+    for (const s of buy) csv += `${q(s.title)},${q(s.summary)}\n`;
   }
   const hardware = projectHardware(project);
   if (hardware.length) {
-    csv += '\nHardware,,,,,,Quantity\n';
-    for (const h of hardware) csv += `${q(h.name)},,,,,,${h.quantity}\n`;
+    csv += '\nHardware,Quantity\n';
+    for (const h of hardware) csv += `${q(h.name)},${h.quantity}\n`;
   }
+  return csv;
+}
 
-  downloadFile(`${project.name.toLowerCase().replace(/\s+/g, '_')}_cut_list.csv`, csv, 'text/csv');
+export function exportCutListCSV(project: FurnitureProject) {
+  downloadFile(`${project.name.toLowerCase().replace(/\s+/g, '_')}_cut_list.csv`, cutListCSV(project), 'text/csv');
 }
 
 export function exportProjectJSON(project: FurnitureProject) {

@@ -1,21 +1,58 @@
 import React from 'react';
 import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
-import { generateCutList, exportCutListCSV, cutListByMaterial, projectHardware } from '../../utils/exportUtils';
+import { generateCutList, exportCutListCSV, cutListSections, projectHardware, type CutListItem } from '../../utils/exportUtils';
+import { formatLens, formatSmallLen } from '../../utils/lengthFormat';
+import { LUMBER_WASTE } from '../../utils/stock';
+import { useReliableTap } from '../../utils/reliableTap';
+import type { FurnitureProject } from '../../types/furniture';
 
 interface CutListDrawerProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const cell: React.CSSProperties = { padding: '10px 12px', verticalAlign: 'top' };
+const sub: React.CSSProperties = { fontSize: 12, fontWeight: 400, color: '#9ca3af', marginTop: 2 };
+
+/** L × W × T; may wrap between dimensions on a phone, never inside one (23 5/8"). */
+export function cutSizeText(item: Pick<CutListItem, 'lengthIn' | 'widthIn' | 'thicknessIn'>, unit: FurnitureProject['unit']): string {
+  const v = [item.lengthIn, item.widthIn, item.thicknessIn];
+  if (unit === 'mm' || unit === 'cm') return formatLens(v, unit);
+  return v.map((n) => formatSmallLen(n, unit).replace(/ /g, '\u00a0')).join(' × ');
+}
+
+/** One part row: name with its shape/joinery/assembly underneath, size L × W × T, quantity. */
+const PartRow: React.FC<{ item: CutListItem; unit: FurnitureProject['unit'] }> = ({ item, unit }) => {
+  const details = [item.shape !== 'Board' ? item.shape : '', item.notes ?? '', item.usedIn ? `in ${item.usedIn}` : ''].filter(Boolean);
+  return (
+    <tr data-testid="cut-part-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <td style={{ ...cell, fontWeight: 600 }}>
+        {item.name}
+        {details.map((d) => <div key={d} data-testid="cut-part-detail" style={sub}>{d}</div>)}
+      </td>
+      <td data-testid="cut-part-size" style={{ ...cell, fontVariantNumeric: 'tabular-nums' }}>
+        {cutSizeText(item, unit)}
+      </td>
+      <td style={{ ...cell, fontWeight: 700, color: '#e09f3e', textAlign: 'right' }}>{item.quantity}</td>
+    </tr>
+  );
+};
+
 export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose }) => {
   const { projects, activeProjectId } = useProjectStore();
   const currentProject = projects.find(p => p.id === activeProjectId);
+  const tapExport = useReliableTap(() => { if (currentProject) exportCutListCSV(currentProject); });
+  const tapClose = useReliableTap(onClose);
 
   if (!isOpen || !currentProject) return null;
 
+  const unit = currentProject.unit;
   const cutList = generateCutList(currentProject);
+  const sections = cutListSections(cutList, unit);
   const hardware = projectHardware(currentProject);
+  const hasSheets = sections.some((s) => s.kind === 'sheet');
+  const hasLumber = sections.some((s) => s.kind === 'lumber');
 
   return (
     <div style={{
@@ -53,16 +90,16 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              className="glass-button active"
-              onClick={() => exportCutListCSV(currentProject)}
-            >
+            <button type="button" className="glass-button active" data-testid="cut-export-csv" onClick={tapExport} onPointerUp={tapExport}>
               <FileSpreadsheet size={16} /> Export CSV
             </button>
 
             <button
+              type="button"
               className="glass-button"
-              onClick={onClose}
+              aria-label="Close cut list"
+              onClick={tapClose}
+              onPointerUp={tapClose}
               style={{ padding: 6, minHeight: 'auto', minWidth: 'auto', borderRadius: '50%' }}
             >
               <X size={18} />
@@ -75,62 +112,53 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', color: '#e09f3e' }}>
-                <th style={{ padding: '10px 12px' }}>Part</th>
-                <th style={{ padding: '10px 12px' }}>Shape</th>
-                <th style={{ padding: '10px 12px' }}>Length</th>
-                <th style={{ padding: '10px 12px' }}>Width</th>
-                <th style={{ padding: '10px 12px' }}>Thickness</th>
-                <th style={{ padding: '10px 12px' }}>Material Finish</th>
-                <th style={{ padding: '10px 12px' }}>Qty</th>
+                <th style={cell}>Part</th>
+                <th style={cell}>Length × Width × Thick</th>
+                <th style={{ ...cell, textAlign: 'right' }}>Qty</th>
               </tr>
             </thead>
             <tbody>
               {cutList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={3} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
                     No 3D objects in canvas yet. Add shapes to view cut list.
                   </td>
                 </tr>
               ) : (
-                cutListByMaterial(cutList).map((g) => (
-                  <React.Fragment key={g.material}>
+                sections.map((s) => (
+                  <React.Fragment key={`${s.kind}-${s.title}`}>
                     <tr data-testid="cut-material-row">
-                      <td colSpan={7} style={{ padding: '14px 12px 6px', fontWeight: 700, color: '#e09f3e' }}>
-                        {g.material} · {g.items.reduce((n, it) => n + it.quantity, 0)} pcs
+                      <td colSpan={3} style={{ padding: '14px 12px 6px' }}>
+                        <div style={{ fontWeight: 700, color: '#e09f3e' }}>{s.title} · {s.pieces} pcs</div>
+                        {s.summary && <div data-testid="cut-buy" style={sub}>{s.summary}</div>}
                       </td>
                     </tr>
-                    {g.items.map((item) => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                          {item.name}
-                          {item.notes && <div data-testid="cut-joinery" style={{ fontSize: 12, fontWeight: 400, color: '#9ca3af', marginTop: 2 }}>{item.notes}</div>}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#9ca3af' }}>{item.shape}</td>
-                        <td style={{ padding: '10px 12px' }}>{item.length}</td>
-                        <td style={{ padding: '10px 12px' }}>{item.width}</td>
-                        <td style={{ padding: '10px 12px' }}>{item.height}</td>
-                        <td style={{ padding: '10px 12px' }}>{item.material}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#e09f3e' }}>{item.quantity}</td>
-                      </tr>
-                    ))}
+                    {s.items.map((item) => <PartRow key={item.id} item={item} unit={unit} />)}
                   </React.Fragment>
                 ))
               )}
               {hardware.length > 0 && (
                 <>
                   <tr data-testid="cut-hardware-row">
-                    <td colSpan={7} style={{ padding: '14px 12px 6px', fontWeight: 700, color: '#e09f3e' }}>Hardware</td>
+                    <td colSpan={3} style={{ padding: '14px 12px 6px', fontWeight: 700, color: '#e09f3e' }}>Hardware</td>
                   </tr>
                   {hardware.map((h) => (
                     <tr key={h.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <td colSpan={6} style={{ padding: '10px 12px', fontWeight: 600 }}>{h.name}</td>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#e09f3e' }}>{h.quantity}</td>
+                      <td colSpan={2} style={{ ...cell, fontWeight: 600 }}>{h.name}</td>
+                      <td style={{ ...cell, fontWeight: 700, color: '#e09f3e', textAlign: 'right' }}>{h.quantity}</td>
                     </tr>
                   ))}
                 </>
               )}
             </tbody>
           </table>
+          {cutList.length > 0 && (
+            <p data-testid="cut-footnote" style={{ ...sub, padding: '12px 12px 0', lineHeight: 1.5 }}>
+              Finished sizes, joinery included. Length runs with the grain.
+              {hasSheets && ' Sheets: parts nested on 4×8 with a 1/8" kerf; plywood keeps its grain on the 8\' side.'}
+              {hasLumber && ` Board feet use rough thickness (3/4" from 4/4); buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
+            </p>
+          )}
         </div>
       </div>
     </div>
