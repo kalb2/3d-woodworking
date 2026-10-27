@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Archive, Camera, FileCode, FileSpreadsheet, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
+import { Archive, Box, Camera, FileCode, FileSpreadsheet, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
 import { useReliableTap } from '../../utils/reliableTap';
 import { backUpProjects } from '../../utils/projectFile';
 import { saveFile, saveMessage, type SaveResult } from '../../native/fileExport';
+import { designParts, exportDesignFile, type ModelFormat } from '../../utils/modelExport';
 
 interface EditorOverflowListProps {
   onOpenCutList: () => void;
@@ -59,6 +60,15 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       window.setTimeout(onClose, 700);
     });
   };
+  const exportModel = (format: ModelFormat) => {
+    const project = currentProject;
+    onClose();
+    if (!project || designParts(project).length === 0) {
+      window.alert('Nothing to export yet.');
+      return;
+    }
+    void exportDesignFile(project, format).then(report);
+  };
 
   return (
     <div className="editor-overflow-list">
@@ -68,6 +78,8 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <MenuRow icon={<FileSpreadsheet size={18} />} label="Export cut list (CSV)" testId="menu-export-csv" onTap={() => { if (currentProject) exportCutListCSV(currentProject); onClose(); }} />
       <MenuRow icon={<Camera size={18} />} label="Snapshot image" testId="menu-export-png" onTap={snapshot} />
       <MenuRow icon={<FileCode size={18} />} label="Export project file" testId="menu-export-json" onTap={exportFile} />
+      <MenuRow icon={<Box size={18} />} label="Export 3D model (USDZ)" testId="menu-export-usdz" onTap={() => exportModel('usdz')} />
+      <MenuRow icon={<Box size={18} />} label="Export 3D model (GLB)" testId="menu-export-glb" onTap={() => exportModel('glb')} />
       <MenuRow icon={<Copy size={18} />} label={copied ? 'Copied' : 'Copy project JSON'} testId="menu-copy-json" onTap={copyJson} />
       <h3 className="menu-kicker">Across projects</h3>
       <MenuRow icon={<LayoutTemplate size={18} />} label="Templates" testId="menu-templates" onTap={() => { onClose(); setSidebarPanel('templates'); openOverlay('sidebar'); }} />

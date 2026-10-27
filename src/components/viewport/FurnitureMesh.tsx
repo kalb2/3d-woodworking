@@ -4,7 +4,7 @@ import { Edges, Line } from '@react-three/drei';
 import { featureEdges } from '../../utils/featureEdges';
 import type { FurnitureObject } from '../../types/furniture';
 import { createWoodMeshMaterial } from '../../utils/woodTextureGenerator';
-import { createBoardGeometry, defaultBoardOptions } from '../../utils/boardGeometry';
+import { createPartGeometry, partDrawScale } from '../../utils/partGeometry';
 import { SELECTION_COLOR } from '../../theme/canvasSelection';
 import { GIZMO_OUTLINE_WIDTH } from '../../theme/gizmo';
 import { SphereOutline } from './gizmoLook';
@@ -43,11 +43,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const length = positiveSize(dimensions.length);
   const width = positiveSize(dimensions.width);
   const height = positiveSize(dimensions.height);
-  const meshScale: [number, number, number] = shape === 'sphere'
-    ? [length / 2, height / 2, width / 2]
-    : shape === 'cylinder' || shape === 'pole'
-      ? [length / 2, height, width / 2]
-      : [1, 1, 1];
+  const meshScale = partDrawScale(shape, dimensions);
   const holes = supportsHoles(shape) ? getHoles(object) : [];
   const holesKey = JSON.stringify(holes);
   // Joinery cuts (dados, rabbets, dowel/pocket holes) follow the parts they join.
@@ -58,80 +54,12 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     const c = partCutters(p, object.id);
     return c.length ? JSON.stringify(c) : '';
   });
-  const baseGeometry = useMemo(() => {
-    const l = positiveSize(dimensions.length);
-    const w = positiveSize(dimensions.width);
-    const h = positiveSize(dimensions.height);
-
-    switch (shape) {
-      case 'cylinder':
-      case 'pole':
-        // Unit tube. Per-axis scale lives on the mesh so a drag does not rebuild buffers.
-        return new THREE.CylinderGeometry(1, 1, 1, 32);
-      case 'sphere':
-        return new THREE.SphereGeometry(1, 32, 32);
-      case 'bevel_top': {
-        const shape2D = new THREE.Shape();
-        const halfX = l / 2;
-        const halfZ = w / 2;
-        const radius = Math.min(1.0, Math.min(l, w) * 0.1);
-
-        shape2D.moveTo(-halfX + radius, -halfZ);
-        shape2D.lineTo(halfX - radius, -halfZ);
-        shape2D.quadraticCurveTo(halfX, -halfZ, halfX, -halfZ + radius);
-        shape2D.lineTo(halfX, halfZ - radius);
-        shape2D.quadraticCurveTo(halfX, halfZ, halfX - radius, halfZ);
-        shape2D.lineTo(-halfX + radius, halfZ);
-        shape2D.quadraticCurveTo(-halfX, halfZ, -halfX, halfZ - radius);
-        shape2D.lineTo(-halfX, -halfZ + radius);
-        shape2D.quadraticCurveTo(-halfX, -halfZ, -halfX + radius, -halfZ);
-
-        const extrudeSettings = {
-          steps: 1,
-          depth: h,
-          bevelEnabled: true,
-          bevelThickness: Math.min(0.3, h * 0.2),
-          bevelSize: Math.min(0.3, h * 0.2),
-          bevelSegments: 4
-        };
-
-        const geom = new THREE.ExtrudeGeometry(shape2D, extrudeSettings);
-        geom.rotateX(Math.PI / 2);
-        geom.center();
-        return geom;
-      }
-      case 'wedge': {
-        const geom = new THREE.BufferGeometry();
-        const halfX = l / 2;
-        const halfY = h / 2;
-        const halfZ = w / 2;
-
-        const vertices = new Float32Array([
-          -halfX, -halfY, -halfZ,   halfX, -halfY, -halfZ,   halfX, -halfY, halfZ,
-          -halfX, -halfY, -halfZ,   halfX, -halfY, halfZ,   -halfX, -halfY, halfZ,
-          -halfX, -halfY, halfZ,    halfX, -halfY, halfZ,    halfX, halfY, halfZ,
-          -halfX, -halfY, halfZ,    halfX, halfY, halfZ,    -halfX, halfY, halfZ,
-          -halfX, -halfY, -halfZ,  -halfX, halfY, halfZ,     halfX, halfY, halfZ,
-          -halfX, -halfY, -halfZ,   halfX, halfY, halfZ,     halfX, -halfY, -halfZ,
-          -halfX, -halfY, -halfZ,  -halfX, -halfY, halfZ,   -halfX, halfY, halfZ,
-           halfX, -halfY, -halfZ,   halfX, halfY, halfZ,     halfX, -halfY, halfZ
-        ]);
-
-        geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-        geom.computeVertexNormals();
-        return geom;
-      }
-      case 'cushion': {
-        return new THREE.BoxGeometry(l, h, w, 8, 8, 8);
-      }
-      case 'board':
-        return createBoardGeometry(dimensions, object.board ?? defaultBoardOptions());
-      case 'group':
-      case 'cube':
-      default:
-        return new THREE.BoxGeometry(l, h, w);
-    }
-  }, [shape, roundPart, roundPart ? null : `${dimensions.length}|${dimensions.width}|${dimensions.height}`, object.board]);
+  const baseGeometry = useMemo(
+    () => createPartGeometry(shape, dimensions, object.board),
+    // Round parts are unit meshes; their size lives on the scale, so dimensions don't rebuild them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shape, roundPart, roundPart ? null : `${dimensions.length}|${dimensions.width}|${dimensions.height}`, object.board],
+  );
   const grainShape = !roundPart && shape !== 'group';
   const geometry = useMemo(
     () => {
