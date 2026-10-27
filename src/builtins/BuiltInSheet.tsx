@@ -10,7 +10,8 @@ import { describeWall } from '../native/wallScan';
 import { autoBaseCount, MEDIA_WALL_DEFAULTS, type UpperStyle } from '../generators/mediaWall';
 import { fitMediaWall } from '../generators/fitMediaWall';
 import type { FurnitureObject, RoomWall } from '../types/furniture';
-import { BUILT_IN_TEMPLATES, builtInLabel, findBuiltInTemplate, listBuiltIns } from './builtIns';
+import { builtInLabel, findBuiltInTemplate, LISTED_TEMPLATES, listBuiltIns } from './builtIns';
+import { formatLens } from '../utils/lengthFormat';
 import { useBuiltInFlow } from './useBuiltInFlow';
 import { TemplateSetup } from './TemplateSetup';
 
@@ -203,7 +204,7 @@ export const BuiltInSheet: React.FC = () => {
     );
   } else if (flow.step === 'template') {
     title = wall ? `Template · ${wall.label}` : 'Template';
-    body = BUILT_IN_TEMPLATES.map((t) => (
+    body = LISTED_TEMPLATES.map((t) => (
       <Row key={t.id} onTap={() => flow.chooseTemplate(t.id)} testId={`builtin-template-${t.id}`}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <span style={{ fontWeight: 600 }}>{t.name}</span>
@@ -212,11 +213,34 @@ export const BuiltInSheet: React.FC = () => {
         <ChevronRight size={16} />
       </Row>
     ));
+  } else if (flow.step === 'fitting') {
+    title = 'Drawer / Door';
+    const o = flow.opening;
+    body = (
+      <>
+        <span className="tpl-summary" data-testid="fitting-opening">
+          {o ? `Fits ${o.label.charAt(0).toLowerCase() + o.label.slice(1)}: ${formatLens([o.width, o.height, o.depth], project.unit)}`
+            : 'Free-standing. To fit an opening, select a cabinet (or two parts with a gap between them) first.'}
+        </span>
+        {(['drawers', 'door'] as const).map((id) => {
+          const t = findBuiltInTemplate(id)!;
+          return (
+            <Row key={id} onTap={() => flow.chooseTemplate(id)} testId={`fitting-${id}`}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontWeight: 600 }}>{t.name}</span>
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>{t.description}</span>
+              </div>
+              <ChevronRight size={16} />
+            </Row>
+          );
+        })}
+      </>
+    );
   } else {
     title = `${existing ? 'Edit ' : ''}${findBuiltInTemplate(flow.template ?? 'media-wall')?.name ?? 'Built-in'}${wall ? ` · ${wall.label}` : ''}`;
     const tid = flow.template ?? 'media-wall';
     body = findBuiltInTemplate(tid)?.fields
-      ? <TemplateSetup key={`${tid}-${flow.editGroupId ?? flow.wallId ?? 'free'}`} templateId={tid} wall={wall} existing={existing} onDone={flow.close} />
+      ? <TemplateSetup key={`${tid}-${flow.editGroupId ?? flow.wallId ?? 'free'}`} templateId={tid} wall={wall} existing={existing} onDone={flow.close} opening={flow.fitting ? flow.opening : null} />
       : <MediaWallForm key={flow.editGroupId ?? flow.wallId ?? 'free'} wall={wall} existing={existing} onDone={flow.close} />;
   }
 
@@ -224,7 +248,7 @@ export const BuiltInSheet: React.FC = () => {
     <div className="new-project-backdrop" data-testid="builtin-sheet" onPointerUp={(e) => { if (e.target === e.currentTarget) flow.close(); }}>
       <div className="new-project-card-sheet glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          {flow.mode === 'add' && flow.step === 'form' && !!room?.walls.length && !flow.fromWall && !existing ? (
+          {flow.mode === 'add' && flow.step === 'form' && (flow.fitting || (!!room?.walls.length && !flow.fromWall)) && !existing ? (
             <button type="button" className="glass-button" aria-label="Back" onClick={backTap} onPointerUp={backTap} style={{ padding: 6, minHeight: 40, minWidth: 40 }}>
               <ChevronLeft size={16} />
             </button>

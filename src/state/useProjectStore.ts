@@ -229,7 +229,8 @@ interface ProjectState {
   createProjectFromTemplate: (templateId: string, unit?: LengthUnit) => boolean;
   insertTemplate: (templateId: string) => boolean;
   /** Adds a built-in (or regenerates `editId`); returns its group id. */
-  insertBuiltIn: (req: BuiltInRequest) => string | null;
+  /** `prep`: other built-ins rebuilt first in the same undo step (e.g. a cabinet losing its doors). */
+  insertBuiltIn: (req: BuiltInRequest, prep?: BuiltInRequest[]) => string | null;
   /** Removes a built-in's group and all its parts. */
   deleteBuiltIn: (groupId: string) => void;
   /** Describe it: add an AI design as one group, or rebuild `replaceId` from a changed one. One undo step. */
@@ -798,11 +799,17 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     return true;
   },
 
-  insertBuiltIn: (req) => {
+  insertBuiltIn: (req, prep = []) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find((p) => p.id === activeProjectId);
     if (!proj) return null;
-    const result = placeBuiltIn(proj.objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD, Date.now(), proj.joints ?? []);
+    let objects = proj.objects, joints = proj.joints ?? [];
+    for (const p of prep) {
+      const g = objects.find((o) => o.id === `grp_${p.editId}`);
+      const done = placeBuiltIn(objects, proj.scannedRoom, p, g?.material ?? LIGHT_STARTING_WOOD, Date.now(), joints);
+      if (done) { objects = done.objects; joints = done.joints; }
+    }
+    const result = placeBuiltIn(objects, proj.scannedRoom, req, LIGHT_STARTING_WOOD, Date.now(), joints);
     if (!result) return null;
     set((state) => ({
       projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects, joints: result.joints, updatedAt: Date.now() } : p)),

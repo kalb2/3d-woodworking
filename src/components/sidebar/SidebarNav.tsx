@@ -13,6 +13,7 @@ import {
   RectangleHorizontal,
   Blend,
   Sparkles,
+  Rows3,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
 import { useProjectStore, STANDARD_WOOD_PRESETS, LUMBER_LENGTHS, presetAtLength } from '../../state/useProjectStore';
@@ -24,6 +25,8 @@ import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
 import { useDescribeFlow } from '../../ai/useDescribeFlow';
+import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
+import { detectOpening } from '../../fittings/opening';
 
 const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
   cube: Box,
@@ -98,6 +101,12 @@ export const SidebarNav: React.FC = () => {
     if (overlays.sidebar) setLumberLength(LUMBER_LENGTHS[0]);
   }, [overlays.sidebar]);
   const lastAddAt = useRef(0);
+  const openFitting = () => {
+    const st = useProjectStore.getState();
+    const proj = st.projects.find((p) => p.id === st.activeProjectId);
+    const ids = st.selectedObjectIds.length ? st.selectedObjectIds : st.selectedObjectId ? [st.selectedObjectId] : [];
+    useBuiltInFlow.getState().startFitting(proj ? detectOpening(proj.objects, ids) : null);
+  };
   const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
     fireReliableTap(event, () => {
       const now = performance.now();
@@ -191,6 +200,22 @@ export const SidebarNav: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Describe it</span>
                 <span style={{ fontSize: 10, color: '#9ca3af' }}>Say or type a piece and it gets built</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              data-testid="add-fitting"
+              className={isPhone ? 'phone-sheet-row' : 'glass-button'}
+              onClick={addPart(openFitting)}
+              onPointerUp={addPart(openFitting)}
+              style={isPhone ? { marginBottom: 8 } : { justifyContent: 'flex-start', width: '100%', padding: '10px 12px' }}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: isPhone ? '#f8fafc' : 'rgba(224, 159, 62, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 }}>
+                <Rows3 size={16} color={isPhone ? '#64748b' : '#e09f3e'} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Drawer / Door</span>
+                <span style={{ fontSize: 10, color: '#9ca3af' }}>Fits the selected cabinet or opening</span>
               </div>
             </button>
             {SHAPE_GROUPS.map((group) => {

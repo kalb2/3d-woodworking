@@ -26,6 +26,8 @@ export interface ModuleField {
   options?: { value: string; label: string }[];
   /** Shown under "More options" (progressive disclosure). */
   advanced?: boolean;
+  /** Only shown when this returns true for the current values. */
+  show?: (values: ModuleInput) => boolean;
 }
 
 export interface ModuleSpec {

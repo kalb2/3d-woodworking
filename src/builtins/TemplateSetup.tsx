@@ -4,9 +4,10 @@ import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
 import { LengthField } from '../components/ui/LengthField';
 import { cameraTarget } from '../templates/userTemplates';
-import { buildModule, normalizeModuleInput, type ModuleField, type ModuleId } from '../generators/modules';
+import type { ModuleField } from '../generators/modules';
 import type { BuiltInTemplateId, FurnitureObject, LengthUnit, RoomWall } from '../types/furniture';
-import { builtInModified, findBuiltInTemplate } from './builtIns';
+import { builtInModified, findBuiltInTemplate, type BuiltInRequest } from './builtIns';
+import { hostChanges, openingInput, type Opening } from '../fittings/opening';
 import { useBuiltInFlow } from './useBuiltInFlow';
 
 type Values = Record<string, number | string>;
@@ -81,25 +82,43 @@ const FieldRow: React.FC<{ f: ModuleField; values: Values; unit: LengthUnit; set
  * sizes), the counts that matter, and the rest under More options. Editing a
  * placed one rebuilds it in place; hand changes get one plain-words warning.
  */
-export const TemplateSetup: React.FC<{ templateId: BuiltInTemplateId; wall?: RoomWall; existing?: FurnitureObject; onDone: () => void }> = ({ templateId, wall, existing, onDone }) => {
+export const TemplateSetup: React.FC<{ templateId: BuiltInTemplateId; wall?: RoomWall; existing?: FurnitureObject; onDone: () => void; opening?: Opening | null }> = ({ templateId, wall, existing, onDone, opening }) => {
   const insertBuiltIn = useProjectStore((s) => s.insertBuiltIn);
   const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const unit = project?.unit ?? 'in';
   const t = findBuiltInTemplate(templateId)!;
-  const [values, setValues] = useState<Values>(() => normalizeModuleInput(templateId as ModuleId, { ...(existing?.builtIn?.input ?? { v: 2 }) }));
+  const norm = t.normalize!;
+  const kind = templateId === 'door' ? 'door' : 'drawers';
+  const [values, setValues] = useState<Values>(() => norm({ ...(existing?.builtIn?.input ?? (t.fitting ? (opening ? openingInput(opening, kind) : {}) : { v: 2 })) }));
   const [more, setMore] = useState(false);
   const [warn, setWarn] = useState(false);
-  const set = (k: string, v: number | string) => { setValues((cur) => normalizeModuleInput(templateId as ModuleId, { ...cur, [k]: v })); setWarn(false); };
-  const built = useMemo(() => buildModule(templateId as ModuleId, values), [templateId, values]);
+  const set = (k: string, v: number | string) => { setValues((cur) => norm({ ...cur, [k]: v })); setWarn(false); };
+  const built = useMemo(() => { const b = t.free(values); return { parts: b.parts, joints: b.joints ?? [] }; }, [t, values]);
   const boards = built.parts.length;
-  const main = t.fields!.filter((f) => !f.advanced);
-  const extra = t.fields!.filter((f) => f.advanced);
+  const shown = t.fields!.filter((f) => !f.show || f.show(values));
+  const main = shown.filter((f) => !f.advanced);
+  const extra = shown.filter((f) => f.advanced);
+  // Adding into a template cabinet takes out its own doors (and shelves, for drawers), unless it was changed by hand.
+  const host = !existing && opening?.host ? hostChanges(opening, kind) : null;
+  const hostLocked = !!host && !!project && builtInModified(project.objects, project.joints ?? [], project.scannedRoom, opening!.host!.groupId);
 
+  const place = (): Partial<BuiltInRequest> => {
+    if (existing) return {};
+    if (!t.fitting) return { at: { x: cameraTarget.x, z: cameraTarget.z } };
+    if (opening) return { frame: { origin: opening.origin, rotation: { x: 0, y: opening.yaw, z: 0 } } };
+    // Free-standing: front at the view target, sitting on the floor.
+    const minY = Math.min(...built.parts.map((p) => p.position.y - p.dimensions.height / 2));
+    return { frame: { origin: { x: cameraTarget.x, y: Math.max(0, -minY), z: cameraTarget.z }, rotation: { x: 0, y: 0, z: 0 } } };
+  };
   const build = () => {
     const { wallWidth: _w, ...input } = values;
     void _w;
-    const ok = insertBuiltIn({ template: templateId, input, wallId: wall?.id, center: existing?.builtIn?.center, editId: existing?.builtIn?.id,
-      at: existing ? undefined : { x: cameraTarget.x, z: cameraTarget.z } });
+    const h = opening?.host;
+    const prep: BuiltInRequest[] = host && h && !hostLocked ? [{
+      template: h.template, input: (() => { const { wallWidth: _ww, ...rest } = h.input; void _ww; return { ...rest, ...host.patch }; })(),
+      wallId: h.wallId, center: h.center, width: h.wallId && typeof h.input.wallWidth === 'number' ? h.input.wallWidth : undefined, editId: h.groupId.replace(/^grp_/, ''),
+    }] : [];
+    const ok = insertBuiltIn({ template: templateId, input, wallId: wall?.id, center: existing?.builtIn?.center, editId: existing?.builtIn?.id, ...place() }, prep);
     if (!ok) return;
     if (!existing) {
       // Frame the new piece so it is all in view.
@@ -135,8 +154,15 @@ export const TemplateSetup: React.FC<{ templateId: BuiltInTemplateId; wall?: Roo
         {more && <div className="props-card" data-testid="tpl-more-options">{extra.map((f) => <FieldRow key={f.key} f={f} values={values} unit={unit} set={set} />)}</div>}
       </section>
       <span className="tpl-summary" data-testid="tpl-summary">
-        {boards} boards · {built.joints.filter((j) => j.type !== 'butt').length} joints{wall ? ' · lines up with other cabinets on this wall, skips windows and doors' : ''}
+        {t.note ? `${t.note(values, unit)} · ` : ''}{boards} boards · {built.joints.filter((j) => j.type !== 'butt').length} joints{wall ? ' · lines up with other cabinets on this wall, skips windows and doors' : ''}
       </span>
+      {host && (
+        <span className="tpl-summary" data-testid="tpl-host-note">
+          {hostLocked
+            ? `${opening!.label} has its own ${host.words.join(' and ')} and was changed by hand; set them to None there first.`
+            : `Also takes out ${opening!.label.toLowerCase()}'s own ${host.words.join(' and ')}.`}
+        </span>
+      )}
       {warn ? (
         <div className="tpl-warn" role="alert" data-testid="tpl-warn">
           <span>Rebuilding will replace your manual changes to these boards.</span>

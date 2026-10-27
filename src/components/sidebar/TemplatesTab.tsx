@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Archive, Armchair, Bookmark, BookOpen, MoreHorizontal, PanelTop, Tv, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
-import { BUILT_IN_TEMPLATES } from '../../builtins/builtIns';
+import { BUILT_IN_TEMPLATES, LISTED_TEMPLATES } from '../../builtins/builtIns';
 import { cameraTarget, useUserTemplates, type UserTemplate } from '../../templates/userTemplates';
 import { useReliableTap } from '../../utils/reliableTap';
 
@@ -77,8 +77,8 @@ export const TemplatesTab: React.FC<Props> = ({ isPhone, onDone }) => {
             style={{ border: 'none', background: 'transparent', color: 'inherit', display: 'flex', padding: 4 }}><X size={14} /></button>
         </div>
       )}
-      {BUILT_IN_TEMPLATES.map((t) => (
-        <BuiltInRow key={t.id} name={t.name} description={t.description} isPhone={isPhone} onTap={() => openBuiltIn(t.id)} testId={`builtin-${t.id}`} icon={t.id} />
+      {LISTED_TEMPLATES.map((t) => (
+        <BuiltInRow key={t.id} name={t.name} description={t.description} isPhone={isPhone} onTap={() => openBuiltIn(t.id)} testId={`builtin-${t.id}`} icon={t.id as keyof typeof ICONS} />
       ))}
       <div style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 10, padding: '0 4px' }}>
         My templates
