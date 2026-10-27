@@ -115,7 +115,7 @@ describe('unlock then delete a scanned wall', () => {
 });
 
 describe('boards and sheet presets', async () => {
-  const { STANDARD_WOOD_PRESETS } = await import('./useProjectStore');
+  const { STANDARD_WOOD_PRESETS, presetAtLength } = await import('./useProjectStore');
   const { shapeCatalogEntry } = await import('../catalog/shapeCatalog');
   const { defaultBoardOptions } = await import('../utils/boardGeometry');
   it('names boards "Board" with square edges by default', () => {
@@ -146,6 +146,20 @@ describe('boards and sheet presets', async () => {
     expect(o.position.y).toBe(0.75);
     expect(o.material.species).toBe('pine');
     expect(o.name).toMatch(/^2×6 Pine/);
+  });
+  it('lumber can be added at 10 or 12 ft; other lengths and sheets stay at their size', () => {
+    s().createProject('Long lumber', 'in');
+    s().addWoodPreset('pine_2x4_8ft', 144);
+    const twelve = objs()[objs().length - 1];
+    expect(twelve.dimensions).toEqual({ length: 144, width: 3.5, height: 1.5 });
+    expect(twelve.name).toMatch(/^2×4 Pine \(12 ft\)/);
+    s().addWoodPreset('pine_2x4_8ft', 100);
+    expect(objs()[objs().length - 1].dimensions.length).toBe(96);
+    s().addWoodPreset('plywood_4x8_3_4', 144);
+    expect(objs()[objs().length - 1].dimensions.length).toBe(96);
+    const p = STANDARD_WOOD_PRESETS.find((x) => x.id === 'pine_2x2_8ft')!;
+    expect(presetAtLength(p, 120).description).toBe('120" × 1 1/2" × 1 1/2"');
+    expect(presetAtLength(p).label).toBe('2×2 Pine (8 ft)');
   });
   it('inserting an MDF sheet applies the MDF finish', () => {
     s().createProject('Sheets', 'in');

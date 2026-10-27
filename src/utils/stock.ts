@@ -132,3 +132,67 @@ export function formatBoardFeet(bf: number): string {
   const r = Math.round(bf * 10) / 10;
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
+
+/** Stock lengths dimensional lumber is sold in: 8, 10 and 12 ft (inches). */
+export const STICK_LENGTHS = [96, 120, 144] as const;
+
+/** One stock stick and the parts cut from it, longest first. */
+export interface Stick {
+  length: number;
+  cuts: number[];
+  /** Offcut left after the cuts and kerfs. */
+  left: number;
+}
+
+/**
+ * First-fit decreasing: parts longest first, each into the first stick with
+ * room, else a new stick. Every cut after the first on a stick also costs a
+ * saw kerf. Parts longer than the stock come back as `oversize`.
+ */
+export function packSticks(lengths: number[], stockLength: number, kerf = KERF): { sticks: Stick[]; oversize: number[] } {
+  const sticks: Stick[] = [];
+  const oversize: number[] = [];
+  for (const len of [...lengths].sort((a, b) => b - a)) {
+    if (len > stockLength + 1e-6) { oversize.push(len); continue; }
+    const fit = sticks.find((s) => s.left + 1e-6 >= len + kerf);
+    if (fit) { fit.cuts.push(len); fit.left -= len + kerf; continue; }
+    sticks.push({ length: stockLength, cuts: [len], left: stockLength - len });
+  }
+  for (const s of sticks) s.left = Math.max(0, s.left);
+  return { sticks, oversize };
+}
+
+export interface StickPlan {
+  /** Chosen stock length (inches); 0 when every part is oversize. */
+  stockLength: number;
+  sticks: Stick[];
+  /** Stock bought minus parts cut (inches), kerf and offcuts included. */
+  waste: number;
+  /** Parts longer than the longest stock (12 ft): splice or buy special-order. */
+  oversize: number[];
+}
+
+/**
+ * Sticks to buy for one profile (e.g. all the pine 2×4 parts). Packs the parts
+ * onto each stock length that can hold the longest one and keeps the plan that
+ * wastes least, which is the one that buys the least total length. Ties go to
+ * fewer sticks, then the shorter stock. One stock length per profile.
+ */
+export function planSticks(lengths: number[], options: readonly number[] = STICK_LENGTHS, kerf = KERF): StickPlan {
+  const longest = Math.max(...options);
+  const oversize = lengths.filter((l) => l > longest + 1e-6).sort((a, b) => b - a);
+  const fits = lengths.filter((l) => l <= longest + 1e-6);
+  if (!fits.length) return { stockLength: 0, sticks: [], waste: 0, oversize };
+  const used = fits.reduce((n, l) => n + l, 0);
+  let best: StickPlan | null = null;
+  for (const L of [...options].sort((a, b) => a - b)) {
+    const { sticks, oversize: over } = packSticks(fits, L, kerf);
+    if (over.length) continue;
+    const plan = { stockLength: L, sticks, waste: sticks.length * L - used, oversize };
+    if (!best || plan.waste < best.waste - 1e-6 || (Math.abs(plan.waste - best.waste) <= 1e-6 && plan.sticks.length < best.sticks.length)) best = plan;
+  }
+  return best!;
+}
+
+/** '8 ft' / '10 ft' for a stock length in inches. */
+export const stickFeet = (inches: number) => `${Math.round((inches / 12) * 100) / 100} ft`;

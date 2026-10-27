@@ -14,7 +14,7 @@ import {
   Blend,
 } from 'lucide-react';
 import { SHAPE_CATALOG, SHAPE_GROUPS, shapeLabel, type ShapeCatalogEntry } from '../../catalog/shapeCatalog';
-import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
+import { useProjectStore, STANDARD_WOOD_PRESETS, LUMBER_LENGTHS, presetAtLength } from '../../state/useProjectStore';
 import { useAppStore, type SidebarPanel } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
@@ -32,6 +32,35 @@ const SHAPE_ICONS: Record<ShapeCatalogEntry['type'], React.ComponentType<{ size?
   cylinder: Cylinder,
   pole: Cylinder,
   sphere: Circle,
+};
+
+/** One stock-length choice in the Lumber header ('8 ft'); the selected one is filled. */
+const LengthChoice: React.FC<{ inches: number; selected: boolean; isPhone: boolean; onPick: (inches: number) => void }> = ({ inches, selected, isPhone, onPick }) => {
+  const tap = useReliableTap(() => onPick(inches));
+  const idle = isPhone
+    ? { background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1' }
+    : { background: 'rgba(255,255,255,0.06)', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.18)' };
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      data-testid={`lumber-length-${inches / 12}ft`}
+      onClick={tap}
+      onPointerUp={tap}
+      style={{
+        fontSize: 12,
+        fontWeight: 600,
+        padding: '4px 9px',
+        minHeight: 28,
+        borderRadius: 8,
+        cursor: 'pointer',
+        ...(selected ? { background: '#e09f3e', color: '#1a1206', border: '1px solid #e09f3e' } : idle),
+      }}
+    >
+      {inches / 12} ft
+    </button>
+  );
 };
 
 export const SidebarNav: React.FC = () => {
@@ -61,6 +90,11 @@ export const SidebarNav: React.FC = () => {
   } = useProjectStore();
 
   const currentProject = projects.find(p => p.id === activeProjectId);
+  // Stock length for new lumber; back to 8 ft each time the panel opens.
+  const [lumberLength, setLumberLength] = useState(LUMBER_LENGTHS[0]);
+  useEffect(() => {
+    if (overlays.sidebar) setLumberLength(LUMBER_LENGTHS[0]);
+  }, [overlays.sidebar]);
   const lastAddAt = useRef(0);
   const addPart = (action: () => void) => (event: React.SyntheticEvent) => {
     fireReliableTap(event, () => {
@@ -214,20 +248,33 @@ export const SidebarNav: React.FC = () => {
               letterSpacing: isPhone ? 0 : 0.5,
               marginTop: 8,
               borderTop: isPhone ? '1px solid #eef2f6' : '1px solid rgba(255,255,255,0.08)',
-              paddingTop: 12
+              paddingTop: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8
             }}>
               {category}
+              {category === 'Lumber' && (
+                <div role="radiogroup" aria-label="Lumber length" data-testid="lumber-length" style={{ display: 'flex', gap: 4, textTransform: 'none', letterSpacing: 0 }}>
+                  {LUMBER_LENGTHS.map((inches) => (
+                    <LengthChoice key={inches} inches={inches} selected={lumberLength === inches} isPhone={isPhone} onPick={setLumberLength} />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {STANDARD_WOOD_PRESETS.filter((p) => p.category === category).map((preset) => (
+            {STANDARD_WOOD_PRESETS.filter((p) => p.category === category).map((base) => {
+              const preset = presetAtLength(base, base.stockLengths ? lumberLength : undefined);
+              return (
               <button
                 key={preset.id}
                 type="button"
                 data-testid={`preset-${preset.id}`}
                 aria-label={preset.label}
                 className={isPhone ? 'phone-sheet-row' : 'glass-button'}
-                onClick={addPart(() => addWoodPreset(preset.id))}
-                onPointerUp={addPart(() => addWoodPreset(preset.id))}
+                onClick={addPart(() => addWoodPreset(preset.id, preset.dimensions.length))}
+                onPointerUp={addPart(() => addWoodPreset(preset.id, preset.dimensions.length))}
                 style={isPhone ? undefined : {
                   justifyContent: 'flex-start',
                   width: '100%',
@@ -259,7 +306,8 @@ export const SidebarNav: React.FC = () => {
                   </span>
                 </div>
               </button>
-            ))}
+              );
+            })}
               </React.Fragment>
             ))}
           </div>
