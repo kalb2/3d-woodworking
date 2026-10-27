@@ -6,6 +6,7 @@ import { wallFrame, wallToWorld } from '../generators/roomScan';
 import { formatSmallLen } from '../utils/lengthFormat';
 import { buildModule, fitModule, MODULES, moduleHardware, normalizeModuleInput, type ModuleField, type ModuleId, type ModuleJoint, type ModuleSpec } from '../generators/modules';
 import type { Span } from '../generators/fitMediaWall';
+import { buildDoors, buildDrawers, doorHardware, doorNote, doorSummary, DOOR_DEFAULTS, DOOR_FIELDS, drawerHardware, drawerNote, drawerSummary, DRAWER_DEFAULTS, DRAWER_FIELDS, normalizeDoors, normalizeDrawers } from '../fittings/fittings';
 
 type Part = Omit<FurnitureObject, 'id'>;
 type Input = Record<string, number | string>;
@@ -27,7 +28,19 @@ export interface BuiltInTemplate {
   size?: ModuleSpec['size'];
   /** Template inputs with defaults filled in and clamped. */
   normalize?: (input: Input) => Input;
+  /** Drawers / doors: fill an opening; added from Drawer / Door, not the template list. */
+  fitting?: boolean;
+  /** Origin is the front (not the back): depth grows into the cabinet. */
+  frontOrigin?: boolean;
+  /** Hardware beyond the joints (slides, hinges, pulls). */
+  hardware?: (input: Input) => { name: string; quantity: number }[];
+  /** One-line summary for Properties. */
+  summary?: (input: Input, unit: 'in' | 'cm' | 'mm' | 'ft') => string;
+  /** What the numbers come out to, under the setup form. */
+  note?: (input: Input, unit: 'in' | 'cm' | 'mm' | 'ft') => string;
 }
+
+const unfit = () => ({ parts: [], center: 0, width: 0 });
 
 /** Registry: add new built-in templates here. */
 export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
@@ -52,8 +65,24 @@ export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
     normalize: (input) => normalizeModuleInput(m.id, input),
     fit: (input, wall, opts) => fitModule(m.id as ModuleId, input, wall, { center: opts.center, occupied: opts.occupied }),
     free: (input) => buildModule(m.id as ModuleId, input),
+    hardware: (input) => moduleHardware(m.id as ModuleId, input),
   })),
+  {
+    id: 'drawers', name: 'Drawers', description: 'A drawer or a stack of drawers sized to an opening.', tag: 'drawers',
+    defaults: { ...DRAWER_DEFAULTS }, fields: DRAWER_FIELDS, size: { x: 'width', y: 'height', z: 'depth' },
+    normalize: normalizeDrawers, fitting: true, frontOrigin: true,
+    fit: unfit, free: buildDrawers, hardware: drawerHardware, summary: drawerSummary, note: drawerNote,
+  },
+  {
+    id: 'door', name: 'Doors', description: 'A door or a pair, slab or shaker, with hinge cups.', tag: 'door',
+    defaults: { ...DOOR_DEFAULTS }, fields: DOOR_FIELDS, size: { x: 'width', y: 'height', z: 'thickness' },
+    normalize: normalizeDoors, fitting: true, frontOrigin: true,
+    fit: unfit, free: buildDoors, hardware: doorHardware, summary: doorSummary, note: doorNote,
+  },
 ];
+
+/** Templates shown in the template lists (drawers and doors come from Drawer / Door). */
+export const LISTED_TEMPLATES = BUILT_IN_TEMPLATES.filter((t) => !t.fitting);
 
 export const findBuiltInTemplate = (id: BuiltInTemplateId) => BUILT_IN_TEMPLATES.find((t) => t.id === id);
 
@@ -70,6 +99,8 @@ export interface BuiltInRequest {
   at?: { x: number; z: number };
   /** Editing: move the template's origin by this much in its own frame (resize keeps the opposite face put). */
   shift?: { x: number; y: number; z: number };
+  /** Free-standing: put the template's origin here, turned this way (drawers/doors in an opening). */
+  frame?: { origin: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } };
 }
 
 function bounds(parts: Part[]) {
@@ -147,7 +178,12 @@ export function placeBuiltIn(
     size = b.size;
     let origin: THREE.Vector3;
     let q = new THREE.Quaternion();
-    if (prev?.builtIn && !prev.builtIn.wallId) {
+    if (req.frame) {
+      const f = req.frame;
+      origin = new THREE.Vector3(f.origin.x, f.origin.y, f.origin.z);
+      groupRot = { ...f.rotation };
+      q = new THREE.Quaternion().setFromEuler(new THREE.Euler(f.rotation.x * DEG, f.rotation.y * DEG, f.rotation.z * DEG, 'XYZ'));
+    } else if (prev?.builtIn && !prev.builtIn.wallId) {
       const f = frameOf(template, prev);
       origin = f.origin; q = f.q; groupRot = f.rotation;
     } else {
@@ -239,9 +275,10 @@ export function builtInModified(objects: FurnitureObject[], joints: Joint[], roo
 export function builtInHardware(objects: FurnitureObject[]): { name: string; quantity: number }[] {
   const tally = new Map<string, number>();
   for (const g of objects) {
-    if (g.shape !== 'group' || !g.builtIn || !MODULES.some((m) => m.id === g.builtIn!.template)) continue;
+    const t = g.shape === 'group' && g.builtIn ? findBuiltInTemplate(g.builtIn.template) : undefined;
+    if (!t?.hardware) continue;
     if (!objects.some((o) => o.builtInId === g.builtIn!.id && o.visible !== false)) continue;
-    for (const h of moduleHardware(g.builtIn.template as ModuleId, g.builtIn.input)) tally.set(h.name, (tally.get(h.name) ?? 0) + h.quantity);
+    for (const h of t.hardware(g.builtIn!.input)) tally.set(h.name, (tally.get(h.name) ?? 0) + h.quantity);
   }
   return [...tally].map(([name, quantity]) => ({ name, quantity }));
 }
@@ -279,7 +316,7 @@ export function resizeBuiltIn(
     if (typeof input.elevation === 'number') input.elevation = Number(t.normalize({ ...input, elevation: Number(input.elevation) - d }).elevation);
     else if (!bi.wallId) shift.y = -d;
   }
-  if (axis === 'z' && sign < 0 && !bi.wallId) shift.z = -d;
+  if (axis === 'z' && !bi.wallId && (t.frontOrigin ? sign > 0 : sign < 0)) shift.z = t.frontOrigin ? d : -d;
   const out = placeBuiltIn(objects, room, { template: bi.template, input, wallId: bi.wallId, center, editId: bi.id, shift }, g.material, 0, joints);
   return out ? { objects: out.objects, joints: out.joints } : null;
 }
@@ -290,6 +327,7 @@ export const templateName = (g: FurnitureObject) => findBuiltInTemplate(g.builtI
 export function templateSummary(g: FurnitureObject, unit: 'in' | 'cm' | 'mm' | 'ft' = 'in'): string {
   const t = findBuiltInTemplate(g.builtIn!.template);
   if (!t?.normalize || !t.fields) return '';
+  if (t.summary) return t.summary(g.builtIn!.input, unit);
   const v = t.normalize(g.builtIn!.input);
   const len = (n: number) => formatSmallLen(n, unit);
   const size = [v.width, v.height, v.depth].map((n) => len(Number(n))).join(' × ');

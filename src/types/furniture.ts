@@ -140,7 +140,7 @@ export interface AiInfo {
   spec: AiSpec;
 }
 
-export type BuiltInTemplateId = 'media-wall' | 'base-cabinet' | 'upper-cabinet' | 'bookshelf' | 'window-bench';
+export type BuiltInTemplateId = 'media-wall' | 'base-cabinet' | 'upper-cabinet' | 'bookshelf' | 'window-bench' | 'drawers' | 'door';
 
 export interface BuiltInInfo {
   id: string;

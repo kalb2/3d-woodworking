@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { BuiltInTemplateId } from '../types/furniture';
+import type { Opening } from '../fittings/opening';
 
-export type BuiltInStep = 'wall' | 'template' | 'form';
+export type BuiltInStep = 'wall' | 'template' | 'form' | 'fitting';
 
 interface FocusRequest { x: number; y: number; z: number; radius: number; nonce: number }
 
@@ -35,6 +36,10 @@ interface BuiltInFlowState {
   /** Open a built-in template directly: wall pick (scanned room, no wall) or the form. */
   startTemplate: (id: BuiltInTemplateId, hasRoom: boolean, wallId: string | null) => void;
   requestFocus: (target: { x: number; y: number; z: number }, radius: number) => void;
+  /** Drawer / Door: the opening found from the selection (null = free-standing). */
+  fitting: boolean;
+  opening: Opening | null;
+  startFitting: (opening: Opening | null) => void;
 }
 
 export const useBuiltInFlow = create<BuiltInFlowState>((set, get) => ({
@@ -48,19 +53,23 @@ export const useBuiltInFlow = create<BuiltInFlowState>((set, get) => ({
   focus: null,
   frameNonce: 0,
   targetWallId: null,
+  fitting: false,
+  opening: null,
+  startFitting: (opening) => set({ mode: 'add', step: 'fitting', fitting: true, opening, template: null, wallId: null, editGroupId: null, fromWall: false, focusWallId: null }),
   setTargetWall: (wallId) => set({ targetWallId: wallId }),
-  startTemplate: (id, hasRoom, wallId) => set({ mode: 'add', template: id, wallId, editGroupId: null, fromWall: !!wallId, focusWallId: null, targetWallId: null,
+  startTemplate: (id, hasRoom, wallId) => set({ fitting: false, opening: null, mode: 'add', template: id, wallId, editGroupId: null, fromWall: !!wallId, focusWallId: null, targetWallId: null,
     step: wallId || !hasRoom ? 'form' : 'wall' }),
   requestFrame: () => set({ frameNonce: Date.now() }),
-  startAdd: (hasRoom) => set({ mode: 'add', step: hasRoom ? 'wall' : 'template', wallId: null, template: null, editGroupId: null, fromWall: false, focusWallId: null }),
-  startAddForWall: (wallId) => set({ mode: 'add', step: 'template', wallId, template: null, editGroupId: null, fromWall: true, focusWallId: null }),
-  startEdit: (groupId, template, wallId) => set({ mode: 'add', step: 'form', wallId: wallId ?? null, template, editGroupId: groupId, fromWall: false }),
+  startAdd: (hasRoom) => set({ fitting: false, opening: null, mode: 'add', step: hasRoom ? 'wall' : 'template', wallId: null, template: null, editGroupId: null, fromWall: false, focusWallId: null }),
+  startAddForWall: (wallId) => set({ fitting: false, opening: null, mode: 'add', step: 'template', wallId, template: null, editGroupId: null, fromWall: true, focusWallId: null }),
+  startEdit: (groupId, template, wallId) => set({ fitting: false, opening: null, mode: 'add', step: 'form', wallId: wallId ?? null, template, editGroupId: groupId, fromWall: false }),
   openList: () => set({ mode: 'list', focusWallId: null }),
-  close: () => set({ mode: null, editGroupId: null, fromWall: false }),
+  close: () => set({ mode: null, editGroupId: null, fromWall: false, fitting: false, opening: null }),
   chooseWall: (wallId) => set((st) => ({ wallId, step: st.template ? 'form' : 'template', mode: 'add' })),
   chooseTemplate: (id) => set({ template: id, step: 'form' }),
   back: () => {
-    const { step, editGroupId, fromWall } = get();
+    const { step, editGroupId, fromWall, fitting } = get();
+    if (fitting) return step === 'form' ? set({ step: 'fitting', template: null }) : set({ mode: null, fitting: false, opening: null });
     if (editGroupId || step === 'wall' || (step === 'template' && fromWall)) return set({ mode: null, editGroupId: null, fromWall: false });
     if (step === 'form') return set({ step: 'wall' });
     set({ mode: null });
