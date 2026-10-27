@@ -79,3 +79,43 @@ describe('CutListDrawer buy list', () => {
     expect(r.getByTestId('cut-footnote').textContent).toContain('Other lumber: buy amount adds 15%');
   });
 });
+
+describe('CutListDrawer sheet layout', () => {
+  const ply = () => ({ ...PRESET_WOOD_MATERIALS.plywood });
+  it('lists sheets to buy and draws each sheet on request', () => {
+    seed('in', [
+      ...Array.from({ length: 7 }, () => ({ name: 'Side', dimensions: { length: 0.75, height: 30, width: 23.875 }, material: ply() })),
+      { name: 'Toe kick', dimensions: { length: 0.75, height: 4, width: 20 }, material: ply() },
+      { name: 'Toe kick', dimensions: { length: 0.75, height: 4, width: 20 }, material: ply() },
+      { name: 'Top', dimensions: { length: 0.75, height: 100, width: 30 }, material: ply() },
+    ]);
+    const r = render(<CutListDrawer isOpen onClose={() => {}} />);
+    expect(r.getAllByTestId('cut-sheet-line').map((e) => e.textContent)).toEqual([expect.stringMatching(/^2 × Plywood · 3\/4" 4×8 · \d+% used$/)]);
+    expect(r.getByTestId('cut-sheet-oversize').textContent).toContain('1 Plywood · 3/4" panel is bigger than a 4×8 sheet (Top 100" × 30")');
+    expect(r.queryByTestId('sheet-diagram')).toBeNull();
+    const toggle = r.getByTestId('sheet-layout-toggle');
+    fireEvent.pointerUp(toggle);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const diagrams = r.getAllByTestId('sheet-diagram');
+    expect(diagrams.map((d) => d.querySelector('figcaption')!.textContent)).toEqual([
+      expect.stringMatching(/^Plywood · 3\/4" · sheet 1 of 2 · \d+% used · grain along 8 ft$/),
+      expect.stringMatching(/^Plywood · 3\/4" · sheet 2 of 2 · \d+% used · grain along 8 ft$/),
+    ]);
+    expect(r.getAllByTestId('sheet-panel')).toHaveLength(9);
+    // big panels carry their name and size; a 20" × 4" strip is numbered and keyed below, both toe kicks as one key
+    expect(diagrams[0].textContent).toContain('Side');
+    expect(diagrams[0].textContent).toContain('30" × 23 7/8"');
+    expect(r.getByTestId('sheet-key').textContent).toBe('1: Toe kick 20" × 4"');
+    expect(r.getAllByTestId('sheet-offcut').length).toBeGreaterThan(0);
+    // lumber's cut layout is a separate toggle
+    expect(r.queryByTestId('cut-layout-toggle')).toBeNull();
+  });
+
+  it('MDF captions skip the grain note', () => {
+    seed('in', [{ name: 'Door', dimensions: { length: 0.75, height: 30, width: 15 }, material: { ...PRESET_WOOD_MATERIALS.mdf } }]);
+    const r = render(<CutListDrawer isOpen onClose={() => {}} />);
+    fireEvent.click(r.getByTestId('sheet-layout-toggle'));
+    expect(r.getByTestId('sheet-diagram').querySelector('figcaption')!.textContent).toMatch(/^MDF · 3\/4" · sheet 1 of 1 · \d+% used$/);
+  });
+});

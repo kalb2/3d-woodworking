@@ -78,7 +78,28 @@ export function lumberStock(material: { species?: WoodMaterial['species'] } | un
   return { label: `${q}/4`, order: q * 100 };
 }
 
-export interface SheetPart { length: number; width: number; quantity: number }
+export interface SheetPart { length: number; width: number; quantity: number; name?: string }
+
+/** A rectangle on a sheet: x along the 8' side, y along the 4' side (inches from a corner). */
+export interface SheetRect { x: number; y: number; w: number; h: number }
+
+/** A panel placed on a sheet. `w`/`h` are its footprint; `rotated` means its length runs across the sheet. */
+export interface PlacedPanel extends SheetRect {
+  name?: string;
+  /** The part's own length (grain) and width. */
+  length: number;
+  width: number;
+  rotated: boolean;
+}
+
+export interface SheetLayout {
+  panels: PlacedPanel[];
+  /** Leftover rectangles big enough to keep (both sides at least 3"), after kerfs. */
+  offcuts: SheetRect[];
+  /** Share of this sheet the panels cover (0–1). */
+  used: number;
+}
+
 export interface SheetNest {
   /** 4×8 sheets needed for the parts that fit. */
   sheets: number;
@@ -86,45 +107,110 @@ export interface SheetNest {
   oversize: number;
   /** Share of the sheets' area the parts cover (0–1). */
   yield: number;
+  /** Where each panel goes, one entry per sheet. */
+  layouts: SheetLayout[];
+  /** The parts counted in `oversize`, one entry per piece. */
+  oversizeParts: { name?: string; length: number; width: number }[];
 }
 
+/** Offcuts smaller than this on either side are scrap. */
+const MIN_OFFCUT = 3;
+
+type Piece = { name?: string; length: number; width: number; turn: boolean };
+type Candidate = { sheet: number; free: number; rotated: boolean; fit: number; side: number };
+
 /**
- * Rip-first nesting on 4×8 sheets: parts sorted widest first, ripped into
- * full-length strips, crosscut along the strip, with a saw kerf between cuts.
- * With grain (plywood) a part's length stays on the sheet's long side;
- * without (MDF) a part may turn if that's the only way it fits.
+ * Guillotine nesting of one sort order and split rule. Each panel goes in the
+ * free rectangle it fills best (least area left, then the shorter side left),
+ * on any open sheet, before a new sheet is started. A placed panel splits its
+ * rectangle with one straight cut, so every layout can be cut edge to edge on
+ * a table or track saw. Panels carry a kerf on their far edges; the sheet gets
+ * one kerf of slack so panels can run right to its edges.
+ */
+function guillotine(pieces: Piece[], splitShorter: boolean, sheet: { length: number; width: number }, kerf: number) {
+  const sheets: { free: SheetRect[]; panels: PlacedPanel[] }[] = [];
+  const W = sheet.length + kerf, H = sheet.width + kerf;
+  for (const pc of pieces) {
+    const tryOn = (si: number): Candidate | null => {
+      let best: Candidate | null = null;
+      sheets[si].free.forEach((fr, fi) => {
+        for (const rotated of pc.turn ? [false, true] : [false]) {
+          const w = (rotated ? pc.width : pc.length) + kerf, h = (rotated ? pc.length : pc.width) + kerf;
+          if (w > fr.w + 1e-6 || h > fr.h + 1e-6) continue;
+          const fit = fr.w * fr.h - w * h, side = Math.min(fr.w - w, fr.h - h);
+          if (!best || fit < best.fit - 1e-6 || (Math.abs(fit - best.fit) <= 1e-6 && side < best.side)) best = { sheet: si, free: fi, rotated, fit, side };
+        }
+      });
+      return best;
+    };
+    let pick: Candidate | null = null;
+    for (let si = 0; si < sheets.length; si++) {
+      const c = tryOn(si);
+      if (c && (!pick || c.fit < pick.fit - 1e-6 || (Math.abs(c.fit - pick.fit) <= 1e-6 && c.side < pick.side))) pick = c;
+    }
+    if (!pick) {
+      sheets.push({ free: [{ x: 0, y: 0, w: W, h: H }], panels: [] });
+      pick = tryOn(sheets.length - 1)!;
+    }
+    const sh = sheets[pick.sheet];
+    const fr = sh.free.splice(pick.free, 1)[0];
+    const pw = pick.rotated ? pc.width : pc.length, ph = pick.rotated ? pc.length : pc.width;
+    sh.panels.push({ name: pc.name, x: fr.x, y: fr.y, w: pw, h: ph, length: pc.length, width: pc.width, rotated: pick.rotated });
+    const rw = fr.w - pw - kerf, rh = fr.h - ph - kerf;
+    // Cut across the shorter leftover (or the longer, for the other rule), keeping the bigger offcut whole.
+    const horizontal = splitShorter ? rw <= rh : rw > rh;
+    const right = { x: fr.x + pw + kerf, y: fr.y, w: rw, h: horizontal ? ph + kerf : fr.h };
+    const below = { x: fr.x, y: fr.y + ph + kerf, w: horizontal ? fr.w : pw + kerf, h: rh };
+    for (const r of [right, below]) if (r.w > 1e-6 && r.h > 1e-6) sh.free.push(r);
+  }
+  return sheets;
+}
+
+const SORTS: Array<(a: Piece, b: Piece) => number> = [
+  (a, b) => b.length * b.width - a.length * a.width || b.length - a.length,
+  (a, b) => Math.max(b.length, b.width) - Math.max(a.length, a.width) || b.width - a.width,
+  (a, b) => b.width - a.width || b.length - a.length,
+  (a, b) => b.length - a.length || b.width - a.width,
+];
+
+/**
+ * Nest panels on 4×8 sheets with a saw kerf (guillotine cuts, see above). It
+ * tries four sort orders (area, longest side, width, length) and both split
+ * rules, and keeps the layout with the fewest sheets; ties go to the one whose
+ * last sheet is emptiest (the biggest offcut left over).
+ * With grain (plywood) a part's length stays on the sheet's 8' side; without
+ * (MDF) a part may turn 90°.
  */
 export function nestSheets(parts: SheetPart[], grain: boolean, sheet = SHEET, kerf = KERF): SheetNest {
-  const pieces: { l: number; w: number }[] = [];
-  let oversize = 0;
+  const pieces: Piece[] = [];
+  const oversizeParts: SheetNest['oversizeParts'] = [];
+  const fits = (l: number, w: number) => l <= sheet.length + 1e-6 && w <= sheet.width + 1e-6;
   for (const p of parts) {
-    let l = Math.max(p.length, p.width), w = Math.min(p.length, p.width);
-    if (grain) { l = p.length; w = p.width; }
-    if (l > sheet.length + 1e-6 || w > sheet.width + 1e-6) {
-      if (!grain && l <= sheet.width + 1e-6 && w <= sheet.length + 1e-6) [l, w] = [w, l];
-      else { oversize += p.quantity; continue; }
+    const ok = fits(p.length, p.width) || (!grain && fits(p.width, p.length));
+    for (let i = 0; i < p.quantity; i++) {
+      if (ok) pieces.push({ name: p.name, length: p.length, width: p.width, turn: !grain });
+      else oversizeParts.push({ name: p.name, length: p.length, width: p.width });
     }
-    for (let i = 0; i < p.quantity; i++) pieces.push({ l, w });
   }
-  pieces.sort((a, b) => b.w - a.w || b.l - a.l);
-
-  type Strip = { w: number; left: number };
-  const sheets: { left: number; strips: Strip[] }[] = [];
-  let area = 0;
-  for (const pc of pieces) {
-    area += pc.l * pc.w;
-    let placed = false;
-    for (const s of sheets) {
-      const strip = s.strips.find((st) => st.w + 1e-6 >= pc.w && st.left + 1e-6 >= pc.l);
-      if (strip) { strip.left -= pc.l + kerf; placed = true; break; }
+  const sheetArea = sheet.length * sheet.width;
+  const area = pieces.reduce((n, pc) => n + pc.length * pc.width, 0);
+  let best: ReturnType<typeof guillotine> = [];
+  if (pieces.length) {
+    let bestLast = Infinity;
+    for (const sort of SORTS) for (const splitShorter of [true, false]) {
+      const run = guillotine([...pieces].sort(sort), splitShorter, sheet, kerf);
+      const last = run[run.length - 1].panels.reduce((n, pn) => n + pn.w * pn.h, 0);
+      if (!best.length || run.length < best.length || (run.length === best.length && last < bestLast - 1e-6)) { best = run; bestLast = last; }
     }
-    if (placed) continue;
-    let s = sheets.find((sh) => sh.left + 1e-6 >= pc.w);
-    if (!s) { s = { left: sheet.width, strips: [] }; sheets.push(s); }
-    s.left -= pc.w + kerf;
-    s.strips.push({ w: pc.w, left: sheet.length - pc.l - kerf });
   }
-  return { sheets: sheets.length, oversize, yield: sheets.length ? area / (sheets.length * sheet.length * sheet.width) : 0 };
+  const layouts: SheetLayout[] = best.map((sh) => ({
+    panels: [...sh.panels].sort((a, b) => a.y - b.y || a.x - b.x),
+    offcuts: sh.free
+      .map((r) => ({ x: r.x, y: r.y, w: Math.min(r.w, sheet.length - r.x), h: Math.min(r.h, sheet.width - r.y) }))
+      .filter((r) => r.w >= MIN_OFFCUT && r.h >= MIN_OFFCUT),
+    used: sh.panels.reduce((n, pn) => n + pn.w * pn.h, 0) / sheetArea,
+  }));
+  return { sheets: layouts.length, oversize: oversizeParts.length, yield: layouts.length ? area / (layouts.length * sheetArea) : 0, layouts, oversizeParts };
 }
 
 /** '2.4' / '12' — board feet to one decimal. */

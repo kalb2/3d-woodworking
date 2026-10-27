@@ -192,6 +192,16 @@ function sectionSticks(items: CutListItem[]): StickBuy[] {
 }
 
 /** Every stick to buy across the cut list, e.g. for '3 × 2×4 at 8 ft, 1 × 2×6 at 10 ft'. */
+export function sheetBuyList(sections: CutListSection[]): Array<CutListSection & { sheets: SheetNest }> {
+  return sections.filter((s): s is CutListSection & { sheets: SheetNest } => s.kind === 'sheet' && !!s.sheets);
+}
+
+/** 'Side 30" × 23 5/8"' (plus 'turned' when its length runs across the sheet). */
+export function panelText(p: { name?: string; length: number; width: number; rotated?: boolean }, unit: FurnitureProject['unit']): string {
+  const size = `${formatCutSize(p.length, unit)} × ${formatCutSize(p.width, unit)}`;
+  return [p.name, size, p.rotated ? 'turned' : ''].filter(Boolean).join(' ');
+}
+
 export function lumberBuyList(sections: CutListSection[]): StickBuy[] {
   return sections.flatMap((s) => s.sticks ?? []);
 }
@@ -212,7 +222,7 @@ export function cutListSections(items: CutListItem[], unit: FurnitureProject['un
     s.pieces = s.items.reduce((n, it) => n + it.quantity, 0);
     if (s.kind === 'sheet') {
       const nest = nestSheets(
-        s.items.map((it) => ({ length: it.lengthIn, width: it.widthIn, quantity: it.quantity })),
+        s.items.map((it) => ({ name: it.name, length: it.lengthIn, width: it.widthIn, quantity: it.quantity })),
         sheetHasGrain({ species: s.items[0].species ?? 'plywood' }),
       );
       s.sheets = nest;
@@ -274,6 +284,20 @@ export function cutListCSV(project: FurnitureProject): string {
         csv += `${q(`${b.profile} #${i + 1}`)},${q(stickFeet(st.length))},${q(st.cuts.map((c) => formatCutSize(c, project.unit)).join(' + '))},${q(formatCutSize(st.left, project.unit))}\n`;
       });
       for (const o of b.oversize) csv += `${q(`${b.profile} (too long)`)},${q('over 12 ft')},${q(formatCutSize(o, project.unit))},""\n`;
+    }
+  }
+  const sheetSecs = sheetBuyList(sections).filter((s) => s.sheets.layouts.length || s.sheets.oversize);
+  if (sheetSecs.length) {
+    csv += '\nSheet,Used,Panels (x along 8 ft from the left × y along 4 ft from the top),Offcuts\n';
+    for (const s of sheetSecs) {
+      const n = s.sheets.layouts.length;
+      const at = (x: number, y: number) => `at ${formatCutSize(x, project.unit)}, ${formatCutSize(y, project.unit)}`;
+      s.sheets.layouts.forEach((l, i) => {
+        const panels = l.panels.map((p) => `${panelText(p, project.unit)} ${at(p.x, p.y)}`).join('; ');
+        const offcuts = l.offcuts.map((o) => `${formatCutSize(o.w, project.unit)} × ${formatCutSize(o.h, project.unit)} ${at(o.x, o.y)}`).join('; ');
+        csv += `${q(`${s.title} · sheet ${i + 1} of ${n}`)},${q(`${Math.round(l.used * 100)}%`)},${q(panels)},${q(offcuts)}\n`;
+      });
+      for (const o of s.sheets.oversizeParts) csv += `${q(`${s.title} · too big for a sheet`)},"",${q(panelText(o, project.unit))},""\n`;
     }
   }
   const hardware = projectHardware(project);

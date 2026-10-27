@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FurnitureObject, FurnitureProject } from '../types/furniture';
-import { cutListByMaterial, cutListCSV, cutListSections, generateCutList, lumberBuyList } from './exportUtils';
+import { cutListByMaterial, cutListCSV, cutListSections, generateCutList, lumberBuyList, sheetBuyList } from './exportUtils';
 import { PRESET_WOOD_MATERIALS } from './woodTextureGenerator';
 
 const part = (id: string, dims: [number, number, number], extra: Partial<FurnitureObject> = {}): FurnitureObject => ({
@@ -125,6 +125,32 @@ describe('cut list', () => {
     expect(csv).toContain('"Rustic Pine · 2×6","1 2×6 part is longer than 12 ft"');
     expect(csv).toContain('\nStick,Stock,Cuts,Left over\n"2×4 #1","8 ft","30"" + 30"" + 30""","5 3/4"""\n');
     expect(csv).toContain('"2×6 (too long)","over 12 ft","168""",""');
+  });
+
+  it('sheet count comes from the nested layout, per material and thickness', () => {
+    const items = generateCutList(project([
+      ...[1, 2, 3, 4, 5, 6, 7].map((i) => part(`side${i}`, [0.75, 30, 23.875], { name: 'Side' })),
+      part('back', [0.5, 30, 34.5], { name: 'Back' }),
+      part('door', [0.75, 30, 15], { name: 'Door', material: { ...PRESET_WOOD_MATERIALS.mdf } }),
+    ]));
+    const sheets = sheetBuyList(cutListSections(items, 'in'));
+    expect(sheets.map((s) => [s.title, s.sheets.sheets, s.sheets.layouts.length])).toEqual([
+      ['MDF · 3/4"', 1, 1], ['Plywood · 3/4"', 2, 2], ['Plywood · 1/2"', 1, 1],
+    ]);
+    const ply = sheets[1];
+    expect(ply.summary).toBe(`2 sheets (4×8) · ${Math.round(ply.sheets.yield * 100)}% used`);
+    expect(ply.sheets.layouts.flatMap((l) => l.panels).map((p) => p.name)).toEqual(Array(7).fill('Side'));
+  });
+
+  it('CSV lists each sheet\'s panels, offcuts and oversize panels', () => {
+    const csv = cutListCSV(project([
+      part('top', [0.75, 60, 48], { name: 'Top' }),
+      part('huge', [0.75, 100, 30], { name: 'Huge' }),
+    ]));
+    expect(csv).toContain('"Plywood · 3/4""","1 sheet (4×8) · 63% used · 1 part is bigger than a sheet"');
+    expect(csv).toContain('\nSheet,Used,Panels (x along 8 ft from the left × y along 4 ft from the top),Offcuts\n');
+    expect(csv).toContain('"Plywood · 3/4"" · sheet 1 of 1","63%","Top 60"" × 48"" at 0"", 0""","35 7/8"" × 48"" at 60 1/8"", 0"""');
+    expect(csv).toContain('"Plywood · 3/4"" · too big for a sheet","","Huge 100"" × 30""",""');
   });
 
   it('notes shaping and the assemblies a part is used in', () => {
