@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf';
 import type { FurnitureObject, FurnitureProject, LengthUnit } from '../types/furniture';
-import { cutListSections, lumberBuyList, projectHardware, sheetBuyList, type CutListSection } from '../utils/exportUtils';
+import { costOf, costTotals, cutListSections, lumberBuyList, projectHardware, sheetBuyList, type CutListSection } from '../utils/exportUtils';
+import { EXAMPLE_NOTE, formatMoney, type ResolvedPrices } from '../cost/cost';
+import { pricesFor } from '../cost/usePriceStore';
 import { stickFeet, type SheetLayout } from '../utils/stock';
 import { assemblySteps, type Step } from './assembly';
 import { dim, dimBare, niceScale, overallSize, partSize, planDate } from './format';
@@ -13,6 +15,8 @@ export interface PlanOptions {
   date?: Date;
   /** Cover picture (data URL, JPEG or PNG) rendered from the scene; a vector view is drawn without one. */
   coverImage?: { dataUrl: string; width: number; height: number };
+  /** Prices for the cost list; the device's list (and the project's own) when left out. */
+  prices?: ResolvedPrices;
 }
 
 type RGB = [number, number, number];
@@ -524,7 +528,7 @@ function cutListPages(pen: Pen, project: FurnitureProject, groups: PartGroup[], 
 
 type Cursor = { cb: ReturnType<typeof contentBox>; y: number };
 
-function buyPages(pen: Pen, project: FurnitureProject, sections: CutListSection[], pages: PlanPage[], after?: Cursor) {
+function buyPages(pen: Pen, project: FurnitureProject, sections: CutListSection[], pages: PlanPage[], after?: Cursor, prices: ResolvedPrices = pricesFor(project)) {
   const unit = project.unit;
   let cb: Cursor['cb'], y: number;
   if (after && after.cb.y + after.cb.h - after.y > 160) {
@@ -585,6 +589,31 @@ function buyPages(pen: Pen, project: FurnitureProject, sections: CutListSection[
       pen.text(`×${h.quantity}`, cb.x + 300, y, { align: 'right' });
       y += 13;
     }
+  }
+  const cost = costOf(project, prices, sections);
+  if (cost.lines.length) {
+    y += 8;
+    heading('Estimated cost');
+    const right = cb.x + cb.w;
+    const qty = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+    for (const l of cost.lines) {
+      room(13);
+      pen.font(9, 'normal', INK); pen.text(l.label, cb.x, y);
+      pen.font(9, 'normal', MUTED);
+      pen.text(`${qty(l.quantity)} ${l.unit}${l.unitPrice != null ? ` × ${formatMoney(l.unitPrice)}` : ''}`, right - 90, y, { align: 'right' });
+      pen.font(9, 'normal', l.total == null ? MUTED : INK); pen.text(l.total == null ? 'no price' : formatMoney(l.total), right, y, { align: 'right' });
+      y += 13;
+    }
+    room(16 + 13 * 5);
+    pen.stroke(RULE, 0.5); pen.doc.line(right - 200, y - 6, right, y - 6); y += 4;
+    for (const [label, amount] of costTotals(cost)) {
+      const total = label === 'Total';
+      pen.font(total ? 10 : 9, total ? 'bold' : 'normal', total ? INK : MUTED);
+      pen.text(label, right - 200, y); pen.text(formatMoney(amount), right, y, { align: 'right' });
+      y += total ? 15 : 13;
+    }
+    const notes = [cost.anyExample ? EXAMPLE_NOTE : '', cost.unpriced ? `${cost.unpriced} ${cost.unpriced === 1 ? 'line has' : 'lines have'} no price and ${cost.unpriced === 1 ? 'is' : 'are'} left out.` : ''].filter(Boolean).join(' ');
+    if (notes) { room(12); pen.font(8, 'italic', MUTED); pen.text(notes, cb.x, y); y += 12; }
   }
   if (!buy.length && !hardware.length) { pen.font(9, 'normal', MUTED); pen.text('Nothing to buy: the project has no stock parts yet.', cb.x, y); }
 }
@@ -740,7 +769,7 @@ export function buildPlansPdf(project: FurnitureProject, opts: PlanOptions = {})
     explodedPage(pen, project, parts, groups, pages);
     partPages(pen, project, groups, pages);
     const end = cutListPages(pen, project, groups, pages);
-    buyPages(pen, project, sections, pages, end);
+    buyPages(pen, project, sections, pages, end, opts.prices);
     sheetPages(pen, project, sections, pages);
     assemblyPages(pen, project, assemblySteps(project, partNumbers(groups)), pages);
   }

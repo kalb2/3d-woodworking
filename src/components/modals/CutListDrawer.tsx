@@ -6,6 +6,10 @@ import { formatLens, formatSmallLen } from '../../utils/lengthFormat';
 import { LUMBER_WASTE, SHEET, sheetHasGrain, stickFeet, type SheetLayout, type SheetNest } from '../../utils/stock';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureProject } from '../../types/furniture';
+import { CostSection } from '../../cost/CostSection';
+import { PriceSheet } from '../../cost/PriceSheet';
+import { projectCost, resolvePrices } from '../../cost/cost';
+import { usePriceStore } from '../../cost/usePriceStore';
 
 interface CutListDrawerProps {
   isOpen: boolean;
@@ -224,6 +228,8 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   const currentProject = projects.find(p => p.id === activeProjectId);
   const tapExport = useReliableTap(() => { if (currentProject) exportCutListCSV(currentProject); });
   const tapClose = useReliableTap(onClose);
+  const devicePrices = usePriceStore((s) => s.device);
+  const [editingPrices, setEditingPrices] = React.useState(false);
 
   if (!isOpen || !currentProject) return null;
 
@@ -235,6 +241,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
   const sheetBuys = sheetBuyList(sections);
   const hasSheets = sections.some((s) => s.kind === 'sheet');
   const hasLumber = sections.some((s) => s.kind === 'lumber');
+  const cost = projectCost(sections, hardware, resolvePrices(devicePrices, currentProject.prices));
 
   return (
     <div style={{
@@ -293,6 +300,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
         <div data-testid="cut-scroll" style={{ overflow: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {buys.length > 0 && <BuyList buys={buys} unit={unit} />}
         {sheetBuys.length > 0 && <SheetList sections={sheetBuys} unit={unit} />}
+        {cost.lines.length > 0 && <CostSection cost={cost} onEditPrices={() => setEditingPrices(true)} />}
         <div style={{ overflowX: 'auto', flexShrink: 0 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
@@ -349,6 +357,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
         </div>
         </div>
       </div>
+      {editingPrices && <PriceSheet project={currentProject} cost={cost} onClose={() => setEditingPrices(false)} />}
     </div>
   );
 };
