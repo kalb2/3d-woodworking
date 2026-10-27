@@ -75,7 +75,7 @@ const BuyList: React.FC<{ buys: StickBuy[]; unit: FurnitureProject['unit'] }> = 
         </div>
       ))}
       {showLayout && (
-        <ol data-testid="cut-layout" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, fontSize: 12, color: '#d1d5db' }}>
+        <ol data-testid="cut-layout" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, fontSize: 12 }}>
           {buys.flatMap((b) => b.sticks.map((st, i) => (
             <li key={`${b.material}-${b.profile}-${i}`} data-testid="cut-layout-stick" style={{ padding: '3px 0', lineHeight: 1.45 }}>
               <span style={{ fontWeight: 600 }}>{b.profile} #{i + 1}</span> ({stickFeet(st.length)}): {st.cuts.map(len).join(' + ')}
