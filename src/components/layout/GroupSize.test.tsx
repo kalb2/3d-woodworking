@@ -32,7 +32,7 @@ describe('group / multi-selection size fields', () => {
     act(() => s().setGizmoMode('resize'));
     const r = render(<ResizeSizeRow />);
     const field = r.getByTestId('group-size-y') as HTMLInputElement;
-    expect(field.value).toBe('30');
+    expect(field.value).toBe('30"');
     fireEvent.focus(field);
     fireEvent.change(field, { target: { value: '36' } });
     fireEvent.blur(field);
@@ -40,5 +40,25 @@ describe('group / multi-selection size fields', () => {
     expect(get(base).dimensions.height).toBe(0.75);
     act(() => s().undo());
     expect(get(leg).dimensions.height).toBe(29.25);
+  });
+});
+
+describe('part size fields show fractions', () => {
+  it('a 23 5/8" board reads 23 5/8" and takes 24 1/2', () => {
+    s().createProject('Fractions', 'in');
+    s().addObject('board');
+    const id = proj().objects[proj().objects.length - 1].id;
+    useProjectStore.setState((st) => ({ projects: st.projects.map((p) => (p.id === st.activeProjectId
+      ? { ...p, objects: p.objects.map((o) => (o.id === id ? { ...o, dimensions: { length: 23.625, height: 0.75, width: 11.25 } } : o)) } : p)) }));
+    act(() => { s().selectObject(id); s().setGizmoMode('resize'); });
+    const r = render(<ResizeSizeRow />);
+    expect((r.getByTestId('size-x') as HTMLInputElement).value).toBe('23 5/8"');
+    expect((r.getByTestId('size-y') as HTMLInputElement).value).toBe('3/4"');
+    expect((r.getByTestId('size-z') as HTMLInputElement).value).toBe('11 1/4"');
+    const f = r.getByTestId('size-x') as HTMLInputElement;
+    fireEvent.focus(f);
+    fireEvent.change(f, { target: { value: '24 1/2' } });
+    fireEvent.blur(f);
+    expect(get(id).dimensions.length).toBe(24.5);
   });
 });

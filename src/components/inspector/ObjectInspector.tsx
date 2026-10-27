@@ -1,4 +1,5 @@
-import { NumberField } from '../ui/NumberField';
+import { LengthField } from '../ui/LengthField';
+import { formatLens } from '../../utils/lengthFormat';
 import React, { useEffect, useState } from 'react';
 import { BookmarkPlus, BoxSelect, SlidersHorizontal } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
@@ -7,7 +8,6 @@ import { useIsPhone } from '../../hooks/useIsPhone';
 import { OverlayDismissButton } from '../layout/OverlayChrome';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { PartColorSection } from './MaterialPicker';
-import { unitScale } from '../../utils/units';
 import type { FurnitureObject, FurnitureProject, RoutedEdge } from '../../types/furniture';
 import { defaultBoardOptions } from '../../utils/boardGeometry';
 import { shapeLabel } from '../../catalog/shapeCatalog';
@@ -21,11 +21,6 @@ import { ActionRow, Row, Section, Seg } from '../properties/rows';
 import { templateName, templateSummary } from '../../builtins/builtIns';
 import { ProjectSection } from '../properties/ProjectSection';
 
-/** Clean number: at most 2 decimals, no trailing zeros (24, 23.5, 0.75). */
-export function formatMeasure(inches: number, scale: number) {
-  const v = Math.round(inches * scale * 100) / 100;
-  return String(Object.is(v, -0) ? 0 : v);
-}
 
 type Tab = 'part' | 'project';
 
@@ -96,10 +91,9 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
   const updateObject = useProjectStore((s) => s.updateObject);
   const setOverlayOpen = useAppStore((s) => s.setOverlayOpen);
   const unit = project.unit;
-  const scale = unitScale(unit);
   const isGroup = object.shape === 'group';
   const board = object.board ?? defaultBoardOptions();
-  const dims = `${formatMeasure(object.dimensions.length, scale)} × ${formatMeasure(object.dimensions.width, scale)} × ${formatMeasure(object.dimensions.height, scale)} ${unit}`;
+  const dims = formatLens([object.dimensions.length, object.dimensions.width, object.dimensions.height], unit);
   const edgeSize = board.edgeSize ?? Math.min(object.dimensions.height * 0.42, 0.22);
   const close = () => setOverlayOpen('inspector', false);
 
@@ -119,11 +113,11 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
       </Section>
 
       {object.shape === 'board' && (
-        <Section title={`Board (${unit})`} testId="board-tools">
+        <Section title="Board" testId="board-tools">
           <Row label="Corner radius">
-            <NumberField className="props-input is-number" testId="board-corner-radius" min={0} aria-label="Corner radius"
-              value={board.cornerRadius * scale} format={() => formatMeasure(board.cornerRadius, scale)}
-              onCommit={(num) => updateObject(object.id, { board: { ...board, cornerRadius: num / scale } })} />
+            <LengthField className="props-input is-number" testId="board-corner-radius" min={0} aria-label="Corner radius"
+              inches={board.cornerRadius} unit={unit}
+              onCommit={(num) => updateObject(object.id, { board: { ...board, cornerRadius: num } })} />
           </Row>
           <Row label="Edges">
             <Seg label="Edges" testId="board-edge" value={board.edge} options={EDGES}
@@ -131,9 +125,9 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
           </Row>
           {board.edge !== 'none' && (
             <Row label="Edge size">
-              <NumberField className="props-input is-number" testId="board-edge-size" aria-label="Edge size" min={0.01}
-                value={edgeSize * scale} format={() => formatMeasure(edgeSize, scale)}
-                onCommit={(num) => updateObject(object.id, { board: { ...board, edgeSize: num / scale } })} />
+              <LengthField className="props-input is-number" testId="board-edge-size" aria-label="Edge size" min={0.01}
+                inches={edgeSize} unit={unit}
+                onCommit={(num) => updateObject(object.id, { board: { ...board, edgeSize: num } })} />
             </Row>
           )}
         </Section>
@@ -142,7 +136,7 @@ const PartSection: React.FC<{ object: FurnitureObject; project: FurnitureProject
       {supportsHoles(object.shape) && (
         <section className="props-section">
           <h3 className="props-kicker">Cuts</h3>
-          <HolesSection object={object} unit={unit} scale={scale} />
+          <HolesSection object={object} unit={unit} />
         </section>
       )}
 

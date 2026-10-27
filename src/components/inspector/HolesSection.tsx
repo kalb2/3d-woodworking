@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { ChevronRight, Circle, Square, SquareDashedBottom } from 'lucide-react';
-import type { FurnitureObject } from '../../types/furniture';
+import type { FurnitureObject, LengthUnit } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { useAppStore } from '../../state/useAppStore';
 import { describeHole, faceTowards, getHoles, holesUpdate, newHole, useHoleFocus } from '../../utils/holes';
 import { cameraDir } from '../../templates/userTemplates';
 
 /** Compact hole list; editing happens on the canvas (hole mode). */
-export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; scale: number }> = ({ object, unit, scale }) => {
+export const HolesSection: React.FC<{ object: FurnitureObject; unit: LengthUnit }> = ({ object, unit }) => {
   const updateObject = useProjectStore((s) => s.updateObject);
   const [choosing, setChoosing] = useState(false);
   const holes = getHoles(object);
@@ -31,7 +31,7 @@ export const HolesSection: React.FC<{ object: FurnitureObject; unit: string; sca
     <div className="holes-section" data-testid="holes-section">
       {holes.map((h) => (
         <button key={h.id} type="button" className="hole-list-row" data-testid="hole-row" onClick={() => enterHoleMode(h.id)}>
-          <span>{describeHole(h, unit, scale)}</span>
+          <span>{describeHole(h, unit)}</span>
           <ChevronRight size={14} />
         </button>
       ))}

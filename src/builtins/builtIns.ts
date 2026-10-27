@@ -3,7 +3,7 @@ import type { BuiltInInfo, BuiltInTemplateId, FurnitureObject, Joint, RoomWall, 
 import { generateMediaWall, MEDIA_WALL_DEFAULTS, MEDIA_WALL_TAG, type MediaWallInput, type MediaWallPart } from '../generators/mediaWall';
 import { fitMediaWall } from '../generators/fitMediaWall';
 import { wallFrame, wallToWorld } from '../generators/roomScan';
-import { formatLength } from '../utils/measure';
+import { formatSmallLen } from '../utils/lengthFormat';
 import { buildModule, fitModule, MODULES, moduleHardware, normalizeModuleInput, type ModuleField, type ModuleId, type ModuleJoint, type ModuleSpec } from '../generators/modules';
 import type { Span } from '../generators/fitMediaWall';
 
@@ -290,7 +290,7 @@ export function templateSummary(g: FurnitureObject, unit: 'in' | 'cm' | 'mm' | '
   const t = findBuiltInTemplate(g.builtIn!.template);
   if (!t?.normalize || !t.fields) return '';
   const v = t.normalize(g.builtIn!.input);
-  const len = (n: number) => (unit === 'in' || unit === 'ft' ? `${formatLength(n, 'in').replace(/ in$/, '')}"` : formatLength(n, unit));
+  const len = (n: number) => formatSmallLen(n, unit);
   const size = [v.width, v.height, v.depth].map((n) => len(Number(n))).join(' × ');
   const bits: string[] = [];
   const count = (n: number, one: string, many: string) => { if (n > 0) bits.push(`${n} ${n === 1 ? one : many}`); };

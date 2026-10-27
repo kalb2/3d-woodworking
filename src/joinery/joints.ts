@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { FurnitureObject, FurnitureProject, Joint, JointType, LengthUnit } from '../types/furniture';
 import { boxCorners } from '../state/groupTree';
 import { type Face, faceNormalWorld, pushPull, rotationMatrix } from '../utils/pushPull';
-import { formatLength } from '../utils/measure';
+import { formatSmallLen, inchFraction } from '../utils/lengthFormat';
 
 type Ax = 'x' | 'y' | 'z';
 const AX: Ax[] = ['x', 'y', 'z'];
@@ -273,8 +273,8 @@ export function extendMater(R: FurnitureObject, M: FurnitureObject, face: Face, 
   return pushPull(M, extendFace(R, M, face), amount, { snap: false, step: 0.25, unit: 'in', floorOn: false, min: 0.05 });
 }
 
-const bare = (n: number, unit: LengthUnit) => (unit === 'in' ? formatLength(n, 'in').replace(/ in$/, '') : formatLength(n, unit));
-const withMark = (n: number, unit: LengthUnit) => (unit === 'in' ? `${bare(n, unit)}"` : formatLength(n, unit));
+const bare = (n: number, unit: LengthUnit) => (unit === 'in' || unit === 'ft' ? inchFraction(n) : formatSmallLen(n, unit));
+const withMark = (n: number, unit: LengthUnit) => formatSmallLen(n, unit);
 
 /** Short label for a joint as seen from one part, e.g. 'dado 3/4 x 1/4 @ 12"'. */
 export function jointNote(j: Joint, partId: string, R: FurnitureObject | undefined, M: FurnitureObject | undefined, unit: LengthUnit): string {
@@ -314,7 +314,7 @@ export interface HardwareItem { name: string; quantity: number }
 export function jointHardware(project: Pick<FurnitureProject, 'objects' | 'joints'>): HardwareItem[] {
   const byId = new Map(project.objects.map((o) => [o.id, o]));
   const tally = new Map<string, number>();
-  const frac = (n: number) => `${formatLength(n, 'in').replace(/ in$/, '')}"`;
+  const frac = (n: number) => formatSmallLen(n, 'in');
   for (const j of project.joints ?? []) {
     const c = hardwareCount(j, byId.get(j.receiverId), byId.get(j.materId));
     if (!c) continue;

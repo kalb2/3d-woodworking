@@ -1,3 +1,4 @@
+import { formatLen } from './lengthFormat';
 import type { FurnitureObject, Position3D } from '../types/furniture';
 import { boxCorners } from '../state/groupTree';
 
@@ -77,20 +78,9 @@ export function snapMeasurePoint(hit: Position3D, part: FurnitureObject | undefi
 
 export const measureDistance = dist;
 
-/** Inches as the project unit; inches show 1/16 fractions (23 1/4 in). */
+/** A length in the project unit: 23 1/4" · 2' 6 1/2" · 61 cm · 610 mm (see lengthFormat). */
 export function formatLength(inches: number, unit: 'in' | 'ft' | 'cm' | 'mm'): string {
-  if (unit === 'mm') return `${Math.round(inches * 25.4)} mm`;
-  if (unit === 'cm') return `${Math.round(inches * 25.4) / 10} cm`;
-  const sixteenths = Math.round(inches * 16);
-  const whole = Math.floor(sixteenths / 16);
-  let num = sixteenths % 16, den = 16;
-  while (num && num % 2 === 0) { num /= 2; den /= 2; }
-  const frac = num ? `${num}/${den}` : '';
-  if (unit === 'ft') {
-    const ft = Math.floor(whole / 12), inch = whole % 12;
-    return `${ft ? `${ft}' ` : ''}${inch || !ft || frac ? `${inch}${frac ? ` ${frac}` : ''}"` : ''}`.trim();
-  }
-  return `${whole || !frac ? whole : ''}${whole && frac ? ' ' : ''}${frac} in`;
+  return formatLen(inches, unit);
 }
 
 /** A point on the empty floor (y = 0), snapped to the grid step. */

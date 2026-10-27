@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react';
-import type { BoardHole, HoleAnchor } from '../../types/furniture';
+import type { BoardHole, HoleAnchor, LengthUnit } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { clampHole, getHoles, holesUpdate, inferHoleAnchor, useHoleFocus } from '../../utils/holes';
-import { unitScale } from '../../utils/units';
-import { NumberField } from '../ui/NumberField';
+import { LengthField } from '../ui/LengthField';
+import { fieldUnit } from '../../utils/lengthFormat';
 
 const ANCHORS: HoleAnchor[] = ['start', 'center', 'end'];
 /** Labels for start/center/end of each offset axis, as seen on that face. */
@@ -13,13 +13,11 @@ export function anchorLabels(face: BoardHole['face'], axis: 'u' | 'v'): [string,
   return (face ?? 'top') === 'top' ? ['Front', 'Center', 'Back'] : ['Bottom', 'Center', 'Top'];
 }
 
-const clean = (v: number) => String(Math.round(v * 100) / 100);
 const STEP = 0.125;
 
 /** Number that commits on blur/Enter (one undo step), not per keystroke. */
-const CommitField: React.FC<{ value: number | undefined; scale: number; onCommit: (inches: number) => void; label: string; min?: number; testId?: string }> = ({ value, scale, onCommit, label, min, testId }) => (
-  <NumberField className="hole-bar-input" aria-label={label} testId={testId} min={min} value={(value ?? 0) * scale}
-    format={(v) => clean(v)} onCommit={(n) => onCommit(n / scale)} />
+const CommitField: React.FC<{ value: number | undefined; unit: LengthUnit; onCommit: (inches: number) => void; label: string; min?: number; testId?: string }> = ({ value, unit, onCommit, label, min, testId }) => (
+  <LengthField className="hole-bar-input" aria-label={label} testId={testId} min={min} inches={value ?? 0} unit={unit} unitSuffix={false} onCommit={onCommit} />
 );
 
 /** Bottom bar shown in hole mode. Dragging on the part moves the hole. */
@@ -34,7 +32,6 @@ export const HoleModeBar: React.FC = () => {
   if (!editing || !object || !hole || !project) return null;
 
   const unit = project.unit;
-  const scale = unitScale(unit);
   const kind = hole.kind ?? 'round';
   const rect = kind === 'rect';
   const notch = kind === 'notch';
@@ -67,8 +64,8 @@ export const HoleModeBar: React.FC = () => {
       <div className="hole-bar-row">
         <div className="hole-bar-size">
           <button type="button" aria-label="Smaller" onClick={() => setSize(hole.diameter - STEP)}><Minus size={14} /></button>
-          <CommitField value={hole.diameter} scale={scale} onCommit={setSize} label="Size" min={0} testId="hole-size" />
-          <span className="hole-bar-size-label">{unit}</span>
+          <CommitField value={hole.diameter} unit={unit} onCommit={setSize} label="Size" min={0} testId="hole-size" />
+          {fieldUnit(unit) !== 'in' && <span className="hole-bar-size-label">{fieldUnit(unit)}</span>}
           <button type="button" aria-label="Larger" onClick={() => setSize(hole.diameter + STEP)}><Plus size={14} /></button>
         </div>
         <button type="button" className={`hole-bar-btn${more ? ' is-on' : ''}`} onClick={() => setMore((v) => !v)} data-testid="hole-more">
@@ -90,7 +87,7 @@ export const HoleModeBar: React.FC = () => {
               <button type="button" className={hole.depth !== undefined ? 'is-on' : ''} onClick={() => { if (hole.depth === undefined) patch({ depth: 0.5 }); }}>Depth</button>
             </div>
             {hole.depth !== undefined && (
-              <CommitField value={hole.depth} scale={scale} onCommit={(v) => patch({ depth: Math.max(0.0625, v) })} label="Depth" min={0} />
+              <CommitField value={hole.depth} unit={unit} onCommit={(v) => patch({ depth: Math.max(0.0625, v) })} label="Depth" min={0} />
             )}
           </div>
           <div className="hole-bar-row hole-anchor-row" data-testid="hole-anchor">
@@ -109,11 +106,11 @@ export const HoleModeBar: React.FC = () => {
             })}
           </div>
           <div className="hole-bar-row hole-bar-exact">
-            <label>X <CommitField value={hole.x} scale={scale} onCommit={(v) => patch({ x: v })} label="X offset" /></label>
-            <label>Y <CommitField value={hole.z} scale={scale} onCommit={(v) => patch({ z: v })} label="Y offset" /></label>
+            <label>X <CommitField value={hole.x} unit={unit} onCommit={(v) => patch({ x: v })} label="X offset" /></label>
+            <label>Y <CommitField value={hole.z} unit={unit} onCommit={(v) => patch({ z: v })} label="Y offset" /></label>
             {(rect || notch) && <>
-              <label>{notch ? 'Width' : 'W'} <CommitField value={hole.diameter} scale={scale} onCommit={(v) => patch({ diameter: Math.max(0.0625, v) })} label="Width" min={0} /></label>
-              <label>{notch ? 'Depth in' : 'H'} <CommitField value={hole.height ?? hole.diameter} scale={scale} onCommit={(v) => patch({ height: Math.max(0.0625, v) })} label={notch ? 'Notch depth' : 'Height'} min={0} /></label>
+              <label>{notch ? 'Width' : 'W'} <CommitField value={hole.diameter} unit={unit} onCommit={(v) => patch({ diameter: Math.max(0.0625, v) })} label="Width" min={0} /></label>
+              <label>{notch ? 'Depth in' : 'H'} <CommitField value={hole.height ?? hole.diameter} unit={unit} onCommit={(v) => patch({ height: Math.max(0.0625, v) })} label={notch ? 'Notch depth' : 'Height'} min={0} /></label>
             </>}
           </div>
         </div>
