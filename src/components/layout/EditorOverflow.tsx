@@ -30,6 +30,9 @@ const MenuRow: React.FC<{ icon: React.ReactNode; label: string; testId: string; 
  * projects (templates), and app-wide links (privacy policy, support). This
  * project's own settings live in Properties › Project.
  */
+/** Set at build time from the iOS target's version and build number (vite.config.ts). */
+const APP_VERSION: string | undefined = import.meta.env.VITE_APP_VERSION;
+
 export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCutList, onShareProject, onClose }) => {
   const { openOverlay, setSidebarPanel } = useAppStore();
   const { activeProjectId, projects } = useProjectStore();
@@ -103,6 +106,7 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <h3 className="menu-kicker">About</h3>
       <MenuRow icon={<ShieldCheck size={18} />} label="Privacy Policy" testId="menu-privacy" onTap={() => { onClose(); openExternal(PRIVACY_POLICY_URL); }} />
       <MenuRow icon={<LifeBuoy size={18} />} label="Support" testId="menu-support" onTap={() => { onClose(); openExternal(SUPPORT_URL); }} />
+      {APP_VERSION && <p className="menu-version" data-testid="menu-version">Version {APP_VERSION}</p>}
     </div>
   );
 };

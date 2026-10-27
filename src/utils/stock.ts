@@ -70,11 +70,22 @@ export function lumberBoardFeet(material: { species?: WoodMaterial['species'] } 
   return n ? (length * n.width * n.thickness) / 144 : boardFeet(length, width, thickness);
 }
 
+/** Inches to the nearest 1/8 as 12" or 5 1/2". */
+function inchLabel(inches: number): string {
+  const eighths = Math.round(inches * 8);
+  const whole = Math.floor(eighths / 8);
+  let num = eighths % 8, den = 8;
+  while (num && num % 2 === 0) { num /= 2; den /= 2; }
+  return num ? `${whole ? `${whole} ` : ''}${num}/${den}"` : `${whole}"`;
+}
+
 /** What the stock is called when buying it: '2×4' for dimensional lumber, else rough thickness ('8/4'). */
 export function lumberStock(material: { species?: WoodMaterial['species'] } | undefined, width: number, thickness: number): { label: string; order: number } {
   const n = dimensionalNominal(material, thickness, width);
   if (n) return { label: `${n.thickness}×${n.width}`, order: n.thickness * 4 * 100 + n.width };
   const q = roughQuarters(thickness);
+  // Past 16/4 nobody sells quarter-sawn stock by that name: call it what it is, a glued-up blank.
+  if (q > 16) return { label: `${inchLabel(thickness)} glued-up blank`, order: q * 100 };
   return { label: `${q}/4`, order: q * 100 };
 }
 

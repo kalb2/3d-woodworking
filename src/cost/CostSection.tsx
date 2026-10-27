@@ -3,7 +3,7 @@ import { useReliableTap } from '../utils/reliableTap';
 import { costTotals } from '../utils/exportUtils';
 import { EXAMPLE_NOTE, formatMoney, type ProjectCost } from './cost';
 
-const muted: React.CSSProperties = { color: '#9ca3af' };
+const muted: React.CSSProperties = { color: '#475569' };
 const qty = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** The buy list priced: one line per thing to buy, then extras and the total. Prices are edited behind one button. */

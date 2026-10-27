@@ -38,6 +38,10 @@ describe('CutListDrawer', () => {
     expect(r.getAllByTestId('cut-part-size')[0].textContent).toContain('1\u00a01/2"'); // fractions never split
     expect(r.getByTestId('cut-footnote').textContent).toMatch(/Length runs with the grain/);
     expect(r.getByTestId('cut-export-csv')).toBeTruthy();
+    // Short header that fits a phone: labeled CSV button, readable footnote contrast.
+    expect(r.getByRole('heading', { level: 2 }).textContent).toBe('Cut list');
+    expect(r.getByTestId('cut-export-csv').textContent?.trim()).toBe('CSV');
+    expect(r.getByTestId('cut-footnote').style.color).toBe('rgb(71, 85, 105)');
   });
 
   it('metric projects show one unit per size', () => {

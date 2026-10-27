@@ -487,6 +487,11 @@ html, body, #root {
   flex-shrink: 0;
 }
 
+.phone-tool-sheet.is-add {
+  /* Add opens taller: the dock (tools + Floor) shares this height, so the default cap left only two rows of content. */
+  max-height: min(74dvh, 700px);
+}
+
 .phone-tool-sheet.is-expanded .phone-tool-sheet-handle {
   display: block;
 }
@@ -3270,3 +3275,6 @@ html, body, #root {
 .hole-bar-input.is-frac { width: 76px; }
 .props-input.is-number.is-frac { width: 104px; }
 .pushpull-readout input.is-frac { width: 96px; }
+
+/* ••• menu: quiet, non-interactive version line under About. */
+.menu-version { margin: 4px 0 0; padding: 6px 12px 2px; font-size: 12px; color: #64748b; user-select: text; }
