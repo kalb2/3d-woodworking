@@ -12,7 +12,10 @@ vi.mock('../../utils/modelExport', () => ({
     project.objects.filter((o) => o.visible !== false && o.shape !== 'group' && o.generator !== 'room-scan' && !o.reference),
 }));
 
-afterEach(() => { cleanup(); saveFile.mockClear(); exportDesignFile.mockClear(); });
+const exportBuildPlans = vi.fn(async (..._a: unknown[]) => 'shared' as const);
+vi.mock('../../plans/exportPlans', () => ({ exportBuildPlans: (...a: unknown[]) => exportBuildPlans(...a) }));
+
+afterEach(() => { cleanup(); saveFile.mockClear(); exportDesignFile.mockClear(); exportBuildPlans.mockClear(); });
 
 const { useProjectStore } = await import('../../state/useProjectStore');
 const { EditorOverflowList } = await import('./EditorOverflow');
@@ -85,6 +88,31 @@ describe('••• 3D model', () => {
     const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={() => {}} />);
     fireEvent.click(r.getByTestId('menu-export-glb'));
     expect(exportDesignFile).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledWith('Nothing to export yet.');
+    alert.mockRestore();
+  });
+});
+
+describe('••• build plans', () => {
+  it('loads the plans module on tap and exports the open project', async () => {
+    act(() => s().createProject('Bench', 'in'));
+    const project = s().projects.find((p) => p.id === s().activeProjectId);
+    const onClose = vi.fn();
+    const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={onClose} />);
+    expect(r.getByText('Build plans (PDF)')).toBeTruthy();
+    fireEvent.click(r.getByTestId('menu-export-plans'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(exportBuildPlans).toHaveBeenCalledWith(project));
+  });
+
+  it('says so instead of exporting an empty project', () => {
+    act(() => s().createProject('Bare', 'in'));
+    const id = s().activeProjectId;
+    act(() => useProjectStore.setState({ projects: s().projects.map((p) => (p.id === id ? { ...p, objects: [] } : p)) }));
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={() => {}} />);
+    fireEvent.click(r.getByTestId('menu-export-plans'));
+    expect(exportBuildPlans).not.toHaveBeenCalled();
     expect(alert).toHaveBeenCalledWith('Nothing to export yet.');
     alert.mockRestore();
   });

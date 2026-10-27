@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Archive, Box, Camera, FileCode, FileSpreadsheet, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
+import { Archive, Box, Camera, FileCode, FileSpreadsheet, FileText, Layers, LayoutTemplate, Share2, Copy } from 'lucide-react';
 import { useAppStore } from '../../state/useAppStore';
 import { useProjectStore } from '../../state/useProjectStore';
 import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../../utils/exportUtils';
@@ -69,6 +69,19 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
     }
     void exportDesignFile(project, format).then(report);
   };
+  /** Shop-ready PDF; the plans code (and jsPDF) load only when asked for. */
+  const exportPlans = () => {
+    const project = currentProject;
+    onClose();
+    if (!project || designParts(project).length === 0) {
+      window.alert('Nothing to export yet.');
+      return;
+    }
+    void import('../../plans/exportPlans')
+      .then(({ exportBuildPlans }) => exportBuildPlans(project))
+      .catch(() => 'failed' as const)
+      .then(report);
+  };
 
   return (
     <div className="editor-overflow-list">
@@ -76,6 +89,7 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <MenuRow icon={<Layers size={18} />} label="Cut list" testId="menu-cut-list" onTap={() => { onClose(); onOpenCutList(); }} />
       <MenuRow icon={<Share2 size={18} />} label="Share project" testId="menu-share" onTap={() => { onClose(); onShareProject(); }} />
       <MenuRow icon={<FileSpreadsheet size={18} />} label="Export cut list (CSV)" testId="menu-export-csv" onTap={() => { if (currentProject) exportCutListCSV(currentProject); onClose(); }} />
+      <MenuRow icon={<FileText size={18} />} label="Build plans (PDF)" testId="menu-export-plans" onTap={exportPlans} />
       <MenuRow icon={<Camera size={18} />} label="Snapshot image" testId="menu-export-png" onTap={snapshot} />
       <MenuRow icon={<FileCode size={18} />} label="Export project file" testId="menu-export-json" onTap={exportFile} />
       <MenuRow icon={<Box size={18} />} label="Export 3D model (USDZ)" testId="menu-export-usdz" onTap={() => exportModel('usdz')} />

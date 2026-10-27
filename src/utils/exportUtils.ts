@@ -74,7 +74,12 @@ function assemblyName(obj: FurnitureObject, byId: Map<string, FurnitureObject>):
  * material, then thickness, then size.
  */
 export function generateCutList(project: FurnitureProject): CutListItem[] {
-  const map = new Map<string, CutListItem & { sortKey: number[]; uses: Map<string, number> }>();
+  return cutListWithParts(project).map(({ partIds: _p, ...item }) => item);
+}
+
+/** The cut list with the ids of the parts each row covers (same rows and order as generateCutList). */
+export function cutListWithParts(project: FurnitureProject): Array<CutListItem & { partIds: string[] }> {
+  const map = new Map<string, CutListItem & { sortKey: number[]; uses: Map<string, number>; partIds: string[] }>();
   const unit = project.unit;
   const notesById = jointNotes(project);
   const byId = new Map(project.objects.map((o) => [o.id, o]));
@@ -97,6 +102,7 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
     let row = map.get(key);
     if (row) {
       row.quantity += 1;
+      row.partIds.push(obj.id);
     } else {
       const [ls, ws, ts] = BOX_SHAPES.has(obj.shape) ? [a, b, c] : [a, b, c].sort((x, y) => y - x);
       row = {
@@ -116,6 +122,7 @@ export function generateCutList(project: FurnitureProject): CutListItem[] {
         ...(obj.material?.species ? { species: obj.material.species } : {}),
         sortKey: [a, b, c],
         uses: new Map(),
+        partIds: [obj.id],
       };
       map.set(key, row);
     }
