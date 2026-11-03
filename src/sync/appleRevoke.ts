@@ -13,6 +13,10 @@
  *   APPLE_KEY_ID       Key ID of the Sign in with Apple key (10 chars)
  *   APPLE_PRIVATE_KEY  Contents of AuthKey_<KEY_ID>.p8 (PEM, PKCS#8)
  *   APPLE_CLIENT_ID    Optional. Defaults to the bundle id (APPLE_AUDIENCE).
+ *
+ * If the code exchange fails under the primary client id, the Worker retries
+ * with the other accepted bundle ids (the pre-rename one), because a code is
+ * bound to the bundle id of the app that requested it.
  */
 
 export const APPLE_TOKEN_URL = 'https://appleid.apple.com/auth/token';
@@ -24,6 +28,8 @@ export interface AppleRevokeConfig {
   /** PEM (-----BEGIN PRIVATE KEY-----) or bare base64 PKCS#8. Literal "\n" is accepted. */
   privateKey: string;
   clientId: string;
+  /** Tried in order when the code exchange fails under `clientId` (e.g. the pre-rename bundle id). */
+  fallbackClientIds?: string[];
 }
 
 export interface AppleRevokeEnv {
@@ -38,12 +44,18 @@ export type AppleRevokeResult =
   | { revoked: false; reason: 'not_configured' | 'no_code' | 'exchange_failed' | 'subject_mismatch' | 'revoke_failed' | 'error' };
 
 /** Null until the three key secrets are set. */
-export function appleRevokeConfig(env: AppleRevokeEnv, defaultClientId: string): AppleRevokeConfig | null {
+export function appleRevokeConfig(
+  env: AppleRevokeEnv,
+  defaultClientId: string,
+  otherClientIds: readonly string[] = [],
+): AppleRevokeConfig | null {
   const teamId = env.APPLE_TEAM_ID?.trim();
   const keyId = env.APPLE_KEY_ID?.trim();
   const privateKey = env.APPLE_PRIVATE_KEY?.trim();
   if (!teamId || !keyId || !privateKey) return null;
-  return { teamId, keyId, privateKey, clientId: env.APPLE_CLIENT_ID?.trim() || defaultClientId };
+  const clientId = env.APPLE_CLIENT_ID?.trim() || defaultClientId;
+  const fallbackClientIds = [...new Set(otherClientIds)].filter((id) => id && id !== clientId);
+  return { teamId, keyId, privateKey, clientId, ...(fallbackClientIds.length ? { fallbackClientIds } : {}) };
 }
 
 function base64UrlFromBytes(bytes: Uint8Array): string {
@@ -128,14 +140,22 @@ export async function revokeAppleAuthorization(
   const code = authorizationCode?.trim();
   if (!code) return { revoked: false, reason: 'no_code' };
   try {
-    const clientSecret = await createAppleClientSecret(config);
     const headers = { 'content-type': 'application/x-www-form-urlencoded' };
-    const tokenResponse = await fetchImpl(APPLE_TOKEN_URL, {
-      method: 'POST',
-      headers,
-      body: form({ client_id: config.clientId, client_secret: clientSecret, code, grant_type: 'authorization_code' }),
-    });
-    if (!tokenResponse.ok) return { revoked: false, reason: 'exchange_failed' };
+    // The code is bound to the bundle id that requested it: try the primary client id, then the fallbacks.
+    let clientId = '';
+    let clientSecret = '';
+    let tokenResponse: Response | null = null;
+    for (const candidate of [config.clientId, ...(config.fallbackClientIds ?? [])]) {
+      clientId = candidate;
+      clientSecret = await createAppleClientSecret({ ...config, clientId });
+      tokenResponse = await fetchImpl(APPLE_TOKEN_URL, {
+        method: 'POST',
+        headers,
+        body: form({ client_id: clientId, client_secret: clientSecret, code, grant_type: 'authorization_code' }),
+      });
+      if (tokenResponse.ok) break;
+    }
+    if (!tokenResponse?.ok) return { revoked: false, reason: 'exchange_failed' };
     const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; id_token?: string };
     // The code came from the Apple sheet on the device; only revoke for the account being deleted.
     if (jwtSubject(tokens.id_token) !== expectedSub) return { revoked: false, reason: 'subject_mismatch' };
@@ -145,7 +165,7 @@ export async function revokeAppleAuthorization(
       method: 'POST',
       headers,
       body: form({
-        client_id: config.clientId,
+        client_id: clientId,
         client_secret: clientSecret,
         token,
         token_type_hint: tokens.refresh_token ? 'refresh_token' : 'access_token',

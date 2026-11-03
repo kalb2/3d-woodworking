@@ -25,7 +25,7 @@ async function testKey() {
 
 async function config(): Promise<{ cfg: AppleRevokeConfig; publicKey: CryptoKey }> {
   const { pem, publicKey } = await testKey();
-  return { cfg: { teamId: 'TEAM123456', keyId: 'KEY1234567', privateKey: pem, clientId: 'com.antigravity.furniture3d' }, publicKey };
+  return { cfg: { teamId: 'TEAM123456', keyId: 'KEY1234567', privateKey: pem, clientId: 'com.k24corp.workbench' }, publicKey };
 }
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
@@ -37,7 +37,7 @@ describe('Apple client secret', () => {
     const [h, p, sig] = secret.split('.');
     expect(JSON.parse(new TextDecoder().decode(fromB64url(h)))).toEqual({ alg: 'ES256', kid: 'KEY1234567', typ: 'JWT' });
     expect(JSON.parse(new TextDecoder().decode(fromB64url(p)))).toEqual({
-      iss: 'TEAM123456', iat: 1_800_000_000, exp: 1_800_000_300, aud: 'https://appleid.apple.com', sub: 'com.antigravity.furniture3d',
+      iss: 'TEAM123456', iat: 1_800_000_000, exp: 1_800_000_300, aud: 'https://appleid.apple.com', sub: 'com.k24corp.workbench',
     });
     const valid = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, publicKey, fromB64url(sig), new TextEncoder().encode(`${h}.${p}`));
     expect(valid).toBe(true);
@@ -50,11 +50,15 @@ describe('Apple client secret', () => {
   });
 
   it('config needs team, key id and key; client id defaults to the bundle id', () => {
-    expect(appleRevokeConfig({}, 'com.antigravity.furniture3d')).toBeNull();
+    expect(appleRevokeConfig({}, 'com.k24corp.workbench')).toBeNull();
     expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K' }, 'b')).toBeNull();
-    expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'P' }, 'com.antigravity.furniture3d'))
-      .toEqual({ teamId: 'T', keyId: 'K', privateKey: 'P', clientId: 'com.antigravity.furniture3d' });
+    expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'P' }, 'com.k24corp.workbench'))
+      .toEqual({ teamId: 'T', keyId: 'K', privateKey: 'P', clientId: 'com.k24corp.workbench' });
     expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'P', APPLE_CLIENT_ID: 'other' }, 'b')?.clientId).toBe('other');
+    expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'P' }, 'com.k24corp.workbench', ['com.k24corp.workbench', 'com.antigravity.furniture3d'])?.fallbackClientIds)
+      .toEqual(['com.antigravity.furniture3d']);
+    expect(appleRevokeConfig({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: 'P', APPLE_CLIENT_ID: 'com.antigravity.furniture3d' }, 'com.k24corp.workbench', ['com.k24corp.workbench', 'com.antigravity.furniture3d']))
+      .toMatchObject({ clientId: 'com.antigravity.furniture3d', fallbackClientIds: ['com.k24corp.workbench'] });
   });
 });
 
@@ -73,14 +77,14 @@ describe('revokeAppleAuthorization', () => {
     const tokenBody = tokenInit.body as URLSearchParams;
     expect(tokenBody.get('grant_type')).toBe('authorization_code');
     expect(tokenBody.get('code')).toBe('code-1');
-    expect(tokenBody.get('client_id')).toBe('com.antigravity.furniture3d');
+    expect(tokenBody.get('client_id')).toBe('com.k24corp.workbench');
     expect(tokenBody.get('client_secret')?.split('.')).toHaveLength(3);
     const [revokeUrl, revokeInit] = fetchImpl.mock.calls[1] as unknown as [string, RequestInit];
     expect(revokeUrl).toBe(APPLE_REVOKE_URL);
     const revokeBody = revokeInit.body as URLSearchParams;
     expect(revokeBody.get('token')).toBe('rt');
     expect(revokeBody.get('token_type_hint')).toBe('refresh_token');
-    expect(revokeBody.get('client_id')).toBe('com.antigravity.furniture3d');
+    expect(revokeBody.get('client_id')).toBe('com.k24corp.workbench');
   });
 
   it('falls back to the access token when there is no refresh token', async () => {
@@ -108,6 +112,30 @@ describe('revokeAppleAuthorization', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('retries the code exchange with the pre-rename bundle id, then revokes under the id that worked', async () => {
+    const { cfg } = await config();
+    const withFallback = { ...cfg, fallbackClientIds: ['com.antigravity.furniture3d'] };
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const clientId = new URLSearchParams(String(init?.body)).get('client_id');
+      if (String(url) === APPLE_TOKEN_URL) {
+        return clientId === 'com.antigravity.furniture3d'
+          ? ok({ refresh_token: 'rt', id_token: jwtWithSub('s') })
+          : new Response('{"error":"invalid_grant"}', { status: 400 });
+      }
+      return new Response('', { status: 200 });
+    });
+    expect(await revokeAppleAuthorization('c', 's', withFallback, fetchImpl as unknown as typeof fetch)).toEqual({ revoked: true });
+    const ids = fetchImpl.mock.calls.map(([url, init]) => [String(url), new URLSearchParams(String(init?.body)).get('client_id')]);
+    expect(ids).toEqual([
+      [APPLE_TOKEN_URL, 'com.k24corp.workbench'],
+      [APPLE_TOKEN_URL, 'com.antigravity.furniture3d'],
+      [APPLE_REVOKE_URL, 'com.antigravity.furniture3d'],
+    ]);
+    const bad = vi.fn(async () => new Response('{"error":"invalid_grant"}', { status: 400 }));
+    expect(await revokeAppleAuthorization('c', 's', withFallback, bad as unknown as typeof fetch)).toEqual({ revoked: false, reason: 'exchange_failed' });
+    expect(bad).toHaveBeenCalledTimes(2);
+  });
+
   it('reports Apple errors and network failures without throwing', async () => {
     const { cfg } = await config();
     const bad = vi.fn(async () => new Response('{"error":"invalid_grant"}', { status: 400 }));
@@ -123,7 +151,7 @@ describe('revokeAppleAuthorization', () => {
 
 describe('DELETE /me with Sign in with Apple', () => {
   const identity: IdentityResolver = { resolve: async () => ({ error: 'unused', status: 400 }) };
-  const appConfig = { devSignIn: false, mode: 'cloud' as const, appleAudience: 'com.antigravity.furniture3d' };
+  const appConfig = { devSignIn: false, mode: 'cloud' as const, appleAudience: 'com.k24corp.workbench' };
 
   async function setup(provider: Account['provider']) {
     const db = new MemorySyncDb();
@@ -172,10 +200,10 @@ describe('DELETE /me with Sign in with Apple', () => {
     const { pem } = await testKey();
     const fetchImpl = vi.fn(async (url: string | URL | Request) => String(url) === APPLE_TOKEN_URL
       ? ok({ refresh_token: 'rt', id_token: jwtWithSub('apple-sub-1') }) : new Response('', { status: 200 }));
-    const revoke = appleRevokeOption({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: pem }, 'com.antigravity.furniture3d', fetchImpl as unknown as typeof fetch)!;
+    const revoke = appleRevokeOption({ APPLE_TEAM_ID: 'T', APPLE_KEY_ID: 'K', APPLE_PRIVATE_KEY: pem }, 'com.k24corp.workbench', fetchImpl as unknown as typeof fetch)!;
     const { account } = await setup('apple');
     expect(await revoke(account, 'code')).toEqual({ revoked: true });
-    const unset = appleRevokeOption({}, 'com.antigravity.furniture3d', fetchImpl as unknown as typeof fetch)!;
+    const unset = appleRevokeOption({}, 'com.k24corp.workbench', fetchImpl as unknown as typeof fetch)!;
     expect(await unset(account, 'code')).toEqual({ revoked: false, reason: 'not_configured' });
   });
 });
