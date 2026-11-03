@@ -19,6 +19,8 @@ import { PRESET_WOOD_MATERIALS, freshenFinish } from '../utils/woodTextureGenera
 import { placeAiPiece } from '../ai/build';
 import type { AiSpec } from '../ai/spec';
 import { ancestorIds, leavesOf, deepDuplicate, deleteCascade, groupIds, moveSet, normalizeTree, refitGroups, ungroupOne } from './groupTree';
+import { newId } from '../utils/ids';
+import { importProjectData } from '../utils/exportUtils';
 
 // Also refreshes finishes saved with the old, far-too-dark wood presets (walnut read as black).
 const freshenObjects = (os: FurnitureObject[]) => {
@@ -108,7 +110,12 @@ const LIGHT_STARTING_WOOD = PRESET_WOOD_MATERIALS.birch;
 
 export type ProjectPersistEvent =
   | { type: 'save' }
-  | { type: 'delete'; id: string; updatedAt: number };
+  | { type: 'delete'; id: string; updatedAt: number }
+  /** Projects put back from a backup: their old delete tombstones no longer apply. */
+  | { type: 'restore'; ids: string[] };
+
+/** Shown (once, small) when this device's storage refuses a save. */
+export const SAVE_FAILED_MESSAGE = "Couldn't save on this device. Back up your projects now.";
 
 let persistListener: ((event: ProjectPersistEvent) => void) | null = null;
 let persistSuppressed = false;
@@ -191,6 +198,9 @@ interface ProjectState {
 
   historyStack: FurnitureObject[][];
   historyIndex: number;
+  /** Set when a write to this device's storage fails (usually full); cleared by the next good save. */
+  saveError: string | null;
+  dismissSaveError: () => void;
 
   loadProjects: () => void;
   replaceAllProjects: (projects: FurnitureProject[]) => void;
@@ -286,6 +296,11 @@ function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): Furnitur
   return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
 }
 
+/** Add joints copied with duplicated parts (no-op when there are none). */
+function withCopiedJoints(p: FurnitureProject, copies: Joint[]): FurnitureProject {
+  return copies.length ? { ...p, joints: [...(p.joints ?? []), ...copies] } : p;
+}
+
 /** Joints that went with each undo snapshot (keyed by the snapshot array). */
 const jointSnaps = new WeakMap<FurnitureObject[], Joint[]>();
 /** First undo entry for a project: its parts plus its joints. */
@@ -332,6 +347,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   showDimensions: true,
   historyStack: [seedHistory(INITIAL_PROJECT.objects, INITIAL_PROJECT.joints)],
   historyIndex: 0,
+  saveError: null,
+  dismissSaveError: () => set({ saveError: null }),
 
   loadProjects: () => {
     try {
@@ -371,8 +388,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedProjects));
       set({ projects: updatedProjects });
       notifyProjectPersist({ type: 'save' });
+      if (get().saveError) set({ saveError: null });
     } catch (err) {
       console.warn('Failed to auto-save project:', err);
+      // Keep the edit in memory and let cloud sync (if on) carry it; tell the user.
+      set({ projects: updatedProjects, saveError: SAVE_FAILED_MESSAGE });
+      notifyProjectPersist({ type: 'save' });
     }
   },
 
@@ -414,7 +435,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
   createProject: (name: string, unit: LengthUnit = 'in') => {
     const defaultCube: FurnitureObject = {
-      id: `obj_${Date.now()}_cube`,
+      id: newId('obj'),
       name: 'Box',
       shape: 'cube',
       dimensions: { length: 12, width: 12, height: 12 },
@@ -425,7 +446,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     };
 
     const newProj: FurnitureProject = {
-      id: `proj_${Date.now()}`,
+      id: newId('proj'),
       name: name || 'Untitled Project',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -452,8 +473,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   renameProject: (id: string, newName: string) => {
+    // Bump this project's own updatedAt (it may not be the open one) so sync keeps the new name.
+    const now = Date.now();
     set(state => ({
-      projects: state.projects.map(p => (p.id === id ? { ...p, name: newName } : p))
+      projects: state.projects.map(p => (p.id === id ? { ...p, name: newName, updatedAt: Math.max(now, p.updatedAt + 1) } : p))
     }));
     get().saveCurrentProject();
   },
@@ -462,14 +485,15 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const target = get().projects.find(p => p.id === id);
     if (!target) return;
 
-    const dupProj: FurnitureProject = {
-      ...target,
-      id: `proj_${Date.now()}`,
-      name: `${target.name} (Copy)`,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      objects: target.objects.map(o => ({ ...o, id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}` }))
-    };
+    // Same re-linking as importing a file: fresh project and part ids, with
+    // groups (parentId), joints, measurements and the room scan carried over.
+    const clone = JSON.parse(JSON.stringify(target)) as FurnitureProject;
+    const copied = importProjectData(
+      { ...clone, name: clone.name || 'Untitled Project', snapSettings: clone.snapSettings ?? defaultSnapSettings() },
+      { suffix: ' (Copy)' },
+    );
+    if (!copied) return;
+    const dupProj: FurnitureProject = normalizeProjects([copied])[0];
 
     set(state => ({
       projects: [...state.projects, dupProj],
@@ -504,7 +528,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
-    } catch (e) {}
+    } catch (err) { console.warn('Failed to save after delete:', err); set({ saveError: SAVE_FAILED_MESSAGE }); }
     notifyProjectPersist({ type: 'delete', id, updatedAt: Date.now() });
   },
 
@@ -529,9 +553,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
     } catch (err) {
       console.warn('Failed to save restored projects:', err);
+      set({ saveError: SAVE_FAILED_MESSAGE });
     }
     set({ projects });
-    notifyProjectPersist({ type: 'save' });
+    notifyProjectPersist({ type: 'restore', ids: incoming.map((p) => p.id) });
   },
 
   importProject: (raw: FurnitureProject) => {
@@ -650,9 +675,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!proj) return;
     const ids = selectedObjectIds.filter((id) => proj.objects.find((o) => o.id === id)?.generator !== 'room-scan');
     if (!ids.length) return;
-    const result = deepDuplicate(proj.objects, ids);
+    const result = deepDuplicate(proj.objects, ids, undefined, undefined, proj.joints);
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),
       selectedObjectIds: result.topIds,
       selectedObjectId: result.topIds[result.topIds.length - 1] ?? null,
     }));
@@ -707,7 +732,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const dimensions = spec?.dimensions ?? { length: 12, width: 12, height: 12 };
     const baseName = spec?.defaultName ?? 'Box';
     const newObj: FurnitureObject = {
-      id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: newId('obj'),
       name: customName || nextStockName(proj.objects.map((object) => object.name), baseName),
       shape,
       dimensions: { ...dimensions },
@@ -743,7 +768,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!proj) return;
 
     const newObj: FurnitureObject = {
-      id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: newId('obj'),
       name: nextStockName(proj.objects.map((o) => o.name), preset.label),
       shape: preset.shape,
       dimensions: { ...preset.dimensions },
@@ -913,7 +938,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   addMeasurement: (a, b) => {
     const { activeProjectId, saveCurrentProject } = get();
     if (!activeProjectId) return null;
-    const id = `dim_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = newId('dim');
     set((st) => ({ projects: st.projects.map((p) => (p.id === activeProjectId ? { ...p, measurements: [...(p.measurements ?? []), { id, a: { ...a }, b: { ...b } }] } : p)) }));
     saveCurrentProject();
     return id;
@@ -939,7 +964,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       const R = find(j.receiverId), M = find(j.materId);
       if (R && M) updateObject(M.id, extendMater(R, M, j.face, grow), true);
     }
-    const id = j.id ?? `joint_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = j.id ?? newId('joint');
     const joint: Joint = { ...j, id, extended: grow };
     set((st) => ({
       projects: st.projects.map((p) => {
@@ -1270,10 +1295,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const { projects, activeProjectId, pushHistoryState, saveCurrentProject } = get();
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj || !proj.objects.some((o) => o.id === id)) return;
-    const result = deepDuplicate(proj.objects, [id]);
+    const result = deepDuplicate(proj.objects, [id], undefined, undefined, proj.joints);
     const dupId = result.topIds[0];
     set(state => ({
-      projects: state.projects.map(p => (p.id === activeProjectId ? { ...p, objects: result.objects } : p)),
+      projects: state.projects.map(p => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),
       selectedObjectId: dupId,
       selectedObjectIds: [dupId],
     }));

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import {
+  batchRecords,
   deleteAccountRequest,
   fetchAuthConfig,
   fetchMe,
+  fetchRecords,
   pushRecords,
   readStoredSession,
   signInWithIdentity,
@@ -16,18 +18,27 @@ import {
 import { appleSignInAvailable, authorizeWithApple, isAppleCancel } from '../sync/appleSignIn.ts';
 import { createDevIdentityToken } from '../sync/identity.ts';
 import {
+  changedRecords,
   claimStarterProjectId,
+  knownVersions,
   projectsFromRecords,
   keepInFlightEdits,
   recordsFromProjects,
   tombstonesFromRecords,
 } from '../sync/merge.ts';
-import type { Account, AuthConfig, SyncRecord } from '../sync/types.ts';
+import type { Account, AuthConfig, AuthResponse, SyncPushResponse, SyncRecord } from '../sync/types.ts';
+import type { FurnitureProject } from '../types/furniture.ts';
 import { useAppStore } from './useAppStore.ts';
 import { setProjectPersistListener, useProjectStore } from './useProjectStore.ts';
 
 const MIGRATION_PREFIX = 'workbench_migration_v1:';
 const TOMBSTONE_KEY = 'workbench_tombstones_v1';
+/** Per account: id → updatedAt the server held after the last good sync (so only changes upload). */
+const KNOWN_PREFIX = 'workbench_sync_known_v1:';
+/** The account that last signed in on this device. */
+const LAST_ACCOUNT_KEY = 'workbench_last_account_v1';
+
+export const SIGN_IN_INCOMPLETE = "Sign-in didn't finish. Please try again.";
 
 export type MigrationChoice = 'needed' | 'done' | 'skipped';
 
@@ -109,6 +120,38 @@ function mergedTombstones(accountId: string, buckets: TombstoneBuckets): Record<
   return merged;
 }
 
+function loadKnown(accountId: string): Record<string, number> | null {
+  try {
+    const raw = localStorage.getItem(`${KNOWN_PREFIX}${accountId}`);
+    return raw ? JSON.parse(raw) as Record<string, number> : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveKnown(accountId: string, records: SyncRecord[]) {
+  try {
+    localStorage.setItem(`${KNOWN_PREFIX}${accountId}`, JSON.stringify(knownVersions(records)));
+  } catch {
+    // Without it the next sync just uploads everything again (in batches).
+  }
+}
+
+/**
+ * Another account signed in on this device before: the projects here are
+ * probably theirs, so ask again ("Save this device to your account?") instead
+ * of uploading them into this account on the next automatic sync.
+ */
+function noteAccountOnDevice(accountId: string) {
+  try {
+    const previous = localStorage.getItem(LAST_ACCOUNT_KEY);
+    if (previous && previous !== accountId) localStorage.removeItem(migrationStorageKey(accountId));
+    localStorage.setItem(LAST_ACCOUNT_KEY, accountId);
+  } catch {
+    // Storage unavailable: keep the saved choice.
+  }
+}
+
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -134,9 +177,15 @@ function rememberRemoteTombstones(accountId: string, records: SyncRecord[]) {
   saveTombstones(buckets);
 }
 
-function applyRecords(accountId: string, records: SyncRecord[], sent?: Map<string, string>) {
+function applyRecords(accountId: string, records: SyncRecord[], sent?: Map<string, string>, keepLocal: FurnitureProject[] = []) {
   rememberRemoteTombstones(accountId, records);
   let projects = projectsFromRecords(records);
+  if (keepLocal.length) {
+    // Too big to upload: this device's copy is the only current one, never replace it.
+    const byId = new Map(projects.map((p) => [p.id, p]));
+    for (const p of keepLocal) byId.set(p.id, p);
+    projects = [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+  }
   if (sent) {
     const merged = keepInFlightEdits(sent, useProjectStore.getState().projects, projects);
     projects = merged.projects;
@@ -149,7 +198,17 @@ function applyRecords(accountId: string, records: SyncRecord[], sent?: Map<strin
   }
 }
 
-async function pushLocal(token: string, accountId: string) {
+/** PUT records in bodies under the Worker's 2 MB limit; with nothing to send, just read the server's list. */
+async function uploadInBatches(token: string, records: SyncRecord[]): Promise<{ records: SyncRecord[]; tooLarge: SyncRecord[] }> {
+  const { batches, tooLarge } = batchRecords(records);
+  if (!batches.length) return { records: (await fetchRecords(token)).records, tooLarge };
+  let response: SyncPushResponse = { records: [] };
+  for (const batch of batches) response = await pushRecords(token, batch);
+  return { records: response.records, tooLarge };
+}
+
+/** Returns the names of projects too big to upload (they stay on this device). */
+async function pushLocal(token: string, accountId: string): Promise<string[]> {
   const projectStore = useProjectStore.getState();
   const claimed = claimStarterProjectId(projectStore.projects);
   const idsChanged = claimed.some((project, index) => project.id !== projectStore.projects[index]?.id);
@@ -160,8 +219,26 @@ async function pushLocal(token: string, accountId: string) {
   // by the server's echo of the older copy.
   const sent = new Map(projects.map((p) => [p.id, JSON.stringify(p)]));
   const records = recordsFromProjects(projects, mergedTombstones(accountId, loadTombstones()));
-  const response = await pushRecords(token, records);
-  applyRecords(accountId, response.records, sent);
+  // Upload only what changed since the last good sync (everything the first time).
+  let result = await uploadInBatches(token, changedRecords(records, loadKnown(accountId)));
+  // Anything the server has never seen goes up too (e.g. the saved versions were stale).
+  const onServer = new Set(result.records.map((record) => record.id));
+  const tooLargeIds = new Set(result.tooLarge.map((record) => record.id));
+  const missing = records.filter((record) => !onServer.has(record.id) && !tooLargeIds.has(record.id));
+  if (missing.length) {
+    const again = await uploadInBatches(token, missing);
+    result = { records: again.records, tooLarge: [...result.tooLarge, ...again.tooLarge] };
+  }
+  saveKnown(accountId, result.records);
+  const tooLarge = result.tooLarge.flatMap((record) => (record.project ? [record.project] : []));
+  applyRecords(accountId, result.records, sent, tooLarge);
+  return tooLarge.map((project) => project.name);
+}
+
+function tooLargeNotice(names: string[]): string | null {
+  if (!names.length) return null;
+  if (names.length === 1) return `“${names[0]}” is too big to sync. It stays on this device.`;
+  return `${names.length} projects are too big to sync. They stay on this device.`;
 }
 
 let syncTimer: number | null = null;
@@ -387,6 +464,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       const result = await deleteAccountRequest(token, authorizationCode);
       writeStoredSession(null);
       localStorage.removeItem(migrationStorageKey(account.id));
+      localStorage.removeItem(`${KNOWN_PREFIX}${account.id}`);
       const buckets = loadTombstones();
       delete buckets.accounts[account.id];
       saveTombstones(buckets);
@@ -420,13 +498,14 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     if (!token || !account) return;
     set({ syncStatus: 'syncing', lastError: null });
     try {
-      await pushLocal(token, account.id);
+      const tooLarge = await pushLocal(token, account.id);
       writeMigration(account.id, 'done');
       set({
         syncStatus: 'idle',
         lastSyncedAt: Date.now(),
         migration: 'done',
         lastError: null,
+        ...(tooLarge.length ? { notice: tooLargeNotice(tooLarge) } : {}),
       });
     } catch (error) {
       set({
@@ -457,10 +536,15 @@ function refuseIfUnconfigured(
 async function applySession(
   set: (partial: Partial<AccountState>) => void,
   get: () => AccountState,
-  auth: { token: string; account: Account },
+  auth: AuthResponse & { error?: string },
 ) {
+  // An older server answered some refusals with HTTP 200 and an error body.
+  if (!auth || typeof auth.token !== 'string' || !auth.token || !auth.account?.id) {
+    throw new Error(typeof auth?.error === 'string' && auth.error ? auth.error : SIGN_IN_INCOMPLETE);
+  }
   const account = auth.account;
   writeStoredSession({ token: auth.token, account });
+  noteAccountOnDevice(account.id);
   const migration = readMigration(account.id) ?? 'needed';
   set({
     status: 'signed-in',
@@ -487,6 +571,18 @@ async function finishSignIn(
 }
 
 setProjectPersistListener((event) => {
+  if (event.type === 'restore') {
+    // Restored from a backup: forget earlier deletes of these ids everywhere.
+    const buckets = loadTombstones();
+    let changed = false;
+    for (const id of event.ids) {
+      if (id in buckets.device) { delete buckets.device[id]; changed = true; }
+      for (const account of Object.values(buckets.accounts)) {
+        if (id in account) { delete account[id]; changed = true; }
+      }
+    }
+    if (changed) saveTombstones(buckets);
+  }
   if (event.type === 'delete') {
     const buckets = loadTombstones();
     buckets.device[event.id] = Math.max(buckets.device[event.id] ?? 0, event.updatedAt);

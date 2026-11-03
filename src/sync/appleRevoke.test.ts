@@ -157,7 +157,7 @@ describe('DELETE /me with Sign in with Apple', () => {
     const db = new MemorySyncDb();
     const account: Account = { id: 'acct-1', appleSub: provider === 'apple' ? 'apple-sub-1' : 'name:kaleb', email: '', username: '', displayName: 'K', provider, createdAt: 1 };
     await db.createAccount(account);
-    await db.createSession('tok', account.id, 1);
+    await db.createSession('tok', account.id, Date.now());
     return { db, account };
   }
   const del = (body?: unknown) => new Request('https://w.example/api/v1/me', {

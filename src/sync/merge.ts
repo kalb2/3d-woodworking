@@ -72,3 +72,19 @@ export function keepInFlightEdits(
   const projects = [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   return { projects, keptLocal: true };
 }
+
+/** id → updatedAt of what the server holds, from its last full answer. */
+export function knownVersions(records: SyncRecord[]): Record<string, number> {
+  const known: Record<string, number> = {};
+  for (const record of records) known[record.id] = record.updatedAt;
+  return known;
+}
+
+/**
+ * Records the server doesn't already hold at this version. With no record of
+ * a previous sync (`known` null) that is everything.
+ */
+export function changedRecords(records: SyncRecord[], known: Record<string, number> | null): SyncRecord[] {
+  if (!known) return records;
+  return records.filter((record) => known[record.id] !== record.updatedAt);
+}

@@ -32,29 +32,53 @@ export interface OpenedFile {
   skipped: number;
 }
 
+/** What a project looks like apart from when it was saved (to spot a backup already restored). */
+function contentKey(p: Partial<FurnitureProject>): string {
+  return JSON.stringify([p.name, p.objects ?? [], p.joints ?? [], p.measurements ?? [], p.scannedRoom ?? null]);
+}
+
 /**
  * Read a .json the app exported: one project (share payload or a bare
  * project, always added as a new copy) or a backup of many. A backup restores
  * missing projects as they were, skips ones already here unchanged (same id
- * and last-edited time) so restoring twice adds nothing, and adds a
- * "(from backup)" copy of ones edited since. Null when it's not a Workbench file.
+ * and last-edited time, or same content) so restoring twice adds nothing, and
+ * adds a "(from backup)" copy of ones edited since. Null when it's not a Workbench file.
+ *
+ * A restored project gets a fresh updatedAt (`now`): it may have been deleted
+ * here or on another device, and sync keeps whichever of the delete and the
+ * project is newer. Restoring is the newest intent, so the project must win.
  */
-export function openProjectFile(text: string, existing: Pick<FurnitureProject, 'id' | 'updatedAt'>[] = []): OpenedFile | null {
+export function openProjectFile(
+  text: string,
+  existing: Array<Pick<FurnitureProject, 'id' | 'updatedAt'> & Partial<FurnitureProject>> = [],
+  now = Date.now(),
+): OpenedFile | null {
   let parsed: any;
   try { parsed = JSON.parse(text); } catch { return null; }
   if (parsed?.kind === 'workbench-backup' && Array.isArray(parsed.projects)) {
     const same = new Set(existing.map((p) => `${p.id}@${p.updatedAt}`));
+    const byId = new Map(existing.map((p) => [p.id, p]));
     const ids = new Set(existing.map((p) => p.id));
     let skipped = 0;
     const projects: FurnitureProject[] = [];
     for (const raw of parsed.projects) {
       if (!raw) continue;
       if (same.has(`${raw.id}@${raw.updatedAt}`)) { skipped++; continue; }
+      const here = byId.get(raw.id);
+      if (here?.objects) {
+        const restored = importProjectData(raw, { keepIds: true });
+        if (restored && contentKey(restored) === contentKey(here)) { skipped++; continue; }
+      }
       // Not on this device: restore as it was. Here but edited since: add the backup's version alongside.
       const p = ids.has(raw.id)
         ? importProjectData(raw, { suffix: ' (from backup)' })
         : importProjectData(raw, { keepIds: true });
-      if (p) { projects.push(p); ids.add(p.id); }
+      if (p) {
+        // Newer than any delete tombstone for this id, so the next sync keeps it.
+        p.updatedAt = Math.max(now, p.updatedAt + 1);
+        projects.push(p);
+        ids.add(p.id);
+      }
     }
     return projects.length || skipped ? { kind: 'backup', projects, skipped } : null;
   }

@@ -1,4 +1,5 @@
-import type { FurnitureObject, WoodMaterial } from '../types/furniture';
+import type { FurnitureObject, Joint, WoodMaterial } from '../types/furniture';
+import { newId } from '../utils/ids';
 
 /**
  * Nested groups: a group is an object with shape 'group'; members point at it
@@ -163,8 +164,8 @@ export function refitGroups(objects: FurnitureObject[], groupIds: Iterable<strin
   return out;
 }
 
-export function newGroupId(stamp = Date.now()) {
-  return `grp_${stamp}_${Math.random().toString(36).slice(2, 6)}`;
+export function newGroupId(_stamp = Date.now()) {
+  return newId('grp');
 }
 
 /**
@@ -254,16 +255,15 @@ export function deepDuplicate(
   objects: FurnitureObject[],
   ids: string[],
   offset = { x: 4, y: 0, z: 4 },
-  stamp = Date.now(),
-): { objects: FurnitureObject[]; topIds: string[] } {
-  const rnd = () => Math.random().toString(36).slice(2, 6);
+  _stamp = Date.now(),
+  joints: Joint[] = [],
+): { objects: FurnitureObject[]; topIds: string[]; joints: Joint[] } {
   const idMap = new Map<string, string>();
   const biMap = new Map<string, string>();
   const tops = ids.filter((id) => objects.some((o) => o.id === id) && !ancestorIds(objects, id).some((a) => ids.includes(a)));
   const all: string[] = [];
   for (const id of tops) { all.push(id, ...descendantIds(objects, id)); }
-  let n = 0;
-  for (const id of all) idMap.set(id, `obj_${stamp}_${n++}_${rnd()}`);
+  for (const id of all) idMap.set(id, newId('obj'));
   const copies: FurnitureObject[] = [];
   for (const id of all) {
     const o = objects.find((x) => x.id === id)!;
@@ -273,7 +273,7 @@ export function deepDuplicate(
     copy.position = { x: o.position.x + offset.x, y: o.position.y + offset.y, z: o.position.z + offset.z };
     if (tops.includes(id)) copy.name = `${o.name} Copy`;
     if (o.builtIn) {
-      const nb = biMap.get(o.builtIn.id) ?? `bi_${stamp}_${rnd()}`;
+      const nb = biMap.get(o.builtIn.id) ?? newId('bi');
       biMap.set(o.builtIn.id, nb);
       copy.builtIn = { ...o.builtIn, id: nb };
     }
@@ -282,7 +282,11 @@ export function deepDuplicate(
   // Parts of a copied built-in point at the copy's instance id.
   for (const c of copies) if (c.builtInId && biMap.has(c.builtInId)) c.builtInId = biMap.get(c.builtInId);
   const parents = new Set(tops.map((id) => objects.find((o) => o.id === id)?.parentId).filter(Boolean) as string[]);
-  return { objects: refitGroups([...objects, ...copies], parents), topIds: tops.map((id) => idMap.get(id)!) };
+  // Joints whose two parts were both copied come along, re-pointed at the copies.
+  const jointCopies: Joint[] = joints
+    .filter((j) => idMap.has(j.receiverId) && idMap.has(j.materId))
+    .map((j) => ({ ...JSON.parse(JSON.stringify(j)), id: newId('joint'), receiverId: idMap.get(j.receiverId)!, materId: idMap.get(j.materId)! }));
+  return { objects: refitGroups([...objects, ...copies], parents), topIds: tops.map((id) => idMap.get(id)!), joints: jointCopies };
 }
 
 /** Ids moved together when `id` moves: itself and everything below. */
