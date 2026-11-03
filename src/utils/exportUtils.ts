@@ -382,6 +382,28 @@ export async function copyProjectToClipboard(project: FurnitureProject): Promise
 let importSeq = 0;
 const freshId = (prefix: string) => `${prefix}_${Date.now()}_${(importSeq++).toString(36)}${Math.random().toString(36).substring(2, 5)}`;
 
+/** Inches. Far past any real piece, and inside what the 3D view can hold without blowing up. */
+const MAX_IMPORT_INCHES = 10000;
+
+function finiteWithin(value: unknown, limit: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
+}
+
+/**
+ * A part the scene can draw. Non-finite or huge sizes and positions are dropped
+ * so a bad file cannot white-screen the 3D view.
+ */
+export function importedPartOk(obj: { dimensions?: { length?: unknown; width?: unknown; height?: unknown }; position?: { x?: unknown; y?: unknown; z?: unknown }; rotation?: { x?: unknown; y?: unknown; z?: unknown } | null }): boolean {
+  const d = obj?.dimensions;
+  const p = obj?.position;
+  if (!d || !p) return false;
+  if (![d.length, d.width, d.height].every((n) => finiteWithin(n, MAX_IMPORT_INCHES) && (n as number) > 0)) return false;
+  if (!(['x', 'y', 'z'] as const).every((k) => finiteWithin(p[k], MAX_IMPORT_INCHES))) return false;
+  const r = obj.rotation;
+  if (r != null && !(['x', 'y', 'z'] as const).every((k) => r[k] == null || finiteWithin(r[k], 1e6))) return false;
+  return true;
+}
+
 /**
  * A project from a file as a new project here: fresh project and part ids
  * (so it never collides with what's on this device), with groups, joints,
@@ -393,11 +415,20 @@ const freshId = (prefix: string) => `${prefix}_${Date.now()}_${(importSeq++).toS
 export function importProjectData(projectData: any, options: { suffix?: string; keepIds?: boolean } = {}): FurnitureProject | null {
   if (!projectData || !projectData.name || !Array.isArray(projectData.objects) || !projectData.snapSettings) return null;
 
+  const rawObjects = projectData.objects as any[];
+  const accepted = rawObjects.filter(importedPartOk);
+  if (rawObjects.length > 0 && accepted.length === 0) return null;
+
   const idMap = new Map<string, string>();
-  const fresh = (projectData.objects as any[]).map((obj) => {
+  const fresh = accepted.map((obj) => {
     const id = options.keepIds && typeof obj.id === 'string' ? obj.id : freshId('obj');
     if (typeof obj.id === 'string') idMap.set(obj.id, id);
-    return { ...obj, id };
+    const rotation = {
+      x: typeof obj.rotation?.x === 'number' ? obj.rotation.x : 0,
+      y: typeof obj.rotation?.y === 'number' ? obj.rotation.y : 0,
+      z: typeof obj.rotation?.z === 'number' ? obj.rotation.z : 0,
+    };
+    return { ...obj, id, rotation };
   });
   const objects = fresh.map((obj) => {
     if (!obj.parentId) return obj;

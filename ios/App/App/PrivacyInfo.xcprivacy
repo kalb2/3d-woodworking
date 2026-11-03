@@ -7,11 +7,17 @@
   and file timestamps (@capacitor/filesystem / ion-ios-filesystem stat on files in
   the app container). Sentry ships its own manifest (UserDefaults, SystemBootTime,
   FileTimestamp).
-  Collected data: Sentry crash/performance/diagnostics (sendDefaultPii = true, so
-  reports include the device IP address), not linked to the account. With the
-  optional account: user ID (username or Apple user ID), email and name shared by
-  Sign in with Apple, and synced projects, linked to the account. Nothing is used
-  for tracking.
+  Collected data: Sentry crash/performance/diagnostics. sendDefaultPii is false, so
+  the SDK does not attach the device IP address, name, or email. JS errors sent
+  from the WebView are the error name and message only. With the optional account:
+  user ID (username or Apple user ID), email and name shared by Sign in with Apple,
+  and synced projects, linked to the account. Nothing is used for tracking.
+  Required-reason APIs checked against the linked plugins (none of them ship their
+  own reasons): UserDefaults CA92.1 is @capacitor-community/apple-sign-in. File
+  timestamps C617.1 are @capacitor/filesystem stat (ion-ios-filesystem) on files in
+  the app container. Capacitor's own manifests declare no required-reason APIs.
+  Disk space and system boot time are not called by the app plugins. Sentry.framework
+  ships its own manifest for the APIs it uses.
 -->
 <plist version="1.0">
 <dict>

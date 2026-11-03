@@ -727,7 +727,7 @@ export const HomeScreen: React.FC = () => {
                 Mastering The Workbench
               </h3>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Quick tips and gestures for building realistic woodworking mockups on iPad and desktop.
+                Quick tips and gestures for building realistic woodworking mockups on iPhone and iPad.
               </p>
             </div>
 

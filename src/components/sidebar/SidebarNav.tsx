@@ -24,6 +24,7 @@ import { TemplatesTab } from './TemplatesTab';
 import { PHONE_SHEET_EMBEDDED_STYLE } from '../layout/phoneSheet';
 import { fireReliableTap, useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureObject } from '../../types/furniture';
+import { useDescribeAvailable } from '../../ai/describeAvailable';
 import { useDescribeFlow } from '../../ai/useDescribeFlow';
 import { useBuiltInFlow } from '../../builtins/useBuiltInFlow';
 import { detectOpening } from '../../fittings/opening';
@@ -104,6 +105,7 @@ export const SidebarNav: React.FC = () => {
     if (overlays.sidebar) setLumberLength(LUMBER_LENGTHS[0]);
   }, [overlays.sidebar]);
   const lastAddAt = useRef(0);
+  const describeAvailable = useDescribeAvailable();
   const openFitting = () => {
     const st = useProjectStore.getState();
     const proj = st.projects.find((p) => p.id === st.activeProjectId);
@@ -191,7 +193,7 @@ export const SidebarNav: React.FC = () => {
         {/* SHAPES TAB */}
         {activeTab === 'shapes' && (
           <div style={isPhone ? undefined : { display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button
+            {describeAvailable && <button
               type="button"
               data-testid="add-describe"
               className={isPhone ? 'phone-sheet-row' : 'glass-button'}
@@ -206,7 +208,7 @@ export const SidebarNav: React.FC = () => {
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Describe it</span>
                 <span style={{ fontSize: 10, color: '#9ca3af' }}>Say or type a piece and it gets built</span>
               </div>
-            </button>
+            </button>}
             <button
               type="button"
               data-testid="add-fitting"

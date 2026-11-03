@@ -1,5 +1,11 @@
 import type { LengthUnit } from '../types/furniture';
 
+/**
+ * Longest length a size field will store: 30 ft. That covers a media wall and
+ * a long room, and rejects a typo like 99999". Callers can pass a tighter max.
+ */
+export const MAX_PART_INCHES = 360;
+
 /** Multiply stored inches by this to show the project unit. */
 export function unitScale(unit: LengthUnit): number {
   if (unit === 'cm') return 2.54;

@@ -7,6 +7,8 @@ export type StockKind = 'sheet' | 'lumber' | 'other';
 export const SHEET = { length: 96, width: 48 } as const;
 /** Saw kerf allowed between parts on a sheet. */
 export const KERF = 1 / 8;
+/** Inches squared off each stick before the first cut (checked, split, or rough ends). */
+export const END_TRIM = 1;
 /** Extra lumber to buy for defects, snipe and mistakes. */
 export const LUMBER_WASTE = 0.15;
 
@@ -197,6 +199,9 @@ export function nestSheets(parts: SheetPart[], grain: boolean, sheet = SHEET, ke
   const oversizeParts: SheetNest['oversizeParts'] = [];
   const fits = (l: number, w: number) => l <= sheet.length + 1e-6 && w <= sheet.width + 1e-6;
   for (const p of parts) {
+    // Zero or negative sizes are not panels: nesting them draws a piece off the sheet.
+    if (!Number.isFinite(p.length) || !Number.isFinite(p.width) || p.length <= 0 || p.width <= 0) continue;
+    if (!Number.isFinite(p.quantity) || p.quantity <= 0) continue;
     const ok = fits(p.length, p.width) || (!grain && fits(p.width, p.length));
     for (let i = 0; i < p.quantity; i++) {
       if (ok) pieces.push({ name: p.name, length: p.length, width: p.width, turn: !grain });
@@ -237,23 +242,27 @@ export const STICK_LENGTHS = [96, 120, 144] as const;
 export interface Stick {
   length: number;
   cuts: number[];
-  /** Offcut left after the cuts and kerfs. */
+  /** Usable offcut left after the cuts, the kerfs, and the end trim. */
   left: number;
 }
 
 /**
  * First-fit decreasing: parts longest first, each into the first stick with
  * room, else a new stick. Every cut after the first on a stick also costs a
- * saw kerf. Parts longer than the stock come back as `oversize`.
+ * saw kerf. `trim` inches at the end of each stick are kept for squaring the
+ * mill ends, so a part as long as the stick does not fit. Parts longer than
+ * the usable length come back as `oversize`. Zero and negative lengths are
+ * not cuts.
  */
-export function packSticks(lengths: number[], stockLength: number, kerf = KERF): { sticks: Stick[]; oversize: number[] } {
+export function packSticks(lengths: number[], stockLength: number, kerf = KERF, trim = END_TRIM): { sticks: Stick[]; oversize: number[] } {
   const sticks: Stick[] = [];
   const oversize: number[] = [];
-  for (const len of [...lengths].sort((a, b) => b - a)) {
-    if (len > stockLength + 1e-6) { oversize.push(len); continue; }
+  const usable = stockLength - Math.max(0, trim);
+  for (const len of [...lengths].filter((l) => Number.isFinite(l) && l > 0).sort((a, b) => b - a)) {
+    if (!(usable > 0) || len > usable + 1e-6) { oversize.push(len); continue; }
     const fit = sticks.find((s) => s.left + 1e-6 >= len + kerf);
     if (fit) { fit.cuts.push(len); fit.left -= len + kerf; continue; }
-    sticks.push({ length: stockLength, cuts: [len], left: stockLength - len });
+    sticks.push({ length: stockLength, cuts: [len], left: usable - len });
   }
   for (const s of sticks) s.left = Math.max(0, s.left);
   return { sticks, oversize };
@@ -275,15 +284,17 @@ export interface StickPlan {
  * wastes least, which is the one that buys the least total length. Ties go to
  * fewer sticks, then the shorter stock. One stock length per profile.
  */
-export function planSticks(lengths: number[], options: readonly number[] = STICK_LENGTHS, kerf = KERF): StickPlan {
+export function planSticks(lengths: number[], options: readonly number[] = STICK_LENGTHS, kerf = KERF, trim = END_TRIM): StickPlan {
+  const clean = lengths.filter((l) => Number.isFinite(l) && l > 0);
+  const end = Math.max(0, trim);
   const longest = Math.max(...options);
-  const oversize = lengths.filter((l) => l > longest + 1e-6).sort((a, b) => b - a);
-  const fits = lengths.filter((l) => l <= longest + 1e-6);
+  const oversize = clean.filter((l) => l > longest - end + 1e-6).sort((a, b) => b - a);
+  const fits = clean.filter((l) => l <= longest - end + 1e-6);
   if (!fits.length) return { stockLength: 0, sticks: [], waste: 0, oversize };
   const used = fits.reduce((n, l) => n + l, 0);
   let best: StickPlan | null = null;
   for (const L of [...options].sort((a, b) => a - b)) {
-    const { sticks, oversize: over } = packSticks(fits, L, kerf);
+    const { sticks, oversize: over } = packSticks(fits, L, kerf, trim);
     if (over.length) continue;
     const plan = { stockLength: L, sticks, waste: sticks.length * L - used, oversize };
     if (!best || plan.waste < best.waste - 1e-6 || (Math.abs(plan.waste - best.waste) <= 1e-6 && plan.sticks.length < best.sticks.length)) best = plan;

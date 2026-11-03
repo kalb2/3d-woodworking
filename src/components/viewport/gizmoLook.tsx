@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import { useDisposeLatest } from './gpuLifecycle';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -298,6 +299,8 @@ export const RotateRing: React.FC<{
   const pillRef = useRef<THREE.Group>(null);
   const pillTotal = useRef(1);
   const hitTubeRef = useRef<THREE.Mesh>(null);
+  const replacedHit = useRef<THREE.BufferGeometry | null>(null);
+  useDisposeLatest(replacedHit);
   const wppAt = useWpp();
   useFrame(() => {
     if (!pillRef.current) return;
@@ -312,8 +315,11 @@ export const RotateRing: React.FC<{
       const want = (RING_HIT_PX * w) / ringScale.current;
       const g = hitTubeRef.current.geometry as THREE.TorusGeometry;
       if (Math.abs(g.parameters.tube - want) / want > 0.15) {
-        hitTubeRef.current.geometry.dispose();
-        hitTubeRef.current.geometry = new THREE.TorusGeometry(radius, want, 8, 48);
+        const next = new THREE.TorusGeometry(radius, want, 8, 48);
+        hitTubeRef.current.geometry = next;
+        if (replacedHit.current) replacedHit.current.dispose();
+        else g.dispose();
+        replacedHit.current = next;
       }
     }
   });

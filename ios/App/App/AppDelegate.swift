@@ -17,10 +17,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             #else
             options.environment = "production"
             #endif
-            options.sendDefaultPii = true
+            // No IP address, name, or email on crash and trace events. JS errors use the same rule.
+            options.sendDefaultPii = false
             // Error monitoring is on by default. Tracing stays off until a sample rate is set.
-            // 1.0 captures every transaction while this is new; lower it once volume is known.
-            options.tracesSampleRate = 1.0
+            options.tracesSampleRate = 0.1
             // sentry-cocoa 9.12+ turns metrics on unless this is set. This install is errors + tracing only.
             options.enableMetrics = false
         }

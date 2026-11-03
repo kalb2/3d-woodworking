@@ -103,7 +103,20 @@ export const STANDARD_WOOD_PRESETS: WoodPreset[] = [
   ...DIMENSIONAL_LUMBER.map(lumber),
 ];
 
-const LOCAL_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
+export const PROJECTS_STORAGE_KEY = 'ipad_3d_furniture_projects_v1';
+/** Unreadable copy, kept so a later save does not throw away the only bytes. */
+export const PROJECTS_CORRUPT_KEY = 'ipad_3d_furniture_projects_corrupt';
+const LOCAL_STORAGE_KEY = PROJECTS_STORAGE_KEY;
+let projectsPersistReady = false;
+
+function quarantineProjects(raw: string) {
+  try { localStorage.setItem(PROJECTS_CORRUPT_KEY, raw); } catch { /* the bad copy is still in the main key */ }
+}
+
+function writeProjectsNow(projects: FurnitureProject[]) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+  projectsPersistReady = true;
+}
 const LIGHT_STARTING_WOOD = PRESET_WOOD_MATERIALS.birch;
 
 export type ProjectPersistEvent =
@@ -334,30 +347,41 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   historyIndex: 0,
 
   loadProjects: () => {
+    let saved: string | null = null;
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const projects = normalizeProjects(migrateLegacyLabels(withLightStartingWood(parsed)));
-          const firstId = projects[0].objects[0]?.id ?? null;
-          set({
-            projects,
-            activeProjectId: projects[0].id,
-            selectedObjectId: firstId,
-            selectedObjectIds: firstId ? [firstId] : [],
-            editingGroupId: null,
-            historyStack: [seedHistory(projects[0].objects, projects[0].joints)],
-            historyIndex: 0
-          });
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
-          } catch {
-            // keep the in-memory light starting wood even if persist fails
-          }
-        }
+      saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (!saved) {
+        projectsPersistReady = true;
+        return;
+      }
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) {
+        quarantineProjects(saved);
+        return;
+      }
+      if (parsed.length === 0) {
+        projectsPersistReady = true;
+        return;
+      }
+      const projects = normalizeProjects(migrateLegacyLabels(withLightStartingWood(parsed)));
+      const firstId = projects[0].objects[0]?.id ?? null;
+      set({
+        projects,
+        activeProjectId: projects[0].id,
+        selectedObjectId: firstId,
+        selectedObjectIds: firstId ? [firstId] : [],
+        editingGroupId: null,
+        historyStack: [seedHistory(projects[0].objects, projects[0].joints)],
+        historyIndex: 0
+      });
+      try {
+        writeProjectsNow(projects);
+      } catch {
+        // keep the in-memory light starting wood even if persist fails
+        projectsPersistReady = true;
       }
     } catch (err) {
+      if (saved) quarantineProjects(saved);
       console.warn('Failed to load projects from localStorage:', err);
     }
   },
@@ -368,7 +392,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       p.id === activeProjectId ? { ...p, updatedAt: Date.now() } : p
     );
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedProjects));
+      writeProjectsNow(updatedProjects);
       set({ projects: updatedProjects });
       notifyProjectPersist({ type: 'save' });
     } catch (err) {
@@ -392,7 +416,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     try {
       if (sameActive) {
         set({ projects });
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+        writeProjectsNow(projects);
         return;
       }
       set({
@@ -404,7 +428,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         historyStack: active ? [seedHistory(active.objects, active.joints)] : [seedHistory([])],
         historyIndex: 0,
       });
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+      writeProjectsNow(projects);
     } catch (err) {
       console.warn('Failed to apply synced projects:', err);
     } finally {
@@ -503,8 +527,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     });
 
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
-    } catch (e) {}
+      writeProjectsNow(remaining);
+    } catch {
+      // The in-memory delete stands. The next background flush retries the write.
+    }
     notifyProjectPersist({ type: 'delete', id, updatedAt: Date.now() });
   },
 
@@ -526,7 +552,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!incoming.length) return;
     const projects = [...get().projects, ...normalizeProjects(incoming)];
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projects));
+      writeProjectsNow(projects);
     } catch (err) {
       console.warn('Failed to save restored projects:', err);
     }
@@ -1389,3 +1415,15 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   }
 };
 });
+
+function flushProjectsToDisk() {
+  if (!projectsPersistReady) return;
+  try { writeProjectsNow(useProjectStore.getState().projects); } catch { /* keep the last good copy */ }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushProjectsToDisk();
+  });
+  window.addEventListener('pagehide', flushProjectsToDisk);
+}
