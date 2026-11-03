@@ -64,32 +64,18 @@ describe('••• project files', () => {
 });
 
 describe('••• 3D model', () => {
-  it('exports the open project as USDZ or GLB', () => {
+  it('hides USDZ, GLB, and Copy project JSON while 3D export is off', async () => {
+    const { MODEL_EXPORT_ENABLED } = await import('../../config/features');
+    expect(MODEL_EXPORT_ENABLED).toBe(false);
     act(() => s().createProject('Bench', 'in'));
-    const project = s().projects.find((p) => p.id === s().activeProjectId);
-    const onClose = vi.fn();
-    const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={onClose} />);
-    fireEvent.click(r.getByTestId('menu-export-usdz'));
-    fireEvent.click(r.getByTestId('menu-export-glb'));
-    expect(exportDesignFile).toHaveBeenNthCalledWith(1, project, 'usdz');
-    expect(exportDesignFile).toHaveBeenNthCalledWith(2, project, 'glb');
-    expect(onClose).toHaveBeenCalledTimes(2);
-    expect(r.getByText('Export 3D model (USDZ)')).toBeTruthy();
-    expect(r.getByText('Export 3D model (GLB)')).toBeTruthy();
-  });
-
-  it('does not export when the project has no parts', () => {
-    act(() => s().createProject('Bare', 'in'));
-    const id = s().activeProjectId;
-    act(() => useProjectStore.setState({
-      projects: s().projects.map((p) => (p.id === id ? { ...p, objects: [] } : p)),
-    }));
-    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const r = render(<EditorOverflowList onOpenCutList={() => {}} onShareProject={() => {}} onClose={() => {}} />);
-    fireEvent.click(r.getByTestId('menu-export-glb'));
+    expect(r.queryByTestId('menu-export-usdz')).toBeNull();
+    expect(r.queryByTestId('menu-export-glb')).toBeNull();
+    expect(r.queryByTestId('menu-copy-json')).toBeNull();
+    expect(r.queryByText(/Export 3D model/)).toBeNull();
+    expect(r.queryByText('Copy project JSON')).toBeNull();
     expect(exportDesignFile).not.toHaveBeenCalled();
-    expect(alert).toHaveBeenCalledWith('Nothing to export yet.');
-    alert.mockRestore();
+    expect(r.getByTestId('menu-export-plans')).toBeTruthy();
   });
 });
 

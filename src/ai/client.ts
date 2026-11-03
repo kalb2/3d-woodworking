@@ -28,11 +28,23 @@ export class AiRequestError extends Error {
   }
 }
 
-/** Mock mode: VITE_AI_MOCK=1 at build time, or localStorage workbench_ai_mock = "1". */
+/**
+ * Sample designs for Describe it while developing.
+ * The hidden `workbench_ai_mock` localStorage flag (and VITE_AI_MOCK) is a
+ * no-op unless this is a dev build, so a release binary cannot turn on a
+ * fake-results mode (App Review 2.5.19).
+ */
+export function mockEnabledForBuild(dev: boolean, buildFlag: string | undefined, stored: string | null): boolean {
+  if (!dev) return false;
+  return buildFlag === '1' || stored === '1';
+}
+
 export function aiMockEnabled(): boolean {
+  if (!import.meta.env.DEV) return false;
+  let stored: string | null = null;
+  try { stored = localStorage.getItem('workbench_ai_mock'); } catch { stored = null; }
   const env = import.meta.env as Record<string, string | undefined>;
-  if (env.VITE_AI_MOCK === '1') return true;
-  try { return localStorage.getItem('workbench_ai_mock') === '1'; } catch { return false; }
+  return mockEnabledForBuild(true, env.VITE_AI_MOCK, stored);
 }
 
 const CLIENT_TIMEOUT_MS = 60_000;

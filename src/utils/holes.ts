@@ -155,14 +155,22 @@ let evaluator: Evaluator | null = null;
  * Subtract holes from a centered part geometry. Boards already have their
  * simple through-holes cut in the outline; pass `skipOutline` for those.
  */
+function dropCutters(geometries: THREE.BufferGeometry[], keep: THREE.BufferGeometry[]) {
+  for (const geometry of geometries) {
+    if (!keep.includes(geometry)) geometry.dispose();
+  }
+}
+
 export function cutHoles(base: THREE.BufferGeometry, d: Dimensions3D, holes: BoardHole[], skipOutline = false): THREE.BufferGeometry {
   const todo = holes.filter((h) => h.diameter >= 0.05 && !(skipOutline && isOutlineHole(h)));
   if (todo.length === 0) return base;
+  const trash: THREE.BufferGeometry[] = [];
   try {
     evaluator ??= new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
     evaluator.useGroups = false;
     const src = base.index ? base.toNonIndexed() : base;
+    if (src !== base) trash.push(src);
     if (!src.getAttribute('uv')) {
       src.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(src.getAttribute('position').count * 2), 2));
     }
@@ -170,7 +178,10 @@ export function cutHoles(base: THREE.BufferGeometry, d: Dimensions3D, holes: Boa
     result.updateMatrixWorld(true);
     for (const h of todo) {
       const c = holeCutter(d, h);
-      const brush = new Brush(c.geometry.index ? c.geometry.toNonIndexed() : c.geometry);
+      const cutter = c.geometry.index ? c.geometry.toNonIndexed() : c.geometry;
+      if (cutter !== c.geometry) trash.push(c.geometry);
+      trash.push(cutter);
+      const brush = new Brush(cutter);
       brush.position.copy(c.position);
       brush.quaternion.copy(c.quaternion);
       brush.updateMatrixWorld(true);
@@ -178,8 +189,10 @@ export function cutHoles(base: THREE.BufferGeometry, d: Dimensions3D, holes: Boa
     }
     const out = result.geometry;
     out.computeVertexNormals();
+    dropCutters(trash, [out, base]);
     return out;
   } catch (err) {
+    dropCutters(trash, [base]);
     console.warn('Hole cut failed', err);
     return base;
   }
@@ -291,11 +304,13 @@ export function describeHole(h: BoardHole, unit: LengthUnit): string {
 /** Subtract joinery cutters (grooves, dowel/pocket holes) given in part-local space. */
 export function cutSolids(base: THREE.BufferGeometry, cutters: import('../joinery/joints').Cutter[]): THREE.BufferGeometry {
   if (!cutters.length) return base;
+  const trash: THREE.BufferGeometry[] = [];
   try {
     evaluator ??= new Evaluator();
     evaluator.attributes = ['position', 'normal', 'uv'];
     evaluator.useGroups = false;
     const src = base.index ? base.toNonIndexed() : base.clone();
+    if (src !== base) trash.push(src);
     if (!src.getAttribute('uv')) {
       src.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(src.getAttribute('position').count * 2), 2));
     }
@@ -305,7 +320,10 @@ export function cutSolids(base: THREE.BufferGeometry, cutters: import('../joiner
       const g = c.kind === 'box'
         ? new THREE.BoxGeometry(...c.size)
         : new THREE.CylinderGeometry(c.radius, c.radius, c.depth, 24);
-      const brush = new Brush(g.index ? g.toNonIndexed() : g);
+      const cutter = g.index ? g.toNonIndexed() : g;
+      if (cutter !== g) trash.push(g);
+      trash.push(cutter);
+      const brush = new Brush(cutter);
       brush.position.set(...c.center);
       if (c.kind === 'cyl') brush.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...c.axis).normalize());
       brush.updateMatrixWorld(true);
@@ -313,8 +331,10 @@ export function cutSolids(base: THREE.BufferGeometry, cutters: import('../joiner
     }
     const out = result.geometry;
     out.computeVertexNormals();
+    dropCutters(trash, [out, base]);
     return out;
   } catch (err) {
+    dropCutters(trash, [base]);
     console.warn('Joint cut failed', err);
     return base;
   }

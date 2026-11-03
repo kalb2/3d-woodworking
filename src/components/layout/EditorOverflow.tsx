@@ -7,6 +7,7 @@ import { copyProjectToClipboard, exportCutListCSV, exportProjectJSON } from '../
 import { useReliableTap } from '../../utils/reliableTap';
 import { backUpProjects } from '../../utils/projectFile';
 import { saveFile, saveMessage, type SaveResult } from '../../native/fileExport';
+import { MODEL_EXPORT_ENABLED } from '../../config/features';
 import { designParts, exportDesignFile, type ModelFormat } from '../../utils/modelExport';
 
 interface EditorOverflowListProps {
@@ -97,9 +98,13 @@ export const EditorOverflowList: React.FC<EditorOverflowListProps> = ({ onOpenCu
       <MenuRow icon={<FileText size={18} />} label="Build plans (PDF)" testId="menu-export-plans" onTap={exportPlans} />
       <MenuRow icon={<Camera size={18} />} label="Snapshot image" testId="menu-export-png" onTap={snapshot} />
       <MenuRow icon={<FileCode size={18} />} label="Export project file" testId="menu-export-json" onTap={exportFile} />
-      <MenuRow icon={<Box size={18} />} label="Export 3D model (USDZ)" testId="menu-export-usdz" onTap={() => exportModel('usdz')} />
-      <MenuRow icon={<Box size={18} />} label="Export 3D model (GLB)" testId="menu-export-glb" onTap={() => exportModel('glb')} />
-      <MenuRow icon={<Copy size={18} />} label={copied ? 'Copied' : 'Copy project JSON'} testId="menu-copy-json" onTap={copyJson} />
+      {MODEL_EXPORT_ENABLED && (
+        <>
+          <MenuRow icon={<Box size={18} />} label="Export 3D model (USDZ)" testId="menu-export-usdz" onTap={() => exportModel('usdz')} />
+          <MenuRow icon={<Box size={18} />} label="Export 3D model (GLB)" testId="menu-export-glb" onTap={() => exportModel('glb')} />
+          <MenuRow icon={<Copy size={18} />} label={copied ? 'Copied' : 'Copy project JSON'} testId="menu-copy-json" onTap={copyJson} />
+        </>
+      )}
       <h3 className="menu-kicker">Across projects</h3>
       <MenuRow icon={<LayoutTemplate size={18} />} label="Templates" testId="menu-templates" onTap={() => { onClose(); setSidebarPanel('templates'); openOverlay('sidebar'); }} />
       <MenuRow icon={<Archive size={18} />} label="Back up all projects" testId="menu-backup" onTap={backUp} />

@@ -9,6 +9,7 @@ import type { FurnitureObject } from '../../types/furniture';
 import { pairContact } from '../../joinery/joints';
 import { useJoinFlow } from '../../joinery/useJoinFlow';
 import { useSelectTip } from '../../utils/longPress';
+import { useDescribeAvailable } from '../../ai/describeAvailable';
 import { useDescribeFlow } from '../../ai/useDescribeFlow';
 
 const groupLabel = (g: FurnitureObject) => (g.builtIn ? findBuiltInTemplate(g.builtIn.template)?.name ?? g.name : g.name);
@@ -39,6 +40,7 @@ export const GroupBar: React.FC = () => {
   const s = useProjectStore();
   const flowOpen = useBuiltInFlow((f) => Boolean(f.mode || f.focusWallId));
   const tipSeen = useSelectTip((t) => t.seen);
+  const describeAvailable = useDescribeAvailable();
   const dismissTip = useSelectTip((t) => t.dismiss);
   const project = s.projects.find((p) => p.id === s.activeProjectId);
   if (!project || flowOpen) return null;
@@ -77,7 +79,7 @@ export const GroupBar: React.FC = () => {
     bar = (
       <div className="group-bar" data-testid="group-bar">
         <span className="group-bar-label">{groupLabel(selected)}</span>
-        {selected.ai && <Btn label="Change it" testId="group-change-ai" tone="primary" onTap={() => useDescribeFlow.getState().openChange(selected.id)} />}
+        {selected.ai && describeAvailable && <Btn label="Change it" testId="group-change-ai" tone="primary" onTap={() => useDescribeFlow.getState().openChange(selected.id)} />}
         <Btn label="Open" testId="group-open" tone={selected.ai ? undefined : 'primary'} onTap={() => s.enterGroup(selected.id)} />
         <Btn label="Ungroup" testId="group-ungroup" onTap={() => s.ungroup(selected.id)} />
       </div>

@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AI_ERROR_TEXT, requestSpec } from './client';
+import { AI_ERROR_TEXT, mockEnabledForBuild, requestSpec } from './client';
 
 const res = (body: unknown, status = 200) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
 const call = (fetchImpl: () => Promise<Response>) => requestSpec('a shelf', null, { fetchImpl: vi.fn(fetchImpl), mock: false }).catch((e: { code: string; message: string }) => e);
+
+describe('workbench_ai_mock', () => {
+  it('is a no-op in release builds and only turns on in dev', () => {
+    expect(mockEnabledForBuild(false, '1', '1')).toBe(false);
+    expect(mockEnabledForBuild(false, undefined, '1')).toBe(false);
+    expect(mockEnabledForBuild(true, undefined, '1')).toBe(true);
+    expect(mockEnabledForBuild(true, '1', null)).toBe(true);
+    expect(mockEnabledForBuild(true, undefined, null)).toBe(false);
+    expect(mockEnabledForBuild(true, undefined, '0')).toBe(false);
+  });
+});
 
 describe('requestSpec', () => {
   it('returns the parsed spec', async () => {

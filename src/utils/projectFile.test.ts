@@ -35,6 +35,20 @@ describe('project file import', () => {
     expect(new Set(p.objects.map((o) => o.id)).size).toBe(3);
   });
 
+  it('drops parts with sizes or positions the 3D view cannot draw', () => {
+    const raw = proj('a');
+    raw.objects = [
+      obj('ok'),
+      obj('nan', { dimensions: { length: Number.NaN, width: 12, height: 1 }, position: { x: 0, y: 0, z: 0 } }),
+      obj('huge', { position: { x: 1e12, y: 0, z: 0 } }),
+    ];
+    const p = importProjectFromJSON(JSON.stringify({ project: raw }))!;
+    expect(p.objects).toHaveLength(1);
+    expect(p.objects[0].dimensions).toEqual({ length: 24, width: 12, height: 0.75 });
+    const onlyBad = { ...raw, objects: [obj('inf', { dimensions: { length: Number.POSITIVE_INFINITY, width: 1, height: 1 } })] };
+    expect(importProjectFromJSON(JSON.stringify({ project: onlyBad }))).toBeNull();
+  });
+
   it('drops links to parts that are not in the file', () => {
     const raw = proj('a');
     raw.objects = raw.objects.filter((o) => o.id !== 'G' && o.id !== 'shelf');
