@@ -30,8 +30,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>The Workbench uses the camera and LiDAR to scan your walls for measurements.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Lets The Workbench save images of your designs to Photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

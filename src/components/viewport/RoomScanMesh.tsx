@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef } from 'react';
+import { disposeGeometryOnly, useDisposable } from './gpuLifecycle';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -36,9 +37,14 @@ function getHatch(): THREE.CanvasTexture | null {
   return hatchTexture;
 }
 
+function disposeTexture(texture: THREE.Texture) {
+  texture.dispose();
+}
+
 const DashedEdges: React.FC<{ geometry: THREE.BufferGeometry; color: string; dashed: boolean; opacity?: number }> = ({ geometry, color, dashed, opacity = 1 }) => {
   const ref = useRef<THREE.LineSegments>(null);
   const edges = useMemo(() => new THREE.EdgesGeometry(geometry), [geometry]);
+  useDisposable(edges, disposeGeometryOnly);
   useLayoutEffect(() => { if (dashed) ref.current?.computeLineDistances(); }, [edges, dashed]);
   return (
     <lineSegments ref={ref} geometry={edges} renderOrder={2}>
@@ -85,6 +91,7 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
   const { dimensions: d, position: p, rotation: r } = object;
   const kind = roomPartKind(object);
   const geometry = useMemo(() => new THREE.BoxGeometry(Math.max(d.length, 0.1), Math.max(d.height, 0.1), Math.max(d.width, 0.1)), [d.length, d.height, d.width]);
+  useDisposable(geometry, disposeGeometryOnly);
   const map = useMemo(() => {
     if (kind !== 'wall') return null;
     const base = getHatch();
@@ -94,6 +101,7 @@ export const RoomScanMesh: React.FC<{ object: FurnitureObject; focused: boolean;
     t.repeat.set(d.length / 16, d.height / 16);
     return t;
   }, [kind, d.length, d.height]);
+  useDisposable(map, disposeTexture);
   if (object.visible === false) return null;
 
   const rot: [number, number, number] = [r.x * Math.PI / 180, r.y * Math.PI / 180, r.z * Math.PI / 180];
