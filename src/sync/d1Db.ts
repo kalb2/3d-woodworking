@@ -1,4 +1,5 @@
 import type { Account, SyncDatabase, SyncRecord } from './types.ts';
+import { SESSION_TTL_MS } from './types.ts';
 
 interface D1Statement {
   bind(...values: unknown[]): D1Statement;
@@ -95,11 +96,11 @@ export class D1SyncDb implements SyncDatabase {
     ).bind(token, accountId, createdAt).run();
   }
 
-  async accountForSession(token: string): Promise<Account | null> {
+  async accountForSession(token: string, now = Date.now()): Promise<Account | null> {
     const row = await this.db.prepare(
       `SELECT a.id, a.apple_sub, a.email, a.username, a.display_name, a.provider, a.created_at
-       FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token = ?`,
-    ).bind(token).first<AccountRow>();
+       FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token = ? AND s.created_at > ?`,
+    ).bind(token, now - SESSION_TTL_MS).first<AccountRow>();
     return row ? accountFromRow(row) : null;
   }
 

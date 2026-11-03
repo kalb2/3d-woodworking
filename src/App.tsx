@@ -22,6 +22,7 @@ import { useMeasure } from './measure/useMeasure';
 import { HoleModeBar } from './components/layout/HoleModeBar';
 import { useUndoShortcuts } from './components/layout/UndoRedoButtons';
 import { HomeScreen } from './components/home/HomeScreen';
+import { SaveErrorBanner } from './components/layout/SaveErrorBanner';
 import { TransformMenu } from './components/layout/TransformMenu';
 import { ShareSheet } from './components/share/ShareSheet';
 import { JoinSheet } from './joinery/JoinSheet';
@@ -72,7 +73,12 @@ export const App: React.FC = () => {
   }, [selectedObjectId, isPhone, currentView, setOverlayOpen]);
 
   if (currentView === 'home') {
-    return <HomeScreen />;
+    return (
+      <>
+        <HomeScreen />
+        <SaveErrorBanner />
+      </>
+    );
   }
 
   const anyOverlayOpen =
@@ -86,6 +92,7 @@ export const App: React.FC = () => {
 
   return (
     <div className={`editor-root${isPhone ? ' is-phone' : ''}`}>
+      <SaveErrorBanner />
       {/* 3D Furniture Viewport */}
       <FurnitureCanvas />
 

@@ -8,15 +8,19 @@ const mem = new Map<string, string>();
 } as Storage;
 (globalThis as unknown as { window: unknown }).window ??= globalThis;
 
-// The server echoes what it was sent, but only after we "release" it, so the
-// test can edit while the push is in flight (like the first drag after launch).
+// The server keeps what it was sent and answers with everything it has, but
+// only after we "release" it, so the test can edit while the push is in flight
+// (like the first drag after launch).
 let release: (() => void) | null = null;
+const server = new Map<string, SyncRecord>();
 vi.mock('../sync/client.ts', async (orig) => ({
   ...(await orig<typeof import('../sync/client.ts')>()),
   pushRecords: (_t: string, records: SyncRecord[]) => new Promise((resolve) => {
-    const echo = JSON.parse(JSON.stringify(records));
-    release = () => resolve({ records: echo });
+    for (const record of JSON.parse(JSON.stringify(records)) as SyncRecord[]) server.set(record.id, record);
+    const all = JSON.parse(JSON.stringify([...server.values()]));
+    release = () => resolve({ records: all });
   }),
+  fetchRecords: () => Promise.resolve({ records: JSON.parse(JSON.stringify([...server.values()])) }),
 }));
 
 const { useProjectStore } = await import('./useProjectStore');

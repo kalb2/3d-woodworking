@@ -134,7 +134,11 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     let account = await db.findAccountBySub(resolved.appleSub);
     if (!account) {
       if (!resolved.email) {
-        return json({ error: 'Apple did not share an email. Sign in again and allow email.', status: 400 });
+        // A real 4xx, so the app treats it as a failed sign-in (not a session).
+        return json({
+          error: 'Apple didn\'t share an email for this new account. In Settings → your name → Sign in with Apple, remove The Workbench, then sign in again and choose to share your email.',
+          code: 'apple_email_missing',
+        }, 400);
       }
       account = {
         id: crypto.randomUUID(),

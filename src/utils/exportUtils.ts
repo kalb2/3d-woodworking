@@ -11,6 +11,7 @@ import { builtInHardware } from '../builtins/builtIns';
 import { saveFile, type SaveResult } from '../native/fileExport';
 import { EXAMPLE_NOTE, FLAT_LABEL, cents, projectCost, sanitizePrices, type ProjectCost, type ResolvedPrices } from '../cost/cost';
 import { pricesFor } from '../cost/usePriceStore';
+import { newId } from './ids';
 export type { HardwareItem } from '../joinery/joints';
 
 export interface CutListItem {
@@ -380,7 +381,7 @@ export async function copyProjectToClipboard(project: FurnitureProject): Promise
 }
 
 let importSeq = 0;
-const freshId = (prefix: string) => `${prefix}_${Date.now()}_${(importSeq++).toString(36)}${Math.random().toString(36).substring(2, 5)}`;
+const freshId = (prefix: string) => { importSeq++; return newId(prefix); };
 
 /** Inches. Far past any real piece, and inside what the 3D view can hold without blowing up. */
 const MAX_IMPORT_INCHES = 10000;
@@ -440,7 +441,12 @@ export function importProjectData(projectData: any, options: { suffix?: string; 
   const joints = Array.isArray(projectData.joints)
     ? (projectData.joints as any[])
       .filter((j) => idMap.has(j.receiverId) && idMap.has(j.materId))
-      .map((j) => ({ ...j, receiverId: idMap.get(j.receiverId)!, materId: idMap.get(j.materId)! }))
+      .map((j) => ({
+        ...j,
+        ...(options.keepIds && typeof j.id === 'string' ? {} : { id: freshId('joint') }),
+        receiverId: idMap.get(j.receiverId)!,
+        materId: idMap.get(j.materId)!,
+      }))
     : [];
 
   const keep = !!options.keepIds && typeof projectData.id === 'string';

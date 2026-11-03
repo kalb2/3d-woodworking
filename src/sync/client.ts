@@ -12,10 +12,18 @@ export interface StoredSession {
   account: Account;
 }
 
+/** The live sync Worker. Used by production builds when VITE_SYNC_API_URL isn't set (e.g. a fresh clone). */
+export const PRODUCTION_SYNC_URL = 'https://workbench-sync.k24corp.workers.dev';
+
+/** VITE_SYNC_API_URL wins; a production build falls back to the live Worker; dev uses the Vite middleware (''). */
+export function resolveSyncBaseUrl(env: Record<string, unknown>): string {
+  const configured = typeof env.VITE_SYNC_API_URL === 'string' ? env.VITE_SYNC_API_URL.trim() : '';
+  if (configured) return configured.replace(/\/$/, '');
+  return env.PROD === true ? PRODUCTION_SYNC_URL : '';
+}
+
 export function syncBaseUrl(): string {
-  const env = import.meta.env as Record<string, string | undefined>;
-  const configured = env.VITE_SYNC_API_URL?.trim();
-  return configured ? configured.replace(/\/$/, '') : '';
+  return resolveSyncBaseUrl(import.meta.env as Record<string, unknown>);
 }
 
 /** The Vite dev server serves /api/v1. A native build does not, unless a Worker URL is set. */
@@ -116,6 +124,34 @@ export function deleteAccountRequest(
 
 export function fetchRecords(token: string): Promise<{ records: SyncRecord[] }> {
   return request('/projects', { headers: authHeaders(token) });
+}
+
+/** The Worker refuses PUT bodies over 2,000,000 characters; stay well under it. */
+export const SYNC_BATCH_LIMIT = 1_500_000;
+
+/**
+ * Split records into PUT bodies under `limit` characters. A record that is too
+ * big on its own can never upload; it comes back in `tooLarge` instead.
+ */
+export function batchRecords(records: SyncRecord[], limit = SYNC_BATCH_LIMIT): { batches: SyncRecord[][]; tooLarge: SyncRecord[] } {
+  const overhead = JSON.stringify({ records: [] }).length;
+  const batches: SyncRecord[][] = [];
+  const tooLarge: SyncRecord[] = [];
+  let current: SyncRecord[] = [];
+  let size = overhead;
+  for (const record of records) {
+    const length = JSON.stringify(record).length + 1;
+    if (overhead + length > limit) { tooLarge.push(record); continue; }
+    if (current.length && size + length > limit) {
+      batches.push(current);
+      current = [];
+      size = overhead;
+    }
+    current.push(record);
+    size += length;
+  }
+  if (current.length) batches.push(current);
+  return { batches, tooLarge };
 }
 
 export function pushRecords(token: string, records: SyncRecord[]): Promise<SyncPushResponse> {

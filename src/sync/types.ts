@@ -65,7 +65,8 @@ export interface SyncDatabase {
   createAccount(account: Account, passwordHash?: string | null): Promise<void>;
   deleteAccount(accountId: string): Promise<void>;
   createSession(token: string, accountId: string, createdAt: number): Promise<void>;
-  accountForSession(token: string): Promise<Account | null>;
+  /** The session's account, or null when the token is unknown or older than SESSION_TTL_MS. */
+  accountForSession(token: string, now?: number): Promise<Account | null>;
   deleteSession(token: string): Promise<void>;
   deleteSessionsForAccount(accountId: string): Promise<void>;
   listRecords(accountId: string): Promise<SyncRecord[]>;
@@ -85,3 +86,6 @@ export function acceptedAppleAudiences(primary: string = APPLE_AUDIENCE): string
   return [...new Set([primary, APPLE_AUDIENCE, ...LEGACY_APPLE_AUDIENCES].map((id) => id.trim()).filter(Boolean))];
 }
 export const API_PREFIX = '/api/v1';
+
+/** A sign-in session lasts this long; then the app asks to sign in again. */
+export const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;

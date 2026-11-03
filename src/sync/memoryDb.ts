@@ -1,4 +1,5 @@
 import type { Account, SyncDatabase, SyncRecord } from './types.ts';
+import { SESSION_TTL_MS } from './types.ts';
 import { mergeRecords } from './merge.ts';
 
 export class MemorySyncDb implements SyncDatabase {
@@ -7,6 +8,8 @@ export class MemorySyncDb implements SyncDatabase {
   protected usernames = new Map<string, string>();
   protected passwordHashes = new Map<string, string>();
   protected sessions = new Map<string, string>();
+  /** When each session was made (sessions restored from a snapshot count from the restore). */
+  protected sessionCreated = new Map<string, number>();
   protected records = new Map<string, SyncRecord[]>();
 
   findAccountBySub(appleSub: string): Promise<Account | null> {
@@ -43,24 +46,28 @@ export class MemorySyncDb implements SyncDatabase {
     return Promise.resolve();
   }
 
-  createSession(token: string, accountId: string, _createdAt: number): Promise<void> {
+  createSession(token: string, accountId: string, createdAt: number): Promise<void> {
     this.sessions.set(token, accountId);
+    this.sessionCreated.set(token, createdAt);
     return Promise.resolve();
   }
 
-  accountForSession(token: string): Promise<Account | null> {
+  accountForSession(token: string, now = Date.now()): Promise<Account | null> {
+    const createdAt = this.sessionCreated.get(token) ?? now;
+    if (createdAt <= now - SESSION_TTL_MS) return Promise.resolve(null);
     const accountId = this.sessions.get(token);
     return Promise.resolve(accountId ? this.accounts.get(accountId) ?? null : null);
   }
 
   deleteSession(token: string): Promise<void> {
     this.sessions.delete(token);
+    this.sessionCreated.delete(token);
     return Promise.resolve();
   }
 
   deleteSessionsForAccount(accountId: string): Promise<void> {
     for (const [token, id] of this.sessions) {
-      if (id === accountId) this.sessions.delete(token);
+      if (id === accountId) { this.sessions.delete(token); this.sessionCreated.delete(token); }
     }
     return Promise.resolve();
   }
@@ -97,6 +104,7 @@ export class MemorySyncDb implements SyncDatabase {
     this.usernames.clear();
     this.passwordHashes.clear();
     this.sessions.clear();
+    this.sessionCreated.clear();
     this.records.clear();
     for (const account of data.accounts ?? []) {
       const stored = { ...account, username: account.username || '' };

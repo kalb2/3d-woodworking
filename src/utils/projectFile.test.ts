@@ -65,13 +65,14 @@ describe('backups', () => {
 
   it('restores missing projects as they were, skips unchanged, copies edited ones', () => {
     const text = backupFileText([proj('a', 100), proj('b', 100), proj('c', 100)]);
-    const opened = openProjectFile(text, [{ id: 'a', updatedAt: 100 }, { id: 'b', updatedAt: 200 }])!;
+    const opened = openProjectFile(text, [{ id: 'a', updatedAt: 100 }, { id: 'b', updatedAt: 200 }], 5000)!;
     expect(opened.kind).toBe('backup');
     expect(opened.skipped).toBe(1);
     const [b, c] = opened.projects;
     expect(b.id).not.toBe('b');
     expect(b.name).toBe('Cabinet b (from backup)');
-    expect(c).toMatchObject({ id: 'c', name: 'Cabinet c', createdAt: 50, updatedAt: 100 });
+    // Restored as it was, but saved "now" so it beats any delete tombstone on sync.
+    expect(c).toMatchObject({ id: 'c', name: 'Cabinet c', createdAt: 50, updatedAt: 5000 });
     expect(c.objects.map((o) => o.id)).toEqual(['G', 'side', 'shelf']);
     expect(c.joints?.[0]).toMatchObject({ receiverId: 'side', materId: 'shelf' });
     expect(openedMessage(opened)).toBe('Restored 2 projects (1 already here).');

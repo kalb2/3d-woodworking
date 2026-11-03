@@ -24,14 +24,35 @@ function signatureBytes(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-async function appleKeys(): Promise<AppleJwk[]> {
-  if (cachedKeys && Date.now() - cachedKeys.fetchedAt < 60 * 60 * 1000) return cachedKeys.keys;
+const KEY_CACHE_MS = 60 * 60 * 1000;
+/** After a refetch for an unknown key id, wait this long before forcing another. */
+const UNKNOWN_KID_REFETCH_MS = 60 * 1000;
+
+async function fetchAppleKeys(): Promise<AppleJwk[]> {
   const response = await fetch('https://appleid.apple.com/auth/keys');
   if (!response.ok) throw new Error('Apple key set is unavailable.');
   const body = await response.json() as { keys?: AppleJwk[] };
   const keys = body.keys ?? [];
   cachedKeys = { keys, fetchedAt: Date.now() };
   return keys;
+}
+
+async function appleKeys(): Promise<AppleJwk[]> {
+  if (cachedKeys && Date.now() - cachedKeys.fetchedAt < KEY_CACHE_MS) return cachedKeys.keys;
+  return fetchAppleKeys();
+}
+
+/** The key for `kid`. Apple rotates keys: an unknown id refetches the set once (at most once a minute). */
+async function appleKeyFor(kid: string): Promise<AppleJwk | undefined> {
+  const found = (await appleKeys()).find((key) => key.kid === kid);
+  if (found) return found;
+  if (cachedKeys && Date.now() - cachedKeys.fetchedAt < UNKNOWN_KID_REFETCH_MS) return undefined;
+  return (await fetchAppleKeys()).find((key) => key.kid === kid);
+}
+
+/** Tests: forget the cached Apple key set. */
+export function resetAppleKeyCache() {
+  cachedKeys = null;
 }
 
 /**
@@ -55,7 +76,7 @@ export async function verifyAppleIdentityToken(
     email?: string;
   };
   if (header.alg !== 'RS256' || !header.kid) throw new Error('Unexpected Apple token header.');
-  const jwk = (await appleKeys()).find((key) => key.kid === header.kid);
+  const jwk = await appleKeyFor(header.kid);
   if (!jwk) throw new Error('Apple signing key was not found.');
   const key = await crypto.subtle.importKey(
     'jwk',
