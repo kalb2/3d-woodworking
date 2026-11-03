@@ -1,12 +1,15 @@
 /**
  * Public site links shown in the app (••• menu → About).
  *
- * PENDING: this is the current Vercel deployment of the Workbench site, which is
- * still behind Vercel Deployment Protection (anonymous visitors get a login page).
- * Swap in the final public production URL before App Store submission. It must
- * match the Privacy Policy URL and Support URL entered in App Store Connect.
+ * This is the Workbench site's stable Vercel production URL (the project's
+ * production domain, not a per-deploy preview URL), so it keeps working across
+ * site deploys. It must match the Privacy Policy URL and Support URL entered in
+ * App Store Connect.
+ *
+ * PENDING: the site is still behind Vercel Deployment Protection (anonymous
+ * visitors get a login page) until it is made public at submission prep.
  */
-export const SITE_BASE_URL = 'https://workbench-site-ia8vv6jx8-kalb2s-projects.vercel.app';
+export const SITE_BASE_URL = 'https://workbench-site-two.vercel.app';
 
 export const PRIVACY_POLICY_URL = `${SITE_BASE_URL}/privacy`;
 export const SUPPORT_URL = `${SITE_BASE_URL}/support`;
