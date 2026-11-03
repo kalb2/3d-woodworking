@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { LengthField } from './LengthField';
+import { MAX_PART_INCHES } from '../../utils/units';
 
 afterEach(cleanup);
 
@@ -47,6 +48,24 @@ describe('LengthField', () => {
     fireEvent.change(f, { target: { value: '300' } });
     fireEvent.blur(f);
     expect(onCommit.mock.calls[0][0]).toBeCloseTo(300 / 25.4, 6);
+  });
+  it('clamps an absurd size like 99999" to 30 ft', () => {
+    const onCommit = vi.fn();
+    const r = render(<LengthField testId="f" aria-label="Width" inches={10} unit="in" onCommit={onCommit} />);
+    const f = r.getByTestId('f') as HTMLInputElement;
+    fireEvent.focus(f);
+    fireEvent.change(f, { target: { value: '99999' } });
+    fireEvent.blur(f);
+    expect(onCommit).toHaveBeenCalledWith(MAX_PART_INCHES);
+  });
+  it('a tighter max still wins', () => {
+    const onCommit = vi.fn();
+    const r = render(<LengthField testId="f" aria-label="Width" inches={10} unit="in" max={96} onCommit={onCommit} />);
+    const f = r.getByTestId('f') as HTMLInputElement;
+    fireEvent.focus(f);
+    fireEvent.change(f, { target: { value: '200' } });
+    fireEvent.blur(f);
+    expect(onCommit).toHaveBeenCalledWith(96);
   });
   it('allows negative offsets when there is no lower limit', () => {
     const onCommit = vi.fn();

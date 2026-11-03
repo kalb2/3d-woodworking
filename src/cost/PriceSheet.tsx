@@ -28,6 +28,10 @@ const Amount: React.FC<{ value: number; suffix?: '%'; label: string; testId: str
   const [draft, setDraft] = React.useState(shown);
   React.useEffect(() => setDraft(shown), [shown]);
   const commit = () => {
+    // Same rule as NumberField: leaving the box untouched must not write a price.
+    // Otherwise an example price loses its example flag, an unpriced row becomes
+    // a real $0.00, and a project override is created for a value nobody edited.
+    if (draft.trim() === shown.trim()) return;
     const t = draft.trim().replace(/[$,%\s]/g, '');
     if (t === '') { onCommit(null); return; }
     const n = Number(t);

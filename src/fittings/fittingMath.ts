@@ -20,6 +20,13 @@ export function slideLengthFor(depth: number): number | null {
 export type SlideType = 'side' | 'under';
 
 /**
+ * Inches kept clear of the cabinet back before a slide length is chosen.
+ * Side-mount slides need about 1" so the box doesn't hit the back. Undermount
+ * runners need more room for the rear bracket.
+ */
+export const SLIDE_REAR_CLEARANCE: Record<SlideType, number> = { side: 1, under: 1.5 };
+
+/**
  * Slide clearances.
  * Side-mount ball-bearing: 1/2" each side (box 1" narrower than the opening),
  * 1/2" under and over the box.
@@ -100,8 +107,10 @@ export function drawerPlan(v: DrawerPlanInput): DrawerPlan {
   // Zones split the opening at the middle of each gap.
   const cuts = [v.height, ...fronts.slice(0, -1).map((f) => f.y0 - g / 2), 0].map((y) => Math.max(0, Math.min(v.height, y)));
   const boxFrontZ = inset ? -v.frontT : 0;
-  const slide = slideLengthFor(v.depth + boxFrontZ);
-  const length = slide ?? r16(Math.max(4, v.depth + boxFrontZ - 1));
+  // Depth the box can actually use: opening, minus an inset front, minus rear clearance.
+  const available = v.depth + boxFrontZ - SLIDE_REAR_CLEARANCE[v.slide];
+  const slide = slideLengthFor(available);
+  const length = slide ?? r16(Math.max(4, available));
   const bw = boxWidth(v.width, v.slide, v.side);
   const boxes = fronts.map((_, i) => {
     const hi = cuts[i], lo = cuts[i + 1];

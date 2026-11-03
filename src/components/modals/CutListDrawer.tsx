@@ -3,7 +3,7 @@ import { Layers, FileSpreadsheet, X } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { generateCutList, exportCutListCSV, cutListSections, lumberBuyList, panelText, projectHardware, sheetBuyList, type CutListItem, type CutListSection, type StickBuy } from '../../utils/exportUtils';
 import { formatLens, formatSmallLen } from '../../utils/lengthFormat';
-import { LUMBER_WASTE, SHEET, sheetHasGrain, stickFeet, type SheetLayout, type SheetNest } from '../../utils/stock';
+import { END_TRIM, LUMBER_WASTE, SHEET, sheetHasGrain, stickFeet, type SheetLayout, type SheetNest } from '../../utils/stock';
 import { useReliableTap } from '../../utils/reliableTap';
 import type { FurnitureProject } from '../../types/furniture';
 import { CostSection } from '../../cost/CostSection';
@@ -350,7 +350,7 @@ export const CutListDrawer: React.FC<CutListDrawerProps> = ({ isOpen, onClose })
               Finished sizes, joinery included. Length runs with the grain.
               {hasSheets && ' Sheets: panels nested on 4×8 with straight-through (guillotine) cuts and a 1/8" kerf; plywood keeps its grain on the 8\' side, MDF may turn.'}
               {hasLumber && ` Board feet use nominal size for 1×2, 2×4 and other dimensional pine, rough thickness for other lumber (3/4" from 4/4).`}
-              {buys.length > 0 && ' Dimensional lumber is packed longest-first onto 8, 10 or 12 ft sticks with a 1/8" kerf, picking the length that wastes least.'}
+              {buys.length > 0 && ` Dimensional lumber is packed longest-first onto 8, 10 or 12 ft sticks with a 1/8" kerf and ${END_TRIM}" to square the ends, picking the length that wastes least.`}
               {sections.some((s) => s.kind === 'lumber' && s.summary.includes('waste')) && ` Other lumber: buy amount adds ${Math.round(LUMBER_WASTE * 100)}%.`}
             </p>
           )}

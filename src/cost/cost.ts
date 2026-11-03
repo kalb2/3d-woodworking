@@ -72,7 +72,7 @@ export const DEFAULT_PRICES: Required<Omit<PriceSettings, 'items'>> & { items: R
     [stickKey('2×4', 96)]: 4.5, [stickKey('2×4', 120)]: 6.5, [stickKey('2×4', 144)]: 8,
     [stickKey('2×6', 96)]: 7.5, [stickKey('2×6', 120)]: 10, [stickKey('2×6', 144)]: 12.5,
     [sheetKey('plywood', 0.75)]: 65, [sheetKey('plywood', 0.5)]: 50, [sheetKey('plywood', 0.25)]: 32,
-    [sheetKey('mdf', 0.75)]: 45, [sheetKey('mdf', 0.5)]: 38,
+    [sheetKey('mdf', 0.75)]: 45, [sheetKey('mdf', 0.5)]: 38, [sheetKey('mdf', 0.25)]: 28,
     [sheetKey('custom_paint', 0.75)]: 55,
     'bf:oak': 7, 'bf:walnut': 14, 'bf:cherry': 10, 'bf:mahogany': 12, 'bf:birch': 6, 'bf:pine': 4, 'bf:custom_paint': 5, 'bf:teak': 30, 'bf:ebony': 90,
     'hw:slide-side': 12, 'hw:slide-under': 35, 'hw:hinge-concealed': 4, 'hw:hinge-butt': 3,
