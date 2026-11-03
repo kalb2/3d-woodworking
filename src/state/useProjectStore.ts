@@ -528,7 +528,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
-    } catch (err) { console.warn('Failed to save after delete:', err); set({ saveError: SAVE_FAILED_MESSAGE }); }
+    } catch (e) {}
     notifyProjectPersist({ type: 'delete', id, updatedAt: Date.now() });
   },
 
