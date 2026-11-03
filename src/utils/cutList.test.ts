@@ -10,6 +10,13 @@ const part = (id: string, dims: [number, number, number], extra: Partial<Furnitu
 const project = (objects: FurnitureObject[], unit: FurnitureProject['unit'] = 'in') => ({ id: 'p', name: 'P', unit, objects } as unknown as FurnitureProject);
 
 describe('cut list', () => {
+  it('an empty project has nothing to cut, buy, or nest', () => {
+    expect(generateCutList(project([]))).toEqual([]);
+    expect(cutListSections([], 'in')).toEqual([]);
+    expect(lumberBuyList([])).toEqual([]);
+    expect(sheetBuyList([])).toEqual([]);
+  });
+
   it('merges identical boards regardless of orientation; keeps 3/4" exact; parts in nested groups count', () => {
     const items = generateCutList(project([
       part('G', [10, 10, 10], { shape: 'group' }),
@@ -70,7 +77,8 @@ describe('cut list', () => {
     expect(sec.pieces).toBe(5);
     expect(sec.boardFeet).toBeCloseTo(4 / 3 + 8 / 3 + 2 * 16 / 3 + 8, 6);
     expect(sec.summary).toBe('22.7 bd ft of 1×2, 2×2, 2×4, 2×6'); // stick counts say what to buy
-    expect(sec.sticks!.map((b) => b.text)).toEqual(['1 × 1×2 at 8 ft', '1 × 2×2 at 8 ft', '2 × 2×4 at 8 ft', '1 × 2×6 at 8 ft']);
+    // A full 8 ft part needs a 10 ft stick: 1" is kept to square the ends.
+    expect(sec.sticks!.map((b) => b.text)).toEqual(['1 × 1×2 at 10 ft', '1 × 2×2 at 10 ft', '2 × 2×4 at 10 ft', '1 × 2×6 at 10 ft']);
     const csv = cutListCSV(project([stick('stud', 3.5, 1.5)]));
     expect(csv).toContain('"stud","Box","96""","3 1/2""","1 1/2""","Rustic Pine",Lumber,1,5.3,');
   });
@@ -123,7 +131,7 @@ describe('cut list', () => {
     expect(csv).toContain('"Rustic Pine","19 bd ft of 2×4, 2×6"');
     expect(csv).toContain('"Rustic Pine · 2×4","1 × 2×4 at 8 ft"');
     expect(csv).toContain('"Rustic Pine · 2×6","1 2×6 part is longer than 12 ft"');
-    expect(csv).toContain('\nStick,Stock,Cuts,Left over\n"2×4 #1","8 ft","30"" + 30"" + 30""","5 3/4"""\n');
+    expect(csv).toContain('\nStick,Stock,Cuts,Left over\n"2×4 #1","8 ft","30"" + 30"" + 30""","4 3/4"""\n');
     expect(csv).toContain('"2×6 (too long)","over 12 ft","168""",""');
   });
 

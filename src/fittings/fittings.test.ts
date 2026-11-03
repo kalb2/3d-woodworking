@@ -73,6 +73,17 @@ describe('drawerPlan', () => {
     expect(p.slide).toBeNull();
     expect(p.boxes[0].length).toBe(7);
   });
+
+  it('leaves clearance behind the box before choosing a slide', () => {
+    // A 20" opening used to get a 20" slide and a 20" box, hard against the back.
+    const side = drawerPlan({ ...base, depth: 20, count: 1, slide: 'side' });
+    expect(side.slide).toBe(18);
+    expect(side.boxes[0].length).toBe(18);
+    const under = drawerPlan({ ...base, depth: 20, count: 1, slide: 'under' });
+    expect(under.slide).toBe(18);
+    expect(under.boxes[0].length).toBe(18);
+    expect(under.boxes[0].length).toBeLessThanOrEqual(20 - 1.5);
+  });
 });
 
 describe('hinges', () => {
@@ -244,6 +255,6 @@ describe('placing in an opening', () => {
     const g = out.objects.find((x) => x.id === d.groupId)!;
     expect(g.builtIn!.input.depth).toBe(22);
     const back = (objs: FurnitureObject[]) => Math.min(...objs.filter((x) => x.builtInId === g.builtIn!.id).map((x) => x.position.z - x.dimensions.width / 2));
-    close(back(out.objects), back(d.objects)); // 20" → 22" slides; the front moves out 2"
+    close(back(out.objects), back(d.objects)); // 18" → 20" slides; the front moves out 2"
   });
 });

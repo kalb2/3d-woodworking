@@ -51,9 +51,9 @@ export function stackRows(spans: Array<[number, number]>, pad = 4): number[] {
   });
 }
 
-/** Cuts along a stick as [start, end] inches from its end, kerf between them. */
-export function stickSegments(cuts: number[], kerf = KERF): Array<[number, number]> {
-  let x = 0;
+/** Cuts along a stick as [start, end] inches from its end, kerf between them. `start` skips the end trim. */
+export function stickSegments(cuts: number[], kerf = KERF, start = 0): Array<[number, number]> {
+  let x = start;
   return cuts.map((c) => { const seg: [number, number] = [x, x + c]; x += c + kerf; return seg; });
 }
 
