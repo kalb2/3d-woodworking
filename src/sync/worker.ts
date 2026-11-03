@@ -1,7 +1,7 @@
 import { D1SyncDb, type D1Like } from './d1Db.ts';
 import { handleSyncRequest } from './handler.ts';
 import { createIdentityResolver } from './identity.ts';
-import { APPLE_AUDIENCE } from './types.ts';
+import { APPLE_AUDIENCE, acceptedAppleAudiences } from './types.ts';
 import type { RateLimiter, WorkersAiBinding } from '../ai/aiHandler.ts';
 import { mockDescribe } from '../ai/mock.ts';
 import { DESCRIBE_CLOUD_ENABLED } from '../config/features.ts';
@@ -54,7 +54,8 @@ export function aiOptions(env: WorkerEnv, enabled = DESCRIBE_CLOUD_ENABLED): Syn
 
 /** Sign in with Apple revocation on DELETE /me, using the APPLE_* Worker secrets. */
 export function appleRevokeOption(env: WorkerEnv, audience: string, fetchImpl: typeof fetch = fetch): SyncHandlerOptions['appleRevoke'] {
-  const config = appleRevokeConfig(env, audience);
+  // Codes from builds still on the old bundle id only exchange under that client id.
+  const config = appleRevokeConfig(env, audience, acceptedAppleAudiences(audience));
   return (account, code) => revokeAppleAuthorization(code, account.appleSub, config, fetchImpl);
 }
 
@@ -66,11 +67,12 @@ export default {
         { status: 503 },
       );
     }
-    const audience = env.APPLE_AUDIENCE || APPLE_AUDIENCE;
+    const audience = env.APPLE_AUDIENCE?.trim() || APPLE_AUDIENCE;
     const allowDev = env.ALLOW_DEV_AUTH === '1';
     return handleSyncRequest(request, {
       db: new D1SyncDb(env.DB),
-      identity: createIdentityResolver({ allowDev, appleAudience: audience }),
+      // New bundle id plus the old one, so builds installed before the rename keep signing in.
+      identity: createIdentityResolver({ allowDev, appleAudience: acceptedAppleAudiences(audience) }),
       config: { devSignIn: allowDev, mode: 'cloud', appleAudience: audience },
       ai: aiOptions(env),
       appleRevoke: appleRevokeOption(env, audience),

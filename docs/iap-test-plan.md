@@ -6,7 +6,7 @@ Digital goods (Pro, extra cloud, paid templates) stay inside IAP. There is no we
 
 ## Before any test
 
-- [ ] Products created in App Store Connect for bundle id `com.antigravity.furniture3d` (subscription or non-consumable, matching the offer you actually sell)
+- [ ] Products created in App Store Connect for bundle id `com.k24corp.workbench` (subscription or non-consumable, matching the offer you actually sell)
 - [ ] Paid Applications agreement and banking are active on the developer account
 - [ ] A sandbox Apple ID that is not the same Apple ID as the device’s Media & Purchases account
 - [ ] The build under test includes StoreKit and the product ids. Until that build exists, stop here

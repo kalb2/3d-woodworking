@@ -37,10 +37,11 @@ async function appleKeys(): Promise<AppleJwk[]> {
 /**
  * Verifies a Sign in with Apple identity token.
  * No client secret is required: Apple publishes the RS256 keys.
+ * `audience` is the accepted bundle id, or a list of accepted bundle ids.
  */
 export async function verifyAppleIdentityToken(
   token: string,
-  audience: string,
+  audience: string | readonly string[],
 ): Promise<{ sub: string; email?: string }> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Token is not a JWT.');
@@ -72,7 +73,8 @@ export async function verifyAppleIdentityToken(
   if (!valid) throw new Error('Apple token signature is invalid.');
   if (payload.iss !== 'https://appleid.apple.com') throw new Error('Unexpected token issuer.');
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!audiences.includes(audience)) throw new Error('Token audience does not match this app.');
+  const accepted: readonly string[] = typeof audience === 'string' ? [audience] : audience;
+  if (!audiences.some((aud) => typeof aud === 'string' && accepted.includes(aud))) throw new Error('Token audience does not match this app.');
   if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('Apple token has expired.');
   if (!payload.sub) throw new Error('Apple token is missing a subject.');
   return { sub: payload.sub, email: payload.email };

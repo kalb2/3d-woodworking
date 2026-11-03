@@ -3,7 +3,8 @@ import type { AppleAuthRequest, IdentityResolver, ResolvedIdentity } from './typ
 
 export interface IdentityOptions {
   allowDev: boolean;
-  appleAudience: string;
+  /** Accepted Sign in with Apple audience (bundle id), or several. */
+  appleAudience: string | readonly string[];
 }
 
 interface DevPayload {

@@ -9,7 +9,7 @@ npm run build:ios
 
 No trailing slash. A build without that line keeps projects on the device and will not sign up. `npm run dev` on a computer still uses the local Vite sync file and is a separate check.
 
-Bundle id is `com.antigravity.furniture3d`. Team `ZNKG8BKXAT`.
+Bundle id is `com.k24corp.workbench`. Team `ZNKG8BKXAT`.
 
 ## Home and profile
 

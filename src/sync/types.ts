@@ -72,5 +72,16 @@ export interface SyncDatabase {
   upsertRecord(accountId: string, record: SyncRecord): Promise<SyncRecord>;
 }
 
-export const APPLE_AUDIENCE = 'com.antigravity.furniture3d';
+/** Bundle id of The Workbench, and the Sign in with Apple identity-token audience and client id. */
+export const APPLE_AUDIENCE = 'com.k24corp.workbench';
+/**
+ * Earlier bundle ids. Builds installed before the rename still sign in with these
+ * audiences, so the sync server keeps accepting them.
+ */
+export const LEGACY_APPLE_AUDIENCES: readonly string[] = ['com.antigravity.furniture3d'];
+
+/** Audiences the sync server accepts: `primary` first, then the current and legacy bundle ids. */
+export function acceptedAppleAudiences(primary: string = APPLE_AUDIENCE): string[] {
+  return [...new Set([primary, APPLE_AUDIENCE, ...LEGACY_APPLE_AUDIENCES].map((id) => id.trim()).filter(Boolean))];
+}
 export const API_PREFIX = '/api/v1';

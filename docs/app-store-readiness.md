@@ -1,13 +1,14 @@
 # App Store readiness
 
-Checklist for The Workbench (`com.antigravity.furniture3d`). StoreKit is not in this build. Pro stays a later App Store In-App Purchase. See `docs/monetization.md` and `docs/iap-test-plan.md`. Device steps are in `docs/smoke-test.md`.
+Checklist for The Workbench (`com.k24corp.workbench`; the bundle id was `com.antigravity.furniture3d` before the rename). StoreKit is not in this build. Pro stays a later App Store In-App Purchase. See `docs/monetization.md` and `docs/iap-test-plan.md`. Device steps are in `docs/smoke-test.md`.
 
 ## App identity
 
-- [x] Apple Developer App ID `com.antigravity.furniture3d` has Sign in with Apple
-- [x] Xcode target bundle id is `com.antigravity.furniture3d` (Debug and Release), team `ZNKG8BKXAT`
+- [ ] Apple Developer App ID `com.k24corp.workbench` has Sign in with Apple (the first signed build with `-allowProvisioningUpdates` registers it)
+- [ ] The Sign in with Apple key used for revocation (`APPLE_KEY_ID`) is enabled for `com.k24corp.workbench`
+- [x] Xcode target bundle id is `com.k24corp.workbench` (Debug and Release), team `ZNKG8BKXAT`
 - [x] Entitlement file `ios/App/App/App.entitlements` sets `com.apple.developer.applesignin` to Default
-- [x] `capacitor.config.json` `appId` is `com.antigravity.furniture3d`, matching Xcode
+- [x] `capacitor.config.json` `appId` is `com.k24corp.workbench`, matching Xcode
 - [ ] App Store Connect record uses that same bundle id
 - [ ] On Kalb-Mini, Signing & Capabilities lists **Sign in with Apple**. If the profile is stale, toggle the capability off and on once
 
@@ -17,7 +18,7 @@ Display name in `Info.plist` is The Workbench. Marketing version is `1.0`, build
 
 ## Sign in
 
-Account creation is a username and password. No email or phone is required. Sign in with Apple is the second button and opens only in the iOS app. The identity-token audience is `com.antigravity.furniture3d`.
+Account creation is a username and password. No email or phone is required. Sign in with Apple is the second button and opens only in the iOS app. The identity-token audience is `com.k24corp.workbench`. The Worker also accepts `com.antigravity.furniture3d` for builds installed before the rename.
 
 Username-only accounts are an acceptable App Store path when the app does not offer another social login (Google, Facebook, and similar). Apple sign-in stays available. It is not required to create an account.
 

@@ -30,7 +30,7 @@ Prefix: `/api/v1`
 
 Username accounts: the username is stored lowercase, 3–32 characters, starting with a letter, then letters, numbers, or underscores. The password is 8–200 characters. The server stores PBKDF2-SHA256 (`pbkdf2$iterations$salt$hash`, 100,000 iterations) and never returns the hash on the account. A taken username is `409`. A wrong username or password is `401` with “Username or password is wrong.” Sessions are the same random bearer tokens as Apple sign-in. The account uses `provider: "password"`, `appleSub: "name:<username>"`, and an empty email.
 
-Apple identity tokens are verified with Apple’s JWKS (RS256, issuer `https://appleid.apple.com`, audience `com.antigravity.furniture3d`). No Apple client secret is required. Dev tokens are `dev.` plus base64url JSON `{ email, displayName }` and are accepted only when `ALLOW_DEV_AUTH` is on. That path is not on the Profile screen. The same email maps to one account (`appleSub` `dev:<email>`).
+Apple identity tokens are verified with Apple’s JWKS (RS256, issuer `https://appleid.apple.com`, audience `com.k24corp.workbench`; the Worker also accepts the pre-rename bundle id `com.antigravity.furniture3d` so builds installed before the rename keep signing in). No Apple client secret is required. Dev tokens are `dev.` plus base64url JSON `{ email, displayName }` and are accepted only when `ALLOW_DEV_AUTH` is on. That path is not on the Profile screen. The same email maps to one account (`appleSub` `dev:<email>`).
 
 ## Environment
 
@@ -38,7 +38,7 @@ Apple identity tokens are verified with Apple’s JWKS (RS256, issuer `https://a
 | --- | --- | --- |
 | `VITE_SYNC_API_URL` | app build | Worker origin, no trailing slash. Empty uses the same origin, which is correct for `npm run dev`. A Capacitor build (`capacitor://localhost`) must set this to the deployed Worker or Profile stays on-device with the sentence above. People using the app never see this name. |
 | `ALLOW_DEV_AUTH` | Worker secret | Set to `1` only on a private dev Worker. Production should omit it so dev email tokens are rejected. Username accounts and Apple tokens still work. |
-| `APPLE_AUDIENCE` | Worker secret, optional | Defaults to `com.antigravity.furniture3d`. |
+| `APPLE_AUDIENCE` | Worker secret, optional | Primary audience. Defaults to `com.k24corp.workbench`. That default and the legacy `com.antigravity.furniture3d` are always accepted too (`acceptedAppleAudiences` in `src/sync/types.ts`). |
 | D1 binding `DB` | `worker/wrangler.toml` | Database name `workbench`, id `e87ee84f-66b3-4e33-9aad-ca20e995534c`. |
 
 Dev data file `.data/sync-dev.json` is gitignored.
@@ -96,7 +96,7 @@ npm run build:ios
 
 ## Sign in with Apple on device
 
-The App ID `com.antigravity.furniture3d` has Sign in with Apple enabled. The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). Profile is the person icon at the top right of Home. The primary controls are **Create account** and **Sign in** with a username and password. **Sign in with Apple** sits under those. On iOS it calls `SignInWithApple.authorize`. The browser does not run Apple’s web JS flow; it uses the username form.
+The App ID `com.k24corp.workbench` needs Sign in with Apple enabled (the first signed build with `-allowProvisioningUpdates` registers the App ID; the bundle id was `com.antigravity.furniture3d` before the rename). The iOS target uses that bundle id, `@capacitor-community/apple-sign-in`, and `ios/App/App/App.entitlements` (`com.apple.developer.applesignin` = Default). Profile is the person icon at the top right of Home. The primary controls are **Create account** and **Sign in** with a username and password. **Sign in with Apple** sits under those. On iOS it calls `SignInWithApple.authorize`. The browser does not run Apple’s web JS flow; it uses the username form.
 
 A native build with no `VITE_SYNC_API_URL` does not call `/api/v1` on `capacitor://localhost`. Profile stays signed out and shows “Projects stay on this device until cloud sync is turned on.”
 
@@ -105,16 +105,16 @@ Apple sends the email only the first time someone authorizes the app. Later sign
 On Kalb-Mini, after pulling this branch:
 
 1. `npm install`, then the deploy commands above. Put the printed origin in `.env.production`.
-2. `npm run build:ios`, then `npx cap open ios`. Confirm the App target’s bundle id is `com.antigravity.furniture3d`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
+2. `npm run build:ios`, then `npx cap open ios`. Confirm the App target’s bundle id is `com.k24corp.workbench`, team `ZNKG8BKXAT`, and Signing & Capabilities lists **Sign in with Apple**. Automatic signing should refresh the profile to include the entitlement. If Xcode reports a provisioning error, toggle the capability off and on once so it rewrites the profile.
 3. Run on a device. Create a username on the phone. Sign in with Apple is the second button and needs an Apple ID on the device. A build made before `.env.production` exists keeps projects on the device and shows “Projects stay on this device until cloud sync is turned on.”
 
-`capacitor.config.json` `appId` is `com.antigravity.furniture3d`, the same id as the Xcode target. Do not delete `ios/` or run `npx cap add ios`. `npx cap sync ios` refreshes the gitignored native config copy and leaves `PRODUCT_BUNDLE_IDENTIFIER` alone. The identity-token audience is `com.antigravity.furniture3d`.
+`capacitor.config.json` `appId` is `com.k24corp.workbench`, the same id as the Xcode target. Do not delete `ios/` or run `npx cap add ios`. `npx cap sync ios` refreshes the gitignored native config copy and leaves `PRODUCT_BUNDLE_IDENTIFIER` alone. The identity-token audience is `com.k24corp.workbench` (the Worker still accepts `com.antigravity.furniture3d`).
 
 ## Sign in with Apple revocation on account deletion
 
 Profile → Delete account… → Delete cloud account. For an Apple account the app first shows the Apple sheet to confirm (cancelling keeps the account) and sends the one-time `authorizationCode` with `DELETE /api/v1/me`. The Worker (`src/sync/appleRevoke.ts`) signs an ES256 client secret with the Sign in with Apple `.p8` key, exchanges the code at `https://appleid.apple.com/auth/token`, checks the returned `sub` is this account, and revokes the refresh token at `https://appleid.apple.com/auth/revoke`. Revocation never blocks deletion: if the secrets are missing or Apple fails, the account is still deleted and the message points to Settings → Sign in with Apple.
 
-Worker secrets (`npx wrangler secret put …`): `APPLE_TEAM_ID` (ZNKG8BKXAT), `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (contents of `AuthKey_<KEY_ID>.p8`), optional `APPLE_CLIENT_ID` (defaults to `com.antigravity.furniture3d`).
+Worker secrets (`npx wrangler secret put …`): `APPLE_TEAM_ID` (ZNKG8BKXAT), `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (contents of `AuthKey_<KEY_ID>.p8`), optional `APPLE_CLIENT_ID` (defaults to `APPLE_AUDIENCE`, i.e. `com.k24corp.workbench`). The Sign in with Apple key must be enabled for `com.k24corp.workbench`. A code from a build still on `com.antigravity.furniture3d` fails to exchange under the new client id, so the Worker retries the exchange with the other accepted bundle id before giving up.
 
 ## Not in this cut
 
