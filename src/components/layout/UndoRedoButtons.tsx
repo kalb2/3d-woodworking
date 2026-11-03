@@ -4,9 +4,10 @@ import { useProjectStore } from '../../state/useProjectStore';
 import { useReliableTap } from '../../utils/reliableTap';
 
 /**
- * Undo / redo pair in a fixed bottom-left spot. Both slots always render (the
- * unavailable one dimmed) so nothing shifts under a finger; the whole pair is
- * hidden only when the project has no history at all.
+ * Undo / redo pair in a fixed bottom-left spot. Only the available buttons
+ * show (no dimmed ghost buttons). When only Redo is available an empty,
+ * invisible slot holds Undo's place so Redo never slides under a finger that
+ * was tapping Undo; the whole pair is hidden when there is nothing to undo or redo.
  */
 export const UndoRedoButtons: React.FC<{ placement: 'phone' | 'ipad' | 'inline' }> = ({ placement }) => {
   const canUndo = useProjectStore((s) => s.historyIndex > 0);
@@ -16,14 +17,20 @@ export const UndoRedoButtons: React.FC<{ placement: 'phone' | 'ipad' | 'inline' 
   if (!canUndo && !canRedo) return null;
   return (
     <div className={`undo-redo-pair is-${placement}`} data-testid="undo-redo">
-      <button type="button" className="undo-redo-btn" disabled={!canUndo} aria-disabled={!canUndo}
-        onClick={undoTap} onPointerUp={undoTap} title="Undo" aria-label="Undo" data-testid="undo-btn">
-        <Undo2 size={18} />
-      </button>
-      <button type="button" className="undo-redo-btn" disabled={!canRedo} aria-disabled={!canRedo}
-        onClick={redoTap} onPointerUp={redoTap} title="Redo" aria-label="Redo" data-testid="redo-btn">
-        <Redo2 size={18} />
-      </button>
+      {canUndo ? (
+        <button type="button" className="undo-redo-btn"
+          onClick={undoTap} onPointerUp={undoTap} title="Undo" aria-label="Undo" data-testid="undo-btn">
+          <Undo2 size={18} />
+        </button>
+      ) : (
+        <span className="undo-redo-slot" aria-hidden="true" data-testid="undo-slot" />
+      )}
+      {canRedo && (
+        <button type="button" className="undo-redo-btn"
+          onClick={redoTap} onPointerUp={redoTap} title="Redo" aria-label="Redo" data-testid="redo-btn">
+          <Redo2 size={18} />
+        </button>
+      )}
     </div>
   );
 };

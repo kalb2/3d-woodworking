@@ -4,6 +4,7 @@ import { featuredTemplates, PROJECT_TEMPLATES } from '../../catalog/templates';
 import { shapeLabel } from '../../catalog/shapeCatalog';
 import type { PresetTemplate, TemplateCategory } from '../../types/furniture';
 import type { DeviceShare } from '../../utils/share';
+import { countLabel } from '../../utils/countLabel';
 
 const CATEGORIES: Array<TemplateCategory | 'All'> = ['All', 'Blocks', 'Boards', 'Rounds', 'Layouts'];
 /** Display names; the stored category id 'Layouts' reads as 'Assemblies' (everything here is a template). */
@@ -156,7 +157,7 @@ export const CommunityPanel: React.FC<{
               <div className="card-meta">
                 <span className="card-badge">
                   <Box size={12} />
-                  {share.project.objects.length} shapes
+                  {countLabel(share.project.objects.length, 'shape')}
                 </span>
                 <span>{new Date(share.sharedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </div>

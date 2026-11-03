@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useProjectStore } from '../state/useProjectStore';
 import { useReliableTap } from '../utils/reliableTap';
+import { countLabel } from '../utils/countLabel';
 import { LengthField } from '../components/ui/LengthField';
 import { cameraTarget } from '../templates/userTemplates';
 import type { ModuleField } from '../generators/modules';
@@ -154,7 +155,7 @@ export const TemplateSetup: React.FC<{ templateId: BuiltInTemplateId; wall?: Roo
         {more && <div className="props-card" data-testid="tpl-more-options">{extra.map((f) => <FieldRow key={f.key} f={f} values={values} unit={unit} set={set} />)}</div>}
       </section>
       <span className="tpl-summary" data-testid="tpl-summary">
-        {t.note ? `${t.note(values, unit)} · ` : ''}{boards} boards · {built.joints.filter((j) => j.type !== 'butt').length} joints{wall ? ' · lines up with other cabinets on this wall, skips windows and doors' : ''}
+        {t.note ? `${t.note(values, unit)} · ` : ''}{countLabel(boards, 'board')} · {countLabel(built.joints.filter((j) => j.type !== 'butt').length, 'joint')}{wall ? ' · lines up with other cabinets on this wall, skips windows and doors' : ''}
       </span>
       {host && (
         <span className="tpl-summary" data-testid="tpl-host-note">

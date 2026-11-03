@@ -68,3 +68,13 @@ describe('every display uses the same fractions', () => {
     expect(templateSummary(g, 'in')).toMatch(/^35 1\/2" × 72" × 11 3\/4"/);
   });
 });
+
+describe('size field labels', () => {
+  it('spell out the unit for screen readers', async () => {
+    const { sizeFieldLabel, unitWord } = await import('./lengthFormat');
+    expect(sizeFieldLabel('length', 'in')).toBe('Length, inches');
+    expect(sizeFieldLabel('width', 'mm')).toBe('Width, millimeters');
+    expect(sizeFieldLabel('height', 'cm', 'Group')).toBe('Group height, centimeters');
+    expect(unitWord('ft')).toBe('feet');
+  });
+});
