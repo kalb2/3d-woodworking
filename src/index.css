@@ -2738,10 +2738,12 @@ html, body, #root {
   touch-action: manipulation;
   cursor: pointer;
 }
-.undo-redo-btn:disabled {
-  opacity: 0.35;
-  box-shadow: none;
-  cursor: default;
+/* Holds Undo's place when only Redo shows, so Redo doesn't slide left under a finger. */
+.undo-redo-slot {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .room-wall-label.is-unlocked {

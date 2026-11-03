@@ -23,14 +23,15 @@ import {
   LayoutTemplate,
 } from 'lucide-react';
 import { useProjectStore, STANDARD_WOOD_PRESETS } from '../../state/useProjectStore';
-import { inchFraction } from '../../utils/lengthFormat';
+import { formatLens, inchFraction } from '../../utils/lengthFormat';
+import { countLabel } from '../../utils/countLabel';
 import { useAppStore, ACCENT_COLOR_PRESETS } from '../../state/useAppStore';
 import { useIsPhone } from '../../hooks/useIsPhone';
 import { exportProjectJSON, importProjectFromJSON } from '../../utils/exportUtils';
 import { openProjectFile, openedMessage } from '../../utils/projectFile';
 import { saveMessage } from '../../native/fileExport';
 import { listDeviceShares, removeDeviceShare, type DeviceShare } from '../../utils/share';
-import type { FurnitureObject, PresetTemplate } from '../../types/furniture';
+import type { FurnitureObject, LengthUnit, PresetTemplate } from '../../types/furniture';
 import { NewProjectSheet } from '../modals/NewProjectSheet';
 import { ShareSheet } from '../share/ShareSheet';
 import { CommunityPanel, TemplatePreviewSheet, TemplatesPanel } from './LibraryPanels';
@@ -174,12 +175,12 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const previewRows = (objects: FurnitureObject[]) =>
+  const previewRows = (objects: FurnitureObject[], unit: LengthUnit) =>
     objects.map((object) => ({
       id: object.id ?? object.name,
       name: object.name,
       shape: object.shape,
-      size: `${object.dimensions.length} × ${object.dimensions.width} × ${object.dimensions.height} in`,
+      size: formatLens([object.dimensions.length, object.dimensions.width, object.dimensions.height], unit),
     }));
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,14 +343,6 @@ export const HomeScreen: React.FC = () => {
                   <p>Add boxes, boards, and round stock in the editor. Or start from a template and share it on this device.</p>
                 </div>
                 <div className="home-welcome-actions">
-                  <button type="button" className="glass-button active" onClick={() => setHomeTab('templates')}>
-                    <LayoutTemplate size={16} />
-                    <span>Templates</span>
-                  </button>
-                  <button type="button" className="glass-button" onClick={() => setHomeTab('community')}>
-                    <Users size={16} />
-                    <span>Community</span>
-                  </button>
                   <button type="button" className="home-welcome-dismiss" onClick={dismissWelcome} aria-label="Dismiss welcome">
                     <X size={16} />
                   </button>
@@ -424,7 +417,7 @@ export const HomeScreen: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="card-badge">
                         <Box size={12} />
-                        {proj.objects.length} parts
+                        {countLabel(proj.objects.length, 'part')}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Unit: {proj.unit}</span>
                       {isActive && (
@@ -835,7 +828,7 @@ export const HomeScreen: React.FC = () => {
           title={preview.template.name}
           description={preview.template.description}
           badge={preview.template.category}
-          rows={previewRows(preview.template.objects.map((object, index) => ({ ...object, id: `${preview.template.id}-${index}` })))}
+          rows={previewRows(preview.template.objects.map((object, index) => ({ ...object, id: `${preview.template.id}-${index}` })), preferences.defaultUnit)}
           startLabel="Start project"
           onClose={() => setPreview(null)}
           onStart={() => startTemplate(preview.template.id)}
@@ -847,7 +840,7 @@ export const HomeScreen: React.FC = () => {
           title={preview.share.title}
           description="Saved on this device. Opening it makes a new editable copy."
           badge="On this device"
-          rows={previewRows(preview.share.project.objects)}
+          rows={previewRows(preview.share.project.objects, preview.share.project.unit)}
           startLabel="Open copy"
           onClose={() => setPreview(null)}
           onStart={() => openDeviceShare(preview.share)}

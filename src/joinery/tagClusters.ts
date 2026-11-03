@@ -1,3 +1,5 @@
+import { countLabel } from '../utils/countLabel';
+
 /** Screen-space box of one joint tag (pixels, centred on x/y). */
 export interface TagBox { id: string; x: number; y: number; w: number; h: number }
 
@@ -35,7 +37,7 @@ export const worstStatus = (s: TagStatus[]): TagStatus => (s.includes('broken') 
 /** Chip text: "3 joints", plus how many need a look. */
 export function clusterLabel(statuses: TagStatus[]): string {
   const bad = statuses.filter((x) => x !== 'fits').length;
-  return `${statuses.length} joints${bad ? ` · ${bad} to check` : ''}`;
+  return `${countLabel(statuses.length, 'joint')}${bad ? ` · ${bad} to check` : ''}`;
 }
 
 /**

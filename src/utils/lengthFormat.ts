@@ -56,3 +56,17 @@ export function formatLens(values: number[], unit: LengthUnit, sep = ' × '): st
 
 /** Editable length fields work in inches (fractions) for in/ft projects, else the metric unit. */
 export const fieldUnit = (u: LengthUnit): 'in' | 'cm' | 'mm' => (u === 'ft' || u === 'in' ? 'in' : u);
+
+/** Spoken unit name for screen-reader labels: in → inches, mm → millimeters. */
+export function unitWord(u: LengthUnit): string {
+  if (u === 'mm') return 'millimeters';
+  if (u === 'cm') return 'centimeters';
+  if (u === 'ft') return 'feet';
+  return 'inches';
+}
+
+/** Screen-reader label for a size field: "Length, inches" / "Group width, millimeters". */
+export function sizeFieldLabel(axis: string, u: LengthUnit, prefix = ''): string {
+  const name = prefix ? `${prefix} ${axis}` : axis.charAt(0).toUpperCase() + axis.slice(1);
+  return `${name}, ${unitWord(u)}`;
+}

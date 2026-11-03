@@ -158,8 +158,8 @@ export const PhoneBottomSheet: React.FC<{ children?: React.ReactNode }> = ({
           {children}
         </div>
       )}
-      {/* Properties takes the whole sheet; the transform bar comes back when it closes. */}
-      {!overlays.inspector && (<>
+      {/* Properties and Add take the whole sheet; the transform bar comes back when they close. */}
+      {!overlays.inspector && !overlays.sidebar && (<>
       <nav className="phone-transform-bar" data-testid="transform-menu" aria-label="Move, resize, and rotate">
         <DockItem
           label="Move"

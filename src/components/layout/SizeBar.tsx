@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Info, Link2, RotateCcw, Unlink2 } from 'lucide-react';
 import { useProjectStore } from '../../state/useProjectStore';
 import { unitScale } from '../../utils/units';
-import { fieldUnit } from '../../utils/lengthFormat';
+import { fieldUnit, sizeFieldLabel, unitWord } from '../../utils/lengthFormat';
 import type { Dimensions3D, LengthUnit } from '../../types/furniture';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { NumberField } from '../ui/NumberField';
@@ -60,7 +60,7 @@ const FloorDistanceSlider: React.FC<{
       aria-valuemin={0}
       aria-valuemax={maxDisplay}
       aria-valuenow={display}
-      aria-label={`Drag distance from the floor in ${unit}`}
+      aria-label={`Drag distance from the floor, ${unitWord(unit)}`}
       onPointerDown={(event) => {
         event.stopPropagation();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -114,7 +114,7 @@ export const MoveFloorRow: React.FC = () => {
         testId="floor-distance-input"
         min={0}
         unitSuffix={false}
-        aria-label={`Distance from the floor in ${fieldUnit(project.unit)}`}
+        aria-label={`Distance from the floor, ${unitWord(fieldUnit(project.unit))}`}
         style={{ color: GIZMO_AXIS.y, borderBottomColor: GIZMO_AXIS.y }}
         inches={gapInches}
         unit={project.unit}
@@ -170,7 +170,7 @@ export const ResizeSizeRow: React.FC = () => {
           testId={axis.testId}
           min={0.05}
           unitSuffix={false}
-          aria-label={`${axis.key} in ${fieldUnit(project.unit)}`}
+          aria-label={sizeFieldLabel(axis.key, fieldUnit(project.unit))}
           style={{ color: axis.color, borderBottomColor: axis.color }}
           inches={object.dimensions[axis.key]}
           unit={project.unit}
@@ -212,7 +212,7 @@ const GroupSizeRow: React.FC = () => {
           testId={`group-${axis.testId}`}
           min={0.25}
           unitSuffix={false}
-          aria-label={`Group ${axis.key} in ${fieldUnit(project.unit)}`}
+          aria-label={sizeFieldLabel(axis.key, fieldUnit(project.unit), 'Group')}
           style={{ color: axis.color, borderBottomColor: axis.color }}
           inches={size[axis.key]}
           unit={project.unit}

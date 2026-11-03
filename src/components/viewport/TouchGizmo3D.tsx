@@ -278,7 +278,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
         controls.enabled = true;
       }
     };
-  }, [activeAxis, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
+  }, [activeAxis, activeProjectId, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
 
   if (activeGizmoMode === 'resize') return null;
   // Rotating a multi-selection isn't supported (each would spin alone): Group first.
