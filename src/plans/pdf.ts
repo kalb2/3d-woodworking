@@ -3,7 +3,7 @@ import type { FurnitureObject, FurnitureProject, LengthUnit } from '../types/fur
 import { costOf, costTotals, cutListSections, lumberBuyList, projectHardware, sheetBuyList, type CutListSection } from '../utils/exportUtils';
 import { EXAMPLE_NOTE, formatMoney, type ResolvedPrices } from '../cost/cost';
 import { pricesFor } from '../cost/usePriceStore';
-import { stickFeet, type SheetLayout } from '../utils/stock';
+import { END_TRIM, KERF, stickFeet, type SheetLayout } from '../utils/stock';
 import { assemblySteps, type Step } from './assembly';
 import { dim, dimBare, niceScale, overallSize, partSize, planDate } from './format';
 import { explodeOffsets, isoParts, levelLines, orthoView, pieceBox, planParts, type Bounds2, type IsoPart, type OrthoView, type P2 } from './geometry';
@@ -567,7 +567,7 @@ function buyPages(pen: Pen, project: FurnitureProject, sections: CutListSection[
         const bx = cb.x + 70, by = y;
         pen.font(7.5, 'normal', MUTED); pen.text(`#${i + 1} · ${stickFeet(st.length)}`, cb.x, by + 8);
         pen.stroke(INK, 0.6); pen.fill(1); pen.doc.rect(bx, by, barW, 12, 'S');
-        for (const [a, c] of stickSegments(st.cuts)) {
+        for (const [a, c] of stickSegments(st.cuts, KERF, END_TRIM)) {
           pen.fill(0.88); pen.stroke(INK, 0.5); pen.doc.rect(bx + a * s, by, (c - a) * s, 12, 'FD');
           pen.font(6.5, 'normal', INK);
           const lab = dimBare(c - a, unit);

@@ -56,6 +56,15 @@ describe('price list', () => {
 });
 
 describe('project cost', () => {
+  it('prices 1/4" MDF from the example list', () => {
+    const prices = resolvePrices();
+    expect(prices.items[sheetKey('mdf', 0.25)]).toBe(28);
+    expect(prices.example.has(sheetKey('mdf', 0.25))).toBe(true);
+    const c = cost(project([board('Door', 30, 20, 0.25, PRESET_WOOD_MATERIALS.mdf)]), prices);
+    expect(c.lines.find((l) => l.key === 'sheet:mdf:0.25')).toMatchObject({ quantity: 1, unit: 'sheet', unitPrice: 28, total: 28, example: true });
+    expect(c.unpriced).toBe(0);
+  });
+
   it('prices sticks by profile and length, sheets by material and thickness, lumber by the board foot', () => {
     const p = project([
       board('Leg', 30, 3.5, 1.5), board('Leg', 30, 3.5, 1.5), board('Leg', 30, 3.5, 1.5), // 3 × 30" 2×4 → one 8 ft stick
