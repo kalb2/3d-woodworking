@@ -33,7 +33,7 @@ import { setProjectPersistListener, useProjectStore } from './useProjectStore.ts
 
 const MIGRATION_PREFIX = 'workbench_migration_v1:';
 const TOMBSTONE_KEY = 'workbench_tombstones_v1';
-/** Per account: id → updatedAt the server held after the last good sync (so only changes upload). */
+/** Per account: id → version the server held after the last good sync (so only changes upload). */
 const KNOWN_PREFIX = 'workbench_sync_known_v1:';
 /** The account that last signed in on this device. */
 const LAST_ACCOUNT_KEY = 'workbench_last_account_v1';
@@ -120,10 +120,10 @@ function mergedTombstones(accountId: string, buckets: TombstoneBuckets): Record<
   return merged;
 }
 
-function loadKnown(accountId: string): Record<string, number> | null {
+function loadKnown(accountId: string): Record<string, string> | null {
   try {
     const raw = localStorage.getItem(`${KNOWN_PREFIX}${accountId}`);
-    return raw ? JSON.parse(raw) as Record<string, number> : null;
+    return raw ? JSON.parse(raw) as Record<string, string> : null;
   } catch {
     return null;
   }

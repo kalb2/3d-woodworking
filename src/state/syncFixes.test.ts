@@ -84,6 +84,24 @@ describe('restoring a backup', () => {
     expect(ps().projects.map((p) => p.id).sort()).toEqual(['gone', 'keep']);
   });
 
+  it('still works when the restore lands in the same millisecond as the delete', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(1_800_000_000_000);
+      signedIn();
+      await as().syncNow();
+      const backup = backupFileText(ps().projects);
+      ps().deleteProject('gone');
+      await as().syncNow();
+      ps().addProjects(openProjectFile(backup, ps().projects)!.projects);
+      await as().syncNow();
+      expect(ps().projects.map((p) => p.id).sort()).toEqual(['gone', 'keep']);
+      expect(server.get('gone')?.project).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('restoring the same backup twice adds nothing the second time', () => {
     const backup = backupFileText(ps().projects);
     ps().deleteProject('gone');

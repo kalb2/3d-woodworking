@@ -48,4 +48,10 @@ describe('only changed projects upload', () => {
     expect(changedRecords(local, knownVersions(server)).map((r) => r.id)).toEqual(['b', 'c']);
     expect(changedRecords(local, null)).toHaveLength(3);
   });
+
+  it('a restore in the same millisecond as the delete still uploads', () => {
+    const tombstone: SyncRecord = { id: 'a', updatedAt: 50, deletedAt: 50 };
+    expect(changedRecords([record('a', 1, 50)], knownVersions([tombstone])).map((r) => r.id)).toEqual(['a']);
+    expect(changedRecords([tombstone], knownVersions([tombstone]))).toEqual([]);
+  });
 });

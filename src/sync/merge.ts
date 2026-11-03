@@ -73,10 +73,15 @@ export function keepInFlightEdits(
   return { projects, keptLocal: true };
 }
 
-/** id → updatedAt of what the server holds, from its last full answer. */
-export function knownVersions(records: SyncRecord[]): Record<string, number> {
-  const known: Record<string, number> = {};
-  for (const record of records) known[record.id] = record.updatedAt;
+/** One record's version: deleted or not, and when (a delete and a restore can share a millisecond). */
+function versionOf(record: SyncRecord): string {
+  return `${record.deletedAt != null || !record.project ? 'd' : 'p'}${record.updatedAt}`;
+}
+
+/** id → version of what the server holds, from its last full answer. */
+export function knownVersions(records: SyncRecord[]): Record<string, string> {
+  const known: Record<string, string> = {};
+  for (const record of records) known[record.id] = versionOf(record);
   return known;
 }
 
@@ -84,7 +89,7 @@ export function knownVersions(records: SyncRecord[]): Record<string, number> {
  * Records the server doesn't already hold at this version. With no record of
  * a previous sync (`known` null) that is everything.
  */
-export function changedRecords(records: SyncRecord[], known: Record<string, number> | null): SyncRecord[] {
+export function changedRecords(records: SyncRecord[], known: Record<string, string> | null): SyncRecord[] {
   if (!known) return records;
-  return records.filter((record) => known[record.id] !== record.updatedAt);
+  return records.filter((record) => known[record.id] !== versionOf(record));
 }
