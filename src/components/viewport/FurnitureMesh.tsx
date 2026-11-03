@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { disposeGeometry, disposeMaterial, useDisposable } from './gpuLifecycle';
 import * as THREE from 'three';
 import { Edges, Line } from '@react-three/drei';
 import { featureEdges } from '../../utils/featureEdges';
@@ -35,9 +36,11 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const style = useProjectStore((s) => projectStyle(s.projects.find((p) => p.id === s.activeProjectId)));
   // Lots of parts: drop per-part outlines in Realistic to keep the frame rate up.
   const busy = useProjectStore((s) => (s.projects.find((p) => p.id === s.activeProjectId)?.objects.length ?? 0) > 200);
-  const meshMaterial = useMemo(() => {
-    return createWoodMeshMaterial(material, style);
-  }, [material, style]);
+  const meshMaterial = useMemo(
+    () => (isGroup ? null : createWoodMeshMaterial(material, style)),
+    [isGroup, material, style],
+  );
+  useDisposable(meshMaterial, disposeMaterial);
 
   const roundPart = shape === 'sphere' || shape === 'cylinder' || shape === 'pole';
   const length = positiveSize(dimensions.length);
@@ -63,14 +66,26 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
   const grainShape = !roundPart && shape !== 'group';
   const geometry = useMemo(
     () => {
+      const drop = (g: THREE.BufferGeometry, next: THREE.BufferGeometry) => {
+        if (g !== next && g !== baseGeometry) g.dispose();
+      };
       let g = holes.length ? cutHoles(baseGeometry, { length, width, height }, holes, shape === 'board') : baseGeometry;
-      if (jointKey) g = cutSolids(g, JSON.parse(jointKey));
+      if (jointKey) {
+        const cut = cutSolids(g, JSON.parse(jointKey));
+        drop(g, cut);
+        g = cut;
+      }
+      if (!grainShape) return g;
       // Grain runs along the part's longest dimension (box-like parts).
-      return grainShape ? grainUVs(g, { x: length, y: height, z: width }) : g;
+      const mapped = grainUVs(g, { x: length, y: height, z: width });
+      drop(g, mapped);
+      return mapped;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseGeometry, holesKey, jointKey],
   );
+  useDisposable(baseGeometry, disposeGeometry);
+  useDisposable(geometry === baseGeometry ? null : geometry, disposeGeometry);
   // Cut parts (holes, joinery): outline only real feature edges. three's EdgesGeometry
   // draws every CSG T-junction as a border, which shows as diagonals across faces.
   const cutOutline = useMemo(() => {
@@ -88,12 +103,14 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
     const { u, v, n } = faceAxes(focusHole.face);
     const f = footprint(focusHole);
     const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, n.clone().cross(u), n));
-    const geom = (focusHole.kind ?? 'round') === 'round'
-      ? new THREE.EdgesGeometry(new THREE.CircleGeometry(f.wu / 2 + 0.05, 40))
-      : new THREE.EdgesGeometry(new THREE.PlaneGeometry(f.wu, f.wv));
+    const source = (focusHole.kind ?? 'round') === 'round'
+      ? new THREE.CircleGeometry(f.wu / 2 + 0.05, 40)
+      : new THREE.PlaneGeometry(f.wu, f.wv);
+    const geom = new THREE.EdgesGeometry(source);
     const position = n.clone().multiplyScalar(faceThickness(dims, focusHole.face) / 2 + 0.03).addScaledVector(u, f.cu).addScaledVector(v, f.cv);
     return { geom, position, quaternion: q, handle: Math.max(0.12, Math.min(0.35, Math.min(f.wu, f.wv) * 0.18)) };
   }, [focusHole, length, width, height]);
+  useDisposable(focusMarker?.geom ?? null, disposeGeometry);
 
   const groupOutline = useMemo(() => {
     if (shape !== 'group') return null;
@@ -101,6 +118,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       new THREE.BoxGeometry(dimensions.length, dimensions.height, dimensions.width)
     );
   }, [shape, dimensions.length, dimensions.height, dimensions.width]);
+  useDisposable(groupOutline, disposeGeometry);
 
   const rotRadX = (rotation.x * Math.PI) / 180;
   const rotRadY = (rotation.y * Math.PI) / 180;
@@ -113,7 +131,7 @@ export const FurnitureMesh: React.FC<FurnitureMeshProps> = ({
       <mesh
         geometry={geometry}
         scale={meshScale}
-        material={isGroup ? undefined : meshMaterial}
+        material={meshMaterial ?? undefined}
         castShadow={!isGroup && style === 'realistic'}
         receiveShadow={!isGroup && style === 'realistic'}
         raycast={isGroup && !pickGroup ? () => undefined : undefined}

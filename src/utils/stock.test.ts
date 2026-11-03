@@ -86,27 +86,42 @@ describe('dimensional lumber', () => {
 });
 
 describe('stick packing (first-fit decreasing, 1/8" kerf)', () => {
-  it('fits cuts on one stick with a kerf between them', () => {
+  it('fits cuts on one stick with a kerf between them and 1" to square the ends', () => {
     const { sticks, oversize } = packSticks([30, 30, 30], 96);
     expect(oversize).toEqual([]);
     expect(sticks).toHaveLength(1);
     expect(sticks[0].cuts).toEqual([30, 30, 30]);
-    expect(sticks[0].left).toBeCloseTo(96 - 90 - 2 / 8, 6);
+    expect(sticks[0].left).toBeCloseTo(96 - 1 - 90 - 2 / 8, 6);
   });
 
   it('the kerf can force another stick: two 48" parts need two 8 ft sticks', () => {
     expect(packSticks([48, 48], 96).sticks).toHaveLength(2);
-    expect(packSticks([48, 47.875], 96).sticks).toHaveLength(1);
+    // 47 + 47.875 + 1/8 kerf + 1" trim is exactly 96".
+    expect(packSticks([47, 47.875], 96).sticks).toHaveLength(1);
+    expect(packSticks([48, 47.875], 96).sticks).toHaveLength(2);
   });
 
-  it('a part exactly the stock length fits with no kerf', () => {
-    const { sticks } = packSticks([96, 96], 96);
-    expect(sticks.map((s) => s.left)).toEqual([0, 0]);
+  it('a part exactly the stock length does not fit: 1" is kept to square the ends', () => {
+    const full = packSticks([96, 96], 96);
+    expect(full.sticks).toEqual([]);
+    expect(full.oversize).toEqual([96, 96]);
+    const exact = packSticks([95], 96);
+    expect(exact.oversize).toEqual([]);
+    expect(exact.sticks.map((s) => s.left)).toEqual([0]);
+    // Trim is configurable; 0 keeps the old "use the whole stick" behavior.
+    expect(packSticks([96], 96, 1 / 8, 0).sticks.map((s) => s.left)).toEqual([0]);
+  });
+
+  it('ignores zero and negative lengths', () => {
+    const { sticks, oversize } = packSticks([30, 0, -4, Number.NaN], 96);
+    expect(oversize).toEqual([]);
+    expect(sticks.map((s) => s.cuts)).toEqual([[30]]);
+    expect(sticks[0].left).toBeCloseTo(96 - 1 - 30, 6);
   });
 
   it('places longest first, each into the first stick with room', () => {
-    const { sticks } = packSticks([20, 70, 25], 96);
-    expect(sticks.map((s) => s.cuts)).toEqual([[70, 25], [20]]);
+    const { sticks } = packSticks([20, 70, 24], 96);
+    expect(sticks.map((s) => s.cuts)).toEqual([[70, 24], [20]]);
   });
 
   it('picks the stock length that wastes least', () => {
@@ -114,6 +129,7 @@ describe('stick packing (first-fit decreasing, 1/8" kerf)', () => {
     expect([two60.stockLength, two60.sticks.length]).toEqual([144, 1]);
     expect(two60.waste).toBe(24);
     expect(planSticks([100]).stockLength).toBe(120); // 8 ft can't hold it
+    expect(planSticks([96]).stockLength).toBe(120); // 8 ft has no room to square the ends
     expect(planSticks([40]).stockLength).toBe(96); // ties go to the shorter stock
     const five48 = planSticks([48, 48, 48, 48, 48]);
     expect([five48.stockLength, five48.sticks.length]).toEqual([120, 3]);
@@ -200,6 +216,19 @@ describe('sheet layouts', () => {
     const nest = nestSheets([{ name: 'Top', length: 100, width: 30, quantity: 2 }, { name: 'Side', length: 30, width: 20, quantity: 1 }], false);
     expect(nest.oversizeParts).toEqual([{ name: 'Top', length: 100, width: 30 }, { name: 'Top', length: 100, width: 30 }]);
     expect([nest.oversize, nest.sheets]).toEqual([2, 1]);
+  });
+
+  it('skips zero and negative panels instead of placing them', () => {
+    const nest = nestSheets([
+      { length: 0, width: 10, quantity: 1 },
+      { length: -4, width: 12, quantity: 2 },
+      { length: 20, width: -1, quantity: 1 },
+      { length: 30, width: 10, quantity: 0 },
+      { name: 'Side', length: 30, width: 10, quantity: 1 },
+    ], true);
+    expect(nest.oversize).toBe(0);
+    expect(nest.sheets).toBe(1);
+    expect(nest.layouts[0].panels.map((p) => p.name)).toEqual(['Side']);
   });
 
   it('keeps usable offcuts and drops slivers', () => {

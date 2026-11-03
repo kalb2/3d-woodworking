@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import AVFoundation
 import simd
 #if canImport(RoomPlan)
 import RoomPlan
@@ -63,8 +64,12 @@ final class WallScanViewController: UIViewController, RoomCaptureViewDelegate {
     var onFinish: ((Result<[String: Any], WallScanError>) -> Void)?
     private var captureView: RoomCaptureView!
     private var finished = false
+    private var captureStarted = false
     private let doneButton = UIButton(type: .system)
     private let cancelButton = UIButton(type: .system)
+    private let blockedTitle = UILabel()
+    private let blockedDetail = UILabel()
+    private let settingsButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -93,15 +98,88 @@ final class WallScanViewController: UIViewController, RoomCaptureViewDelegate {
         ])
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         doneButton.addTarget(self, action: #selector(doneTapped), for: .touchUpInside)
+
+        blockedTitle.text = "Camera access is off"
+        blockedTitle.textColor = .white
+        blockedTitle.font = .boldSystemFont(ofSize: 22)
+        blockedTitle.textAlignment = .center
+        blockedTitle.numberOfLines = 0
+        blockedDetail.text = "Turn on camera access for The Workbench in Settings to scan a room."
+        blockedDetail.textColor = UIColor.white.withAlphaComponent(0.85)
+        blockedDetail.font = .systemFont(ofSize: 16)
+        blockedDetail.textAlignment = .center
+        blockedDetail.numberOfLines = 0
+        settingsButton.setTitle("Open Settings", for: .normal)
+        settingsButton.titleLabel?.font = .boldSystemFont(ofSize: 17)
+        settingsButton.setTitleColor(.black, for: .normal)
+        settingsButton.backgroundColor = .white
+        settingsButton.layer.cornerRadius = 18
+        settingsButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 18, bottom: 10, right: 18)
+        let blockedViews: [UIView] = [blockedTitle, blockedDetail, settingsButton]
+        for label in blockedViews {
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.isHidden = true
+            view.addSubview(label)
+        }
+        NSLayoutConstraint.activate([
+            blockedTitle.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 24),
+            blockedTitle.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -24),
+            blockedTitle.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -36),
+            blockedDetail.leadingAnchor.constraint(equalTo: blockedTitle.leadingAnchor),
+            blockedDetail.trailingAnchor.constraint(equalTo: blockedTitle.trailingAnchor),
+            blockedDetail.topAnchor.constraint(equalTo: blockedTitle.bottomAnchor, constant: 10),
+            settingsButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            settingsButton.topAnchor.constraint(equalTo: blockedDetail.bottomAnchor, constant: 20),
+        ])
+        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        beginCaptureIfAllowed()
+    }
+
+    private func beginCaptureIfAllowed() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            startSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted { self?.startSession() } else { self?.showCameraOff() }
+                }
+            }
+        default:
+            showCameraOff()
+        }
+    }
+
+    private func startSession() {
+        guard !captureStarted else { return }
+        captureStarted = true
+        captureView.isHidden = false
+        blockedTitle.isHidden = true
+        blockedDetail.isHidden = true
+        settingsButton.isHidden = true
+        doneButton.isEnabled = true
         captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
     }
 
+    private func showCameraOff() {
+        captureView.isHidden = true
+        blockedTitle.isHidden = false
+        blockedDetail.isHidden = false
+        settingsButton.isHidden = false
+        doneButton.isEnabled = false
+    }
+
+    @objc private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
     @objc private func cancelTapped() {
-        captureView.captureSession.stop()
+        if captureStarted { captureView.captureSession.stop() }
         finish(.failure(WallScanError(code: "CANCELLED", localizedDescription: "Scan cancelled")))
     }
 

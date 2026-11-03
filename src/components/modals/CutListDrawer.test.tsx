@@ -70,7 +70,7 @@ describe('CutListDrawer buy list', () => {
     fireEvent.pointerUp(toggle);
     fireEvent.click(toggle); // the tap's click doesn't toggle it back
     const sticks = r.getAllByTestId('cut-layout-stick').map((e) => e.textContent!.replace(/\u00a0/g, ' '));
-    expect(sticks).toEqual(['2×4 #1 (12 ft): 60" + 60" · 23 7/8" left', '2×6 #1 (10 ft): 100" · 20" left']);
+    expect(sticks).toEqual(['2×4 #1 (12 ft): 60" + 60" · 22 7/8" left', '2×6 #1 (10 ft): 100" · 19" left']);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     // sheet goods unchanged
     expect(r.getAllByTestId('cut-material-row').map((e) => e.textContent).join('|')).toContain('1 sheet (4×8)');

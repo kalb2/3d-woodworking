@@ -34,21 +34,35 @@ Collected and sent to the sync Worker (`https://workbench-sync.k24corp.workers.d
 - Optional Apple email and name, only the first time someone uses Sign in with Apple
 - Projects the person chooses to save and sync
 
-Diagnostics: `ios/App/App/AppDelegate.swift` starts Sentry (`sentry-cocoa`) with `sendDefaultPii = true` and `tracesSampleRate = 1.0`. Release uses the `production` environment. Debug builds set Sentry’s debug flag.
+Diagnostics: `ios/App/App/AppDelegate.swift` starts Sentry (`sentry-cocoa`) with `sendDefaultPii = false` and `tracesSampleRate = 0.1`. The SDK does not attach the device IP address, name, or email. Release uses the `production` environment. Debug builds set Sentry’s debug flag. JavaScript errors from the WebView are posted to the same project as the error name and message only, and only from the iOS app.
 
-Not in this app: photo library, camera permission, location, contacts, microphone, advertising identifier, or a tracking prompt. `Info.plist` has no usage-description keys.
+Permissions actually used:
 
-- [ ] App Privacy lists account data, user content (projects), and diagnostics. It does not list tracking
-- [ ] Decide whether `sendDefaultPii` stays on. While it is on, the diagnostics label should include the data Sentry attaches (including IP)
-- [ ] Privacy policy URL in App Store Connect covers the username account, optional Apple sign-in, project sync, and crash reports
+- Camera (and LiDAR): RoomPlan wall scan. `Info.plist` has `NSCameraUsageDescription`. If the person has denied camera access, the scan screen says “Camera access is off”, with Open Settings and Cancel.
+- Photos: not used. Snapshots and exports go to the Files app and the share sheet. There is no photo-library purpose string.
+- Microphone and speech recognition: not used. Describe it dictation is the system keyboard mic, which does not need an app purpose string.
+- Files: documents are written in the app’s Documents folder (`UIFileSharingEnabled`). iOS has no purpose string for that.
+
+Not in this app: location, contacts, advertising identifier, or a tracking prompt.
+
+- [ ] App Privacy lists account data, user content (projects), and diagnostics. It does not list tracking or IP address
+- [x] `sendDefaultPii` is off. Diagnostics are crash, performance, and other diagnostic data, not linked to the account
+- [ ] Privacy policy URL in App Store Connect covers the username account, optional Apple sign-in, project sync, and crash reports. The in-app link is the production site (`src/config/links.ts`). That site is still behind Vercel Deployment Protection until it is made public
 
 ## Sentry dSYM
 
 Release is `DEBUG_INFORMATION_FORMAT = dwarf-with-dsym`. Debug is `dwarf` only, so a Debug install will not produce a dSYM.
 
 - [ ] Archive a Release build
-- [ ] Upload that archive’s dSYM to the Sentry project used by `AppDelegate.swift` (Sentry’s Xcode build phase, or `sentry-cli debug-files upload` against the `.dSYM` inside the archive)
-- [ ] Confirm a test crash from TestFlight symbolicates. The project links Sentry and does not yet run an upload step in the Xcode target
+- [ ] Upload that archive’s dSYM to the Sentry project used by `AppDelegate.swift`. The Xcode target links Sentry and does not run an upload build phase yet. From the archive:
+
+  ```sh
+  # Org slug and project slug are the ones in Sentry for DSN project 4512189597024256.
+  sentry-cli debug-files upload --org <org-slug> --project <project-slug> \
+    path/to/The\ Workbench.app.dSYM
+  ```
+
+- [ ] Confirm a test crash from TestFlight symbolicates
 
 ## Worker URL
 

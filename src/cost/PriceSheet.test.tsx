@@ -54,6 +54,36 @@ describe('Cut list → Cost and Prices', () => {
     expect(r.getByTestId('price-hw:pull')).toBeTruthy();
   });
 
+  it('blurring a price without editing does not save it', () => {
+    act(() => usePriceStore.getState().resetDevice());
+    seed([
+      { name: 'Leg', dimensions: { length: 30, width: 3.5, height: 1.5 }, material: { ...PRESET_WOOD_MATERIALS.pine } },
+      { name: 'Odd', dimensions: { length: 30, width: 3.5, height: 0.75 }, material: { ...PRESET_WOOD_MATERIALS.pine } },
+    ]);
+    const r = render(<CutListDrawer isOpen onClose={() => {}} />);
+    const totals = () => r.getAllByTestId('cost-line-total').map((e) => e.textContent);
+    expect(totals()).toContain('no price');
+    tap(r.getByTestId('cost-edit-prices'));
+
+    const example = r.getByTestId('price-stick:2×4:96') as HTMLInputElement;
+    fireEvent.focus(example);
+    fireEvent.blur(example);
+    expect(usePriceStore.getState().device).toEqual({});
+    expect(r.getByTestId('cost-note').textContent).toContain('Example prices');
+
+    const unpriced = r.getByTestId('price-stick:1×4:96') as HTMLInputElement;
+    expect(unpriced.value).toBe('0.00');
+    fireEvent.focus(unpriced);
+    fireEvent.blur(unpriced);
+    expect(usePriceStore.getState().device.items ?? {}).not.toHaveProperty('stick:1×4:96');
+    expect(totals()).toContain('no price');
+
+    tap(r.getByTestId('price-scope-project'));
+    fireEvent.focus(example);
+    fireEvent.blur(example);
+    expect(proj().prices).toBeUndefined();
+  });
+
   it('This project overrides sit over the device list and can be cleared', () => {
     act(() => usePriceStore.getState().resetDevice());
     act(() => usePriceStore.getState().setDevicePrice('stick:2×4:96', 5));

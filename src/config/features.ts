@@ -11,3 +11,9 @@
  * matching privacy-label / privacy-page updates.
  */
 export const DESCRIBE_CLOUD_ENABLED = false as boolean;
+
+/**
+ * USDZ, GLB, and Copy project JSON in the ••• menu. Off for 1.0: 3D export is
+ * on hold, and Copy JSON is a dev tool. The export code stays; the rows hide.
+ */
+export const MODEL_EXPORT_ENABLED = false as boolean;

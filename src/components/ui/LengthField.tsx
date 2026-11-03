@@ -1,6 +1,6 @@
 import React from 'react';
 import type { LengthUnit } from '../../types/furniture';
-import { unitScale } from '../../utils/units';
+import { MAX_PART_INCHES, unitScale } from '../../utils/units';
 import { fieldUnit, inchFraction, metricNumber } from '../../utils/lengthFormat';
 import { NumberField, type NumberFieldProps } from './NumberField';
 
@@ -31,7 +31,7 @@ export const LengthField: React.FC<LengthFieldProps> = ({ inches, unit, onCommit
       className={imperial ? `${rest.className ?? ''} is-frac`.trim() : rest.className}
       fractions={imperial}
       min={min !== undefined ? min * k : undefined}
-      max={max !== undefined ? max * k : undefined}
+      max={(max ?? MAX_PART_INCHES) * k}
       value={inches * k}
       format={() => (imperial ? `${inchFraction(inches)}"` : metricNumber(inches, fu))}
       onCommit={(n) => onCommit(n / k)}

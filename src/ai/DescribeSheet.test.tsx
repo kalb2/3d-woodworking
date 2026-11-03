@@ -18,7 +18,19 @@ const tap = (el: Element) => { const spy = vi.spyOn(performance, 'now').mockRetu
 const type = (el: Element, value: string) => fireEvent.change(el, { target: { value } });
 
 describe('Describe it', () => {
+  it('stays out of the Add menu when Apple Intelligence is unavailable', () => {
+    act(() => {
+      s().createProject('AI', 'in');
+      useAppStore.getState().setSidebarPanel('shapes');
+      useAppStore.getState().setOverlayOpen('sidebar', true);
+    });
+    const r = render(<SidebarNav />);
+    expect(r.queryByTestId('add-describe')).toBeNull();
+    expect(r.getByTestId('add-fitting')).toBeTruthy();
+  });
+
   it('is a labeled row in the Add menu that opens the sheet', () => {
+    localStorage.setItem('workbench_ai_mock', '1');
     act(() => {
       s().createProject('AI', 'in');
       useAppStore.getState().setSidebarPanel('shapes');
