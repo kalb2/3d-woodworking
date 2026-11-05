@@ -22,6 +22,15 @@ export const INSET_TOL = 0.2;
 export const INSETS = [0.25, 0.5, 0.75];
 /** Targets farther apart than this (gap between boxes) don't infer. */
 export const NEAR_GAP = 36;
+/** Reach for top-to-top / bottom-to-bottom flush with a part the mover is touching. */
+export const CONTACT_ALIGN_TOL = 1.2;
+
+export interface InferOptions {
+  /** Parts the mover touches face to face: they win over other parts, and their tops/bottoms reach farther and beat insets. */
+  prefer?: Set<string>;
+  /** Axes that only take flush edges of a preferred (touching) part, nothing else. */
+  flushOnly?: Partial<Record<AxisKey, boolean>>;
+}
 
 const AXES: AxisKey[] = ['x', 'y', 'z'];
 const center = (b: Box, a: AxisKey) => (b.min[a] + b.max[a]) / 2;
@@ -48,7 +57,9 @@ export function inferAlignments(
   pos: Position3D,
   targets: FurnitureObject[],
   lockedAxes: Partial<Record<AxisKey, unknown>>,
+  opts: InferOptions = {},
 ): { position: Position3D; alignments: Alignment[] } {
+  const prefer = opts.prefer ?? new Set<string>();
   const out = { ...pos };
   const mb0 = objectBox({ ...mover, position: pos });
   const half = { x: (mb0.max.x - mb0.min.x) / 2, y: (mb0.max.y - mb0.min.y) / 2, z: (mb0.max.z - mb0.min.z) / 2 };
@@ -64,22 +75,33 @@ export function inferAlignments(
     let best: { d: number; shift: number; kind: AlignKind; inset?: number; value: number; t: FurnitureObject; b: Box } | null = null;
     const c = pos[a] + off[a];
     const m = { min: c - half[a], ctr: c, max: c + half[a] };
+    const flushOnly = Boolean(opts.flushOnly?.[a]);
     for (const { t, b } of boxes) {
       if (others.some((o) => gap(mb0, b, o) > NEAR_GAP)) continue;
+      const touching = prefer.has(t.id);
+      if (flushOnly && !touching) continue;
+      // Levelling with the part you touch (tops flush / bottoms flush) is the strongest pull on Y.
+      const levelling = touching && a === 'y';
+      const flushTol = levelling ? CONTACT_ALIGN_TOL : ALIGN_TOL;
       const cands: { mine: number; theirs: number; kind: AlignKind; inset?: number; tol: number }[] = [
-        { mine: m.min, theirs: b.min[a], kind: 'flush', tol: ALIGN_TOL },
-        { mine: m.max, theirs: b.max[a], kind: 'flush', tol: ALIGN_TOL },
-        { mine: m.ctr, theirs: center(b, a), kind: 'centered', tol: ALIGN_TOL },
-        ...INSETS.flatMap((i) => [
-          { mine: m.min, theirs: b.min[a] + i, kind: 'inset' as const, inset: i, tol: INSET_TOL },
-          { mine: m.max, theirs: b.max[a] - i, kind: 'inset' as const, inset: i, tol: INSET_TOL },
+        { mine: m.min, theirs: b.min[a], kind: 'flush', tol: flushTol },
+        { mine: m.max, theirs: b.max[a], kind: 'flush', tol: flushTol },
+        ...(flushOnly ? [] : [
+          { mine: m.ctr, theirs: center(b, a), kind: 'centered' as const, tol: ALIGN_TOL },
+          // An inset as deep as the target itself is its opposite face (a 3/4" board's "Inset 3/4"" is
+          // its other side): that is a stack/offset, not an inset, and it fought tops-flush.
+          ...INSETS.filter((i) => i < b.max[a] - b.min[a] - 1e-6).flatMap((i) => [
+            { mine: m.min, theirs: b.min[a] + i, kind: 'inset' as const, inset: i, tol: INSET_TOL },
+            { mine: m.max, theirs: b.max[a] - i, kind: 'inset' as const, inset: i, tol: INSET_TOL },
+          ]),
         ]),
       ];
       for (const k of cands) {
         const d = k.theirs - k.mine;
         if (Math.abs(d) > k.tol) continue;
-        // Prefer exact flush/centered over insets on ties.
-        const score = Math.abs(d) + (k.kind === 'inset' ? 1e-3 : 0);
+        // The part we touch wins over parts farther off; on ties flush beats centered beats inset.
+        const score = Math.abs(d) + (k.kind === 'inset' ? 1e-3 : k.kind === 'centered' ? 1e-4 : 0)
+          - (touching ? 10 : 0) - (levelling && k.kind === 'flush' ? 5 : 0);
         if (!best || score < best.d) best = { d: score, shift: d, kind: k.kind, inset: k.inset, value: k.theirs, t, b };
       }
     }

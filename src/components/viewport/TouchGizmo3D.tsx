@@ -185,12 +185,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
           };
         }
 
-        if (currentProject?.snapSettings.floorCollision) {
-          const minY = object.dimensions.height / 2;
-          if (newPos.y < minY) {
-            newPos.y = minY;
-          }
-        }
+        // Floor: no clamp here. Snapping, updateObject and translateSelection all keep the
+        // part's real lowest point (rotation included) at or above y = 0.
 
         // Several things selected: they all move together by the same delta.
         const multi = useProjectStore.getState().selectedObjectIds.length > 1;

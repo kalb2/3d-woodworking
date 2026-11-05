@@ -4,7 +4,7 @@ import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, resizeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
-import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRules';
+import { DEFAULT_RESIZE_STEP, floorClampY, floorSafeDy, floorSafeY, liftToFloor } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater, jointGeometry, shiftAlong } from '../joinery/joints';
@@ -307,6 +307,15 @@ interface ProjectState {
 /** Keep project.scannedRoom in step with edited room-scan parts. */
 function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): FurnitureProject {
   return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
+}
+
+/** Copies never start below the floor (a source part that already dipped under it is lifted in the copy). */
+function floorSafeCopies(proj: FurnitureProject, objects: FurnitureObject[], topIds: string[]): FurnitureObject[] {
+  if (proj.snapSettings?.floorCollision === false) return objects;
+  const lifted = liftToFloor(objects, topIds);
+  if (lifted === objects) return objects;
+  const parents = new Set(topIds.map((id) => lifted.find((o) => o.id === id)?.parentId).filter(Boolean) as string[]);
+  return refitGroups(lifted, parents);
 }
 
 /** Add joints copied with duplicated parts (no-op when there are none). */
@@ -702,6 +711,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const ids = selectedObjectIds.filter((id) => proj.objects.find((o) => o.id === id)?.generator !== 'room-scan');
     if (!ids.length) return;
     const result = deepDuplicate(proj.objects, ids, undefined, undefined, proj.joints);
+    result.objects = floorSafeCopies(proj, result.objects, result.topIds);
     set((state) => ({
       projects: state.projects.map((p) => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),
       selectedObjectIds: result.topIds,
@@ -1175,12 +1185,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!existingObj) return;
 
     // Groups keep their own pivot. Members stay on the floor themselves.
+    // Uses the real lowest point (rotation included): a stood-up panel's height field is its thickness.
     if (updates.position && proj.snapSettings.floorCollision && existingObj.shape !== 'group') {
-      const objHeight = updates.dimensions?.height ?? existingObj.dimensions.height;
-      const minY = objHeight / 2;
-      if (updates.position.y < minY) {
-        updates = { ...updates, position: { ...updates.position, y: minY } };
-      }
+      const y = floorClampY({ ...existingObj, ...updates } as FurnitureObject);
+      if (y !== updates.position.y) updates = { ...updates, position: { ...updates.position, y } };
     }
 
     // Floor on: resizing keeps a resting part's bottom fixed (grows up) and nothing dips below the floor.
@@ -1322,6 +1330,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj || !proj.objects.some((o) => o.id === id)) return;
     const result = deepDuplicate(proj.objects, [id], undefined, undefined, proj.joints);
+    result.objects = floorSafeCopies(proj, result.objects, result.topIds);
     const dupId = result.topIds[0];
     set(state => ({
       projects: state.projects.map(p => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),
