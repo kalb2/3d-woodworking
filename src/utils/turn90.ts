@@ -23,7 +23,7 @@ export function cleanDegrees(d: number): number {
 }
 
 /** Of the two equivalent XYZ Euler triples, keep the one with fewer / smaller angles (180° Y stays 0,180,0). */
-function simplestEuler(x: number, y: number, z: number) {
+export function simplestEuler(x: number, y: number, z: number) {
   const a = { x: cleanDegrees(x), y: cleanDegrees(y), z: cleanDegrees(z) };
   const b = { x: cleanDegrees(x + 180), y: cleanDegrees(180 - y), z: cleanDegrees(z + 180) };
   const cost = (r: typeof a) => [r.x, r.y, r.z].filter((v) => v !== 0).length * 1000 + Math.abs(r.x) + Math.abs(r.y) + Math.abs(r.z);
