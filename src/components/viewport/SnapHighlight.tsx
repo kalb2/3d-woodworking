@@ -2,7 +2,7 @@ import React from 'react';
 import { create } from 'zustand';
 import * as THREE from 'three';
 import { useProjectStore } from '../../state/useProjectStore';
-import { Html, Line } from '@react-three/drei';
+import { Line } from '@react-three/drei';
 import { getBoundingBox, type SnapContact } from '../../utils/snapUtils';
 import type { Alignment } from '../../utils/snapInfer';
 import { GIZMO_AXIS } from '../../theme/gizmo';
@@ -62,24 +62,16 @@ function FaceQuad({ box, axis, value, opacity }: { box: THREE.Box3; axis: 'x' | 
 
 /** Highlights the face being snapped to (strong) and the mover's touching face (faint). */
 export const SnapHighlight: React.FC = () => {
-  const { moverId, contacts, alignments, hint } = useSnapHighlight();
+  const { moverId, contacts, alignments } = useSnapHighlight();
   const objects = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.objects);
-  if (!moverId || (!contacts.length && !alignments.length && !hint) || !objects) return null;
+  if (!moverId || (!contacts.length && !alignments.length) || !objects) return null;
   const mover = objects.find((o) => o.id === moverId);
-  const mb = mover ? getBoundingBox(mover) : null;
   return (
     <group>
       {alignments.map((al, i) => (
         <Line key={`al-${i}`} points={[[al.from.x, al.from.y, al.from.z], [al.to.x, al.to.y, al.to.z]]} color={GIZMO_AXIS[al.axis]}
           lineWidth={1.5} dashed dashSize={1} gapSize={0.7} depthTest={false} renderOrder={22} />
       ))}
-      {hint && mb && (
-        <group position={[(mb.min.x + mb.max.x) / 2, mb.max.y, (mb.min.z + mb.max.z) / 2]}>
-          <Html center zIndexRange={[29, 0]} style={{ pointerEvents: 'none' }}>
-            <span className="snap-hint" data-testid="snap-hint">{hint}</span>
-          </Html>
-        </group>
-      )}
       {contacts.map((c, i) => {
         const target = objects.find((o) => o.id === c.targetId);
         if (!target) return null;
@@ -101,5 +93,22 @@ export const SnapHighlight: React.FC = () => {
         );
       })}
     </group>
+  );
+};
+
+/**
+ * Snap hint as a fixed HUD pill at the top-center of the screen, just under the
+ * project title. Never drawn at the part, so it can't cover the part or gizmo.
+ * Keeps the last text while fading out.
+ */
+export const SnapHintHud: React.FC = () => {
+  const hint = useSnapHighlight((s) => (s.moverId ? s.hint : null));
+  const [text, setText] = React.useState<string | null>(hint);
+  React.useEffect(() => { if (hint) setText(hint); }, [hint]);
+  if (!text) return null;
+  return (
+    <div className={`snap-hint-hud${hint ? ' is-visible' : ''}`} data-testid="snap-hint" role="status" aria-live="polite" aria-hidden={!hint}>
+      {hint ?? text}
+    </div>
   );
 };

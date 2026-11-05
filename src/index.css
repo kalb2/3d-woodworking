@@ -3112,7 +3112,9 @@ html, body, #root {
 .snap-chip { position: absolute; left: 48px; top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 5px 11px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 14px; font-weight: 700; }
 .measure-tip { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; max-width: 520px; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(15,23,42,0.12); font-size: 13px; color: #334155; line-height: 1.35; }
 
-.snap-hint { display: inline-block; transform: translateY(-34px); padding: 4px 10px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px rgba(15,23,42,0.2); }
+.snap-hint-hud { position: fixed; left: 50%; top: calc(76px + env(safe-area-inset-top, 0px)); z-index: 54; transform: translate(-50%, -4px); max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; padding: 5px 12px; border-radius: 999px; background: rgba(15,23,42,0.9); color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px rgba(15,23,42,0.2); pointer-events: none; opacity: 0; transition: opacity 160ms ease, transform 160ms ease; }
+.snap-hint-hud.is-visible { opacity: 1; transform: translate(-50%, 0); }
+.is-phone .snap-hint-hud { top: calc(70px + env(safe-area-inset-top, 0px)); }
 
 .view-style-row { justify-content: space-between; cursor: default; }
 .view-style-seg { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 999px; overflow: hidden; }
