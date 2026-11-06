@@ -19,7 +19,7 @@ import { startPartPress, useSelectTip } from '../../utils/longPress';
 import { lightHaptic } from '../../native/haptics';
 import { GroupResizeHandles3D } from './GroupResizeHandles3D';
 import { JointTags } from './JointTags';
-import { SnapHighlight } from './SnapHighlight';
+import { SnapHighlight, SnapHintHud } from './SnapHighlight';
 import { MeasureLayer } from '../../measure/MeasureLayer';
 import { useMeasure } from '../../measure/useMeasure';
 
@@ -292,6 +292,7 @@ export const FurnitureCanvas: React.FC = () => {
       onPointerUpCapture={onAreaUp}
       onPointerCancelCapture={onAreaUp}
     >
+      <SnapHintHud />
       {pressRing && (
         // Hold feedback: a ring that fills over the long-press time, then pops.
         <div className={`press-ring${pressRing.done ? ' is-done' : ''}`} data-testid="press-ring" aria-hidden="true" style={{ left: pressRing.x, top: pressRing.y }} />

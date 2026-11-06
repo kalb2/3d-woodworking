@@ -8,6 +8,7 @@ import { GIZMO_AXIS } from '../../theme/gizmo';
 import { NumberField } from '../ui/NumberField';
 import { LengthField } from '../ui/LengthField';
 import { stretchBox } from '../../utils/groupStretch';
+import { bottomOf } from '../../utils/resizeRules';
 
 const AXES: { key: keyof Dimensions3D; color: string; testId: string }[] = [
   { key: 'length', color: GIZMO_AXIS.x, testId: 'size-x' },
@@ -90,7 +91,9 @@ export const MoveFloorRow: React.FC = () => {
   if (activeGizmoMode !== 'move' || !project || !object) return null;
 
   const scale = unitScale(project.unit);
-  const gapInches = Math.max(object.position.y - object.dimensions.height / 2, 0);
+  // The part's real bottom above the floor (rotation included: a stood-up panel's height field is its thickness).
+  const bottom = bottomOf(object);
+  const gapInches = Math.max(bottom, 0);
   // Imperial drags in 1/16" so the field always reads a clean fraction.
   const step = project.unit === 'mm' ? 1 : project.unit === 'cm' ? 0.1 : scale / 16;
   const display = gapInches * scale;
@@ -100,7 +103,7 @@ export const MoveFloorRow: React.FC = () => {
     if (!Number.isFinite(displayValue)) return;
     const inches = Math.max(displayValue / scale, 0);
     updateObject(object.id, {
-      position: { ...object.position, y: inches + object.dimensions.height / 2 },
+      position: { ...object.position, y: object.position.y + inches - bottom },
     }, true);
   };
 

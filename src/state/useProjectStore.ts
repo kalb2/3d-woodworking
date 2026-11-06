@@ -1,10 +1,12 @@
 import { create } from 'zustand';
+import * as THREE from 'three';
+import { quatOf, rotOf, rotationDelta } from '../utils/handleDrag';
 import { migrateLegacyLabels, nextStockName, shapeCatalogEntry } from '../catalog/shapeCatalog';
 import { findTemplate, instantiateTemplate } from '../catalog/templates';
 import { roomScanParts, syncRoomFromParts } from '../generators/roomScan';
 import { placeBuiltIn, resizeBuiltIn, slideAlongWall, type BuiltInRequest } from '../builtins/builtIns';
 import { squareUpRoom } from '../generators/squareRoom';
-import { DEFAULT_RESIZE_STEP, floorSafeDy, floorSafeY } from '../utils/resizeRules';
+import { DEFAULT_RESIZE_STEP, floorClampY, floorSafeDy, floorSafeY, liftToFloor } from '../utils/resizeRules';
 import { groupsToRefit, turnObjects, type TurnAxis } from '../utils/turn90';
 import { instantiateUserTemplate, type Placement, type UserTemplate } from '../templates/userTemplates';
 import { extendMater, jointGeometry, shiftAlong } from '../joinery/joints';
@@ -307,6 +309,15 @@ interface ProjectState {
 /** Keep project.scannedRoom in step with edited room-scan parts. */
 function withRoomSync(p: FurnitureProject, objects: FurnitureObject[]): FurnitureProject {
   return p.scannedRoom ? { ...p, objects, scannedRoom: syncRoomFromParts(p.scannedRoom, objects) } : { ...p, objects };
+}
+
+/** Copies never start below the floor (a source part that already dipped under it is lifted in the copy). */
+function floorSafeCopies(proj: FurnitureProject, objects: FurnitureObject[], topIds: string[]): FurnitureObject[] {
+  if (proj.snapSettings?.floorCollision === false) return objects;
+  const lifted = liftToFloor(objects, topIds);
+  if (lifted === objects) return objects;
+  const parents = new Set(topIds.map((id) => lifted.find((o) => o.id === id)?.parentId).filter(Boolean) as string[]);
+  return refitGroups(lifted, parents);
 }
 
 /** Add joints copied with duplicated parts (no-op when there are none). */
@@ -702,6 +713,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const ids = selectedObjectIds.filter((id) => proj.objects.find((o) => o.id === id)?.generator !== 'room-scan');
     if (!ids.length) return;
     const result = deepDuplicate(proj.objects, ids, undefined, undefined, proj.joints);
+    result.objects = floorSafeCopies(proj, result.objects, result.topIds);
     set((state) => ({
       projects: state.projects.map((p) => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),
       selectedObjectIds: result.topIds,
@@ -1175,12 +1187,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (!existingObj) return;
 
     // Groups keep their own pivot. Members stay on the floor themselves.
+    // Uses the real lowest point (rotation included): a stood-up panel's height field is its thickness.
     if (updates.position && proj.snapSettings.floorCollision && existingObj.shape !== 'group') {
-      const objHeight = updates.dimensions?.height ?? existingObj.dimensions.height;
-      const minY = objHeight / 2;
-      if (updates.position.y < minY) {
-        updates = { ...updates, position: { ...updates.position, y: minY } };
-      }
+      const y = floorClampY({ ...existingObj, ...updates } as FurnitureObject);
+      if (y !== updates.position.y) updates = { ...updates, position: { ...updates.position, y } };
     }
 
     // Floor on: resizing keeps a resting part's bottom fixed (grows up) and nothing dips below the floor.
@@ -1220,51 +1230,25 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       const dx = (updates.position?.x ?? existingObj.position.x) - existingObj.position.x;
       const dy = (updates.position?.y ?? existingObj.position.y) - existingObj.position.y;
       const dz = (updates.position?.z ?? existingObj.position.z) - existingObj.position.z;
-      const drx = (updates.rotation?.x ?? existingObj.rotation.x) - existingObj.rotation.x;
-      const dry = (updates.rotation?.y ?? existingObj.rotation.y) - existingObj.rotation.y;
-      const drz = (updates.rotation?.z ?? existingObj.rotation.z) - existingObj.rotation.z;
-      const pivot = existingObj.position;
-      const rad = (deg: number) => (deg * Math.PI) / 180;
+      // The group box turned from its old orientation to the new one: every member
+      // turns by that same world rotation about the group's pivot (quaternions, so a
+      // stood-up board or a turned rail keeps its shape relation instead of tumbling).
+      const turned = Boolean(updates.rotation) && (['x', 'y', 'z'] as const).some((k) => updates.rotation![k] !== existingObj.rotation[k]);
+      const q = turned ? rotationDelta(existingObj.rotation, updates.rotation!) : null;
+      const pivot = new THREE.Vector3(existingObj.position.x, existingObj.position.y, existingObj.position.z);
       const below = new Set(moveSet(proj.objects, id));
       below.delete(id);
+      const r4 = (n: number) => { const r = Math.round(n * 1e4) / 1e4; return r === 0 ? 0 : r; };
       updatedObjects = updatedObjects.map((object) => {
         if (!below.has(object.id)) return object;
-        let x = object.position.x - pivot.x;
-        let y = object.position.y - pivot.y;
-        let z = object.position.z - pivot.z;
-        if (dry) {
-          const c = Math.cos(rad(dry));
-          const s = Math.sin(rad(dry));
-          // Same handedness as the parts' own Y rotation (three.js): +x turns toward -z.
-          const nx = x * c + z * s;
-          const nz = -x * s + z * c;
-          x = nx;
-          z = nz;
+        if (!q) {
+          return { ...object, position: { x: object.position.x + dx, y: object.position.y + dy, z: object.position.z + dz } };
         }
-        if (drx) {
-          const c = Math.cos(rad(drx));
-          const s = Math.sin(rad(drx));
-          const ny = y * c - z * s;
-          const nz = y * s + z * c;
-          y = ny;
-          z = nz;
-        }
-        if (drz) {
-          const c = Math.cos(rad(drz));
-          const s = Math.sin(rad(drz));
-          const nx = x * c - y * s;
-          const ny = x * s + y * c;
-          x = nx;
-          y = ny;
-        }
+        const p = new THREE.Vector3(object.position.x, object.position.y, object.position.z).sub(pivot).applyQuaternion(q).add(pivot);
         return {
           ...object,
-          position: { x: x + pivot.x + dx, y: y + pivot.y + dy, z: z + pivot.z + dz },
-          rotation: {
-            x: object.rotation.x + drx,
-            y: object.rotation.y + dry,
-            z: object.rotation.z + drz,
-          },
+          position: { x: r4(p.x + dx), y: r4(p.y + dy), z: r4(p.z + dz) },
+          rotation: rotOf(q.clone().multiply(quatOf(object.rotation))),
         };
       });
     }
@@ -1322,6 +1306,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const proj = projects.find(p => p.id === activeProjectId);
     if (!proj || !proj.objects.some((o) => o.id === id)) return;
     const result = deepDuplicate(proj.objects, [id], undefined, undefined, proj.joints);
+    result.objects = floorSafeCopies(proj, result.objects, result.topIds);
     const dupId = result.topIds[0];
     set(state => ({
       projects: state.projects.map(p => (p.id === activeProjectId ? withCopiedJoints({ ...p, objects: result.objects }, result.joints) : p)),

@@ -1,5 +1,5 @@
 import type { FurnitureObject, LengthUnit } from '../types/furniture';
-import { objectBox } from '../state/groupTree';
+import { leavesOf, moveSet, objectBox } from '../state/groupTree';
 
 /** Default drag-resize step (inches). */
 export const DEFAULT_RESIZE_STEP = 0.25;
@@ -40,9 +40,31 @@ export function floorSafeY(before: FurnitureObject, after: FurnitureObject): num
   return Math.round(y * 10000) / 10000;
 }
 
+/** The y that keeps a part's real lowest point (rotation included) at or above the floor. */
+export function floorClampY(o: FurnitureObject): number {
+  const b = bottomOf(o);
+  return b < 0 ? Math.round((o.position.y - b) * 1e6) / 1e6 : o.position.y;
+}
+
 /** Clamp a vertical move so the lowest of `parts` stays at or above the floor. */
 export function floorSafeDy(parts: FurnitureObject[], dy: number): number {
   if (!parts.length) return dy;
   const low = Math.min(...parts.map(bottomOf));
   return low + dy < 0 ? Math.max(dy, -low) : dy;
+}
+
+/**
+ * Lift each of `ids` (a part or a whole group, moved as one) so its lowest
+ * part sits at or above the floor. Used for fresh copies. Pure; returns the
+ * same array when nothing moves.
+ */
+export function liftToFloor(objects: FurnitureObject[], ids: string[]): FurnitureObject[] {
+  let out = objects;
+  for (const id of ids) {
+    const dy = floorSafeDy(leavesOf(out, id).filter((o) => o.generator !== 'room-scan'), 0);
+    if (dy <= 1e-9) continue;
+    const move = moveSet(out, id);
+    out = out.map((o) => (move.has(o.id) ? { ...o, position: { ...o.position, y: Math.round((o.position.y + dy) * 1e6) / 1e6 } } : o));
+  }
+  return out;
 }

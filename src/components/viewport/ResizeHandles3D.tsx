@@ -8,8 +8,9 @@ import { GIZMO_AXIS } from '../../theme/gizmo';
 import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
 import { DEFAULT_RESIZE_STEP } from '../../utils/resizeRules';
-import { BOX_FACE_SHAPES, faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, faceSign, pushPull, rayAxisParam, setFaceSize, type Face } from '../../utils/pushPull';
+import { BOX_FACE_SHAPES, faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, faceSign, pushPull, setFaceSize, type Face } from '../../utils/pushPull';
 import { LengthField } from '../ui/LengthField';
+import { axisTravel, pastSlop, screenAxis, viewportOf, type Pt, type ScreenAxis } from '../../utils/handleDrag';
 
 const FACES: Face[] = ['+x', '-x', '+y', '-y', '+z', '-z'];
 const ACCENT = '#f97316';
@@ -41,23 +42,42 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
   const { updateObject, pushHistoryState, saveCurrentProject } = useProjectStore();
   const [dragFace, setDragFace] = useState<Face | null>(null);
   const [focusFace, setFocusFace] = useState<Face | null>(null);
-  const { camera, raycaster, gl, controls } = useThree() as any;
-  const session = useRef<{ face: Face; start: FurnitureObject; P: THREE.Vector3; N: THREE.Vector3; t0: number; changed: boolean } | null>(null);
+  const { camera, gl, controls } = useThree() as any;
+  const session = useRef<{ face: Face; start: FurnitureObject; pointerId: number; startClient: Pt; axis: ScreenAxis; live: boolean; changed: boolean } | null>(null);
 
-  useEffect(() => { setFocusFace(null); }, [object.id]);
+  /** End the push/pull: one undo step if the size changed. Safe to call twice. */
+  const finish = () => {
+    const s = session.current;
+    session.current = null;
+    setDragFace(null);
+    if (controls) controls.enabled = true;
+    if (s?.changed) useProjectStore.getState().pushHistoryState();
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
+  useEffect(() => {
+    setFocusFace(null);
+    // Another part got selected mid-drag: the old drag never lands on it.
+    if (session.current && session.current.start.id !== object.id) finishRef.current();
+  }, [object.id]);
+  // Leaving Resize (or deselecting) mid-drag still commits what was done.
+  useEffect(() => () => { if (session.current) finishRef.current(); }, []);
 
   const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const unit = project?.unit ?? 'in';
   const floorOn = Boolean(project?.showFloor && project?.snapSettings.floorCollision !== false);
 
   const begin = (e: any, face: Face) => {
-    if (!e.ray) return;
     e.stopPropagation();
+    if (session.current) finish();
+    const ne = (e.nativeEvent ?? e) as PointerEvent;
     (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
     if (controls) controls.enabled = false;
-    const P = faceCenterWorld(object, face);
-    const N = faceNormalWorld(object, face);
-    session.current = { face, start: { ...object }, P, N, t0: rayAxisParam(e.ray.origin, e.ray.direction, P, N), changed: false };
+    // The drag is measured on screen along the face's normal, fixed now: a face you look
+    // straight at (normal toward the camera) can't turn a small move into a huge size.
+    const axis = screenAxis(faceCenterWorld(object, face), faceNormalWorld(object, face), camera, viewportOf(gl.domElement));
+    session.current = { face, start: { ...object }, pointerId: ne.pointerId ?? 0, startClient: { x: ne.clientX ?? 0, y: ne.clientY ?? 0 }, axis, live: false, changed: false };
     setDragFace(face);
     setFocusFace(face);
   };
@@ -66,15 +86,18 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
     if (!dragFace) return;
     const move = (event: PointerEvent) => {
       const s = session.current;
-      if (!s) return;
-      const rect = gl.domElement.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return;
-      raycaster.setFromCamera(new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1), camera);
-      const t = rayAxisParam(raycaster.ray.origin, raycaster.ray.direction, s.P, s.N);
-      if (!Number.isFinite(t)) return;
+      if (!s || (event.pointerId ?? 0) !== s.pointerId) return;
       const st = useProjectStore.getState();
+      if (st.activeGizmoMode !== 'resize') { finishRef.current(); return; }
+      const finger = { x: event.clientX, y: event.clientY };
+      if (!s.live) {
+        if (!pastSlop(s.startClient, finger)) return;
+        s.live = true;
+      }
+      const t = axisTravel(s.axis, s.startClient, finger);
+      if (!Number.isFinite(t)) return;
       const proj = st.projects.find((p) => p.id === st.activeProjectId);
-      const next = pushPull(s.start, s.face, t - s.t0, {
+      const next = pushPull(s.start, s.face, t, {
         snap: proj?.snapSettings.enabled !== false,
         step: proj?.snapSettings.resizeStep ?? DEFAULT_RESIZE_STEP,
         unit: proj?.unit ?? 'in',
@@ -83,17 +106,14 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
       const cur = s.start.dimensions[faceDim(s.face)];
       if (!s.changed && Math.abs(next.dimensions[faceDim(s.face)] - cur) < 1e-9) return;
       s.changed = true;
-      updateObject(object.id, next, true);
+      // Resize only ever writes this part's size and the matching center shift.
+      updateObject(s.start.id, { dimensions: next.dimensions, position: next.position }, true);
     };
-    const up = () => {
+    // A tap just picks the face (no undo step).
+    const up = (event: PointerEvent) => {
       const s = session.current;
-      if (!s) return;
-      session.current = null;
-      setDragFace(null);
-      if (controls) controls.enabled = true;
-      if (!s.changed) return; // a tap just picks the face
-      pushHistoryState();
-      saveCurrentProject();
+      if (!s || (event.pointerId ?? 0) !== s.pointerId) return;
+      finishRef.current();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -102,9 +122,8 @@ export const ResizeHandles3D: React.FC<{ object: FurnitureObject }> = ({ object 
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (controls) controls.enabled = true;
     };
-  }, [dragFace, camera, gl, raycaster, controls, object.id, updateObject, pushHistoryState, saveCurrentProject]);
+  }, [dragFace, updateObject]);
 
   if (object.shape === 'group') return null;
 

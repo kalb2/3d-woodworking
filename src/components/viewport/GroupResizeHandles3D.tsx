@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import * as THREE from 'three';
 import type { FurnitureObject } from '../../types/furniture';
 import { useProjectStore } from '../../state/useProjectStore';
 import { GIZMO_AXIS } from '../../theme/gizmo';
 import { gripAnchor, meshExtents } from '../../theme/partSurface';
 import { FacePad, GizmoDepthClear } from './gizmoLook';
-import { faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, rayAxisParam, type Face } from '../../utils/pushPull';
+import { faceAxis, faceCenterWorld, faceDim, faceFromNormal, faceNormalWorld, type Face } from '../../utils/pushPull';
 import { stretchBox } from '../../utils/groupStretch';
 import { LengthField } from '../ui/LengthField';
 import { FaceHighlight } from './ResizeHandles3D';
+import { axisTravel, pastSlop, screenAxis, viewportOf, type Pt, type ScreenAxis } from '../../utils/handleDrag';
 
 const FACES: Face[] = ['+x', '-x', '+y', '-y', '+z', '-z'];
 
@@ -38,22 +38,39 @@ export const GroupResizeHandles3D: React.FC<{ ids: string[] }> = ({ ids }) => {
   const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const [dragFace, setDragFace] = useState<Face | null>(null);
   const [focusFace, setFocusFace] = useState<Face | null>(null);
-  const { camera, raycaster, gl, controls } = useThree() as any;
-  const session = useRef<{ face: Face; start: FurnitureObject[]; size0: number; P: THREE.Vector3; N: THREE.Vector3; t0: number; changed: boolean } | null>(null);
+  const { camera, gl, controls } = useThree() as any;
+  const session = useRef<{ face: Face; key: string; start: FurnitureObject[]; size0: number; pointerId: number; startClient: Pt; axis: ScreenAxis; live: boolean; changed: boolean } | null>(null);
   const key = ids.join('|');
-  useEffect(() => { setFocusFace(null); }, [key]);
+
+  /** End the stretch: one undo step if anything changed. Safe to call twice. */
+  const finish = () => {
+    const s = session.current;
+    session.current = null;
+    setDragFace(null);
+    if (controls) controls.enabled = true;
+    if (s?.changed) useProjectStore.getState().pushHistoryState();
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  useEffect(() => {
+    setFocusFace(null);
+    if (session.current && session.current.key !== key) finishRef.current();
+  }, [key]);
+  useEffect(() => () => { if (session.current) finishRef.current(); }, []);
 
   const box = project ? selectionBoxPart(project.objects, ids) : null;
   const unit = project?.unit ?? 'in';
 
   const begin = (e: any, face: Face) => {
-    if (!e.ray || !box || !project) return;
+    if (!box || !project) return;
     e.stopPropagation();
+    if (session.current) finish();
+    const ne = (e.nativeEvent ?? e) as PointerEvent;
     (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
     if (controls) controls.enabled = false;
-    const P = faceCenterWorld(box, face);
-    const N = faceNormalWorld(box, face);
-    session.current = { face, start: project.objects, size0: box.dimensions[faceDim(face)], P, N, t0: rayAxisParam(e.ray.origin, e.ray.direction, P, N), changed: false };
+    // Measured on screen along the face normal (see ResizeHandles3D): never explodes head-on.
+    const axis = screenAxis(faceCenterWorld(box, face), faceNormalWorld(box, face), camera, viewportOf(gl.domElement));
+    session.current = { face, key, start: project.objects, size0: box.dimensions[faceDim(face)], pointerId: ne.pointerId ?? 0, startClient: { x: ne.clientX ?? 0, y: ne.clientY ?? 0 }, axis, live: false, changed: false };
     setDragFace(face);
     setFocusFace(face);
   };
@@ -62,26 +79,24 @@ export const GroupResizeHandles3D: React.FC<{ ids: string[] }> = ({ ids }) => {
     if (!dragFace) return;
     const move = (event: PointerEvent) => {
       const s = session.current;
-      if (!s) return;
-      const rect = gl.domElement.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return;
-      raycaster.setFromCamera(new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1), camera);
-      const t = rayAxisParam(raycaster.ray.origin, raycaster.ray.direction, s.P, s.N);
+      if (!s || (event.pointerId ?? 0) !== s.pointerId) return;
+      if (useProjectStore.getState().activeGizmoMode !== 'resize') { finishRef.current(); return; }
+      const cur = { x: event.clientX, y: event.clientY };
+      if (!s.live) {
+        if (!pastSlop(s.startClient, cur)) return;
+        s.live = true;
+      }
+      const t = axisTravel(s.axis, s.startClient, cur);
       if (!Number.isFinite(t)) return;
       const before = useProjectStore.getState().projects.find((p) => p.id === useProjectStore.getState().activeProjectId)?.objects;
-      stretchSelection(ids, s.face, s.size0 + (t - s.t0), s.start);
+      stretchSelection(s.key.split('|'), s.face, s.size0 + t, s.start);
       const after = useProjectStore.getState().projects.find((p) => p.id === useProjectStore.getState().activeProjectId)?.objects;
       if (after !== before) s.changed = true;
     };
-    const up = () => {
+    const up = (event: PointerEvent) => {
       const s = session.current;
-      if (!s) return;
-      session.current = null;
-      setDragFace(null);
-      if (controls) controls.enabled = true;
-      if (!s.changed) return;
-      pushHistoryState();
-      saveCurrentProject();
+      if (!s || (event.pointerId ?? 0) !== s.pointerId) return;
+      finishRef.current();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -90,10 +105,8 @@ export const GroupResizeHandles3D: React.FC<{ ids: string[] }> = ({ ids }) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (controls) controls.enabled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragFace, camera, gl, raycaster, controls, key]);
+  }, [dragFace, stretchSelection]);
 
   if (!box) return null;
   const extents = meshExtents('cube', box.dimensions);

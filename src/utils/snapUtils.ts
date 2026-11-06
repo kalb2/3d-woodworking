@@ -1,27 +1,16 @@
 import * as THREE from 'three';
 import type { FurnitureObject, Position3D, SnapSettings } from '../types/furniture';
-import { boxCorners } from '../state/groupTree';
+import { boxCorners, objectBox } from '../state/groupTree';
 import { inferAlignments, insetLabel, type Alignment } from './snapInfer';
 
+/** World AABB of a part, accounting for its rotation (a stood-up panel is tall, not 3/4"). */
 export function getBoundingBox(obj: FurnitureObject): THREE.Box3 {
-  const halfX = obj.dimensions.length / 2;
-  const halfY = obj.dimensions.height / 2;
-  const halfZ = obj.dimensions.width / 2;
-
-  const min = new THREE.Vector3(
-    obj.position.x - halfX,
-    obj.position.y - halfY,
-    obj.position.z - halfZ
-  );
-
-  const max = new THREE.Vector3(
-    obj.position.x + halfX,
-    obj.position.y + halfY,
-    obj.position.z + halfZ
-  );
-
-  return new THREE.Box3(min, max);
+  const b = objectBox(obj);
+  return new THREE.Box3(new THREE.Vector3(b.min.x, b.min.y, b.min.z), new THREE.Vector3(b.max.x, b.max.y, b.max.z));
 }
+
+/** Lowest world y of a part at `pos` (rotation and dimensions included). */
+const bottomAt = (obj: FurnitureObject, pos: Position3D) => objectBox({ ...obj, position: pos }).min.y;
 
 export interface SnapResult {
   position: Position3D;
@@ -115,6 +104,15 @@ export interface SnapOptions {
   dragAxis?: 'x' | 'y' | 'z' | 'xz';
 }
 
+/** Parts share a face only when they overlap by more than this on the face's two other axes. */
+const SHARE_EPS = 0.01;
+type Axis = 'x' | 'y' | 'z';
+const FACE: Record<Axis, Record<'min' | 'max', NonNullable<SnapResult['snapFace']>>> = {
+  x: { max: 'left', min: 'right' },
+  y: { max: 'bottom', min: 'top' },
+  z: { max: 'back', min: 'front' },
+};
+
 export function calculateSnappedPosition(
   activeObj: FurnitureObject,
   rawPosition: Position3D,
@@ -123,35 +121,40 @@ export function calculateSnappedPosition(
   opts: SnapOptions = {}
 ): SnapResult {
   const vertical = opts.dragAxis === 'y';
+  const floorOn = Boolean(snapSettings.floorCollision);
   let pos = { ...rawPosition };
   let isSnapped = false;
   let snapFace: SnapResult['snapFace'] = undefined;
-  const found: Partial<Record<'x' | 'y' | 'z', SnapContact>> = {};
+  const found: Partial<Record<Axis, SnapContact>> = {};
 
-  if (snapSettings.floorCollision) {
-    const minY = activeObj.dimensions.height / 2;
-    if (pos.y < minY) {
-      pos.y = minY;
-      isSnapped = true;
-      snapFace = 'floor';
-    }
+  // Floor: the part's real lowest point (rotation included) never goes below y = 0.
+  const liftToFloor = () => {
+    if (!floorOn) return false;
+    const b = bottomAt(activeObj, pos);
+    if (b >= -1e-9) return false;
+    pos = { ...pos, y: Math.round((pos.y - b) * 1e6) / 1e6 };
+    return true;
+  };
+  if (liftToFloor()) {
+    isSnapped = true;
+    snapFace = 'floor';
   }
 
   if (!snapSettings.enabled) {
     return { position: pos, isSnapped, snapFace, contacts: [] };
   }
 
-  if (snapSettings.faceSnap && otherObjects.length > 0) {
-    const activeHalfX = activeObj.dimensions.length / 2;
-    const activeHalfY = activeObj.dimensions.height / 2;
-    const activeHalfZ = activeObj.dimensions.width / 2;
+  // Mover half extents from its rotated box (a box's AABB is centered on its position).
+  const own = objectBox({ ...activeObj, position: { x: 0, y: 0, z: 0 } });
+  const half = { x: (own.max.x - own.min.x) / 2, y: (own.max.y - own.min.y) / 2, z: (own.max.z - own.min.z) / 2 };
 
-    const snapDistanceThreshold = SNAP_DIST;
-
+  // Face contacts (one face pair per target). `sidesOnly` re-checks side faces after levelling.
+  const snapFaces = (sidesOnly: boolean) => {
     for (const other of otherObjects) {
       if (other.id === activeObj.id || other.visible === false) continue;
       const r = other.rotation;
       if (isScan(other) || (!near0(r.y) && near0(r.x) && near0(r.z))) {
+        if (sidesOnly) continue;
         if (!near0(r.x) || !near0(r.z)) continue;
         const next = snapToTurned(activeObj, pos, other, found);
         if (next) {
@@ -162,77 +165,94 @@ export function calculateSnappedPosition(
         continue;
       }
 
-      const otherBox = getBoundingBox(other);
-      // Only faces the mover is actually beside (overlapping on the other two axes) pull it.
-      const beside = (a: 'x' | 'y' | 'z') => {
-        const h = a === 'x' ? activeHalfX : a === 'y' ? activeHalfY : activeHalfZ;
-        return pos[a] + h > otherBox.min[a] - snapDistanceThreshold && pos[a] - h < otherBox.max[a] + snapDistanceThreshold;
-      };
-      const canX = beside('y') && beside('z'), canZ = beside('x') && beside('y');
-      // Stacking: a vertical drag may snap to a top/bottom it is near; a horizontal drag only
-      // when the part is mostly over the other part's top. (A 3/4" board butting another
-      // board's end used to "rest on" its top because the 1.2" snap reach exceeds 3/4".)
+      const ob = objectBox(other);
+      const overlap = (a: Axis) => Math.min(pos[a] + half[a], ob.max[a]) - Math.max(pos[a] - half[a], ob.min[a]);
+      // Within snap reach on this axis (may still be a small gap).
+      const beside = (a: Axis) => overlap(a) > -SNAP_DIST;
+      // Really sharing area on this axis (not just meeting at an edge).
+      const shares = (a: Axis) => overlap(a) > SHARE_EPS;
+      // Side faces only pull a part that is level with the other part (not sitting on it or under it).
+      const canX = shares('y') && beside('z');
+      const canZ = shares('y') && beside('x');
+      // Stacking: a vertical drag may rest on a top it is really over; a horizontal drag only
+      // when the part is mostly over the other part's top. Two parts side by side never stack:
+      // that pulled touching boards a board-thickness out of level.
       const moverBox = getBoundingBox({ ...activeObj, position: pos });
-      const canY = vertical ? beside('x') && beside('z') : footprintShare(moverBox, otherBox) >= STACK_SHARE;
+      const canY = vertical ? shares('x') && shares('z') : footprintShare(moverBox, getBoundingBox(other)) >= STACK_SHARE;
 
-      if (canY && Math.abs((pos.y - activeHalfY) - otherBox.max.y) < snapDistanceThreshold) {
-        pos.y = otherBox.max.y + activeHalfY;
-        found.y = { targetId: other.id, axis: 'y', side: 'max', value: otherBox.max.y };
-        isSnapped = true;
-        snapFace = 'bottom';
-      }
-      else if (canY && Math.abs((pos.y + activeHalfY) - otherBox.min.y) < snapDistanceThreshold) {
-        pos.y = otherBox.min.y - activeHalfY;
-        found.y = { targetId: other.id, axis: 'y', side: 'min', value: otherBox.min.y };
-        isSnapped = true;
-        snapFace = 'top';
-      }
-
-      if (canX && Math.abs((pos.x - activeHalfX) - otherBox.max.x) < snapDistanceThreshold) {
-        pos.x = otherBox.max.x + activeHalfX;
-        found.x = { targetId: other.id, axis: 'x', side: 'max', value: otherBox.max.x };
-        isSnapped = true;
-        snapFace = 'left';
-      } else if (canX && Math.abs((pos.x + activeHalfX) - otherBox.min.x) < snapDistanceThreshold) {
-        pos.x = otherBox.min.x - activeHalfX;
-        found.x = { targetId: other.id, axis: 'x', side: 'min', value: otherBox.min.x };
-        isSnapped = true;
-        snapFace = 'right';
-      }
-
-      if (canZ && Math.abs((pos.z - activeHalfZ) - otherBox.max.z) < snapDistanceThreshold) {
-        pos.z = otherBox.max.z + activeHalfZ;
-        found.z = { targetId: other.id, axis: 'z', side: 'max', value: otherBox.max.z };
-        isSnapped = true;
-        snapFace = 'back';
-      } else if (canZ && Math.abs((pos.z + activeHalfZ) - otherBox.min.z) < snapDistanceThreshold) {
-        pos.z = otherBox.min.z - activeHalfZ;
-        found.z = { targetId: other.id, axis: 'z', side: 'min', value: otherBox.min.z };
-        isSnapped = true;
-        snapFace = 'front';
-      }
+      // Two boxes can only touch on one face pair: take the nearest candidate face.
+      let best: { a: Axis; side: 'min' | 'max'; d: number; to: number } | null = null;
+      const consider = (a: Axis, ok: boolean) => {
+        if (!ok) return;
+        const toMax = ob.max[a] + half[a]; // mover's min face on the target's max face
+        const toMin = ob.min[a] - half[a]; // mover's max face on the target's min face
+        const cands: { side: 'min' | 'max'; to: number }[] = [{ side: 'max', to: toMax }, { side: 'min', to: toMin }];
+        for (const c of cands) {
+          const d = Math.abs(pos[a] - c.to);
+          if (d >= SNAP_DIST) continue;
+          // Never tuck a part under another if that would put it through the floor.
+          if (floorOn && a === 'y' && c.side === 'min' && bottomAt(activeObj, { ...pos, y: c.to }) < -1e-6) continue;
+          if (!best || d < best.d) best = { a, side: c.side, d, to: c.to };
+        }
+      };
+      if (!sidesOnly) consider('y', canY);
+      consider('x', canX);
+      consider('z', canZ);
+      if (!best) continue;
+      const hit = best as { a: Axis; side: 'min' | 'max'; d: number; to: number };
+      pos = { ...pos, [hit.a]: hit.to };
+      found[hit.a] = { targetId: other.id, axis: hit.a, side: hit.side, value: ob[hit.side][hit.a] };
+      isSnapped = true;
+      snapFace = FACE[hit.a][hit.side];
     }
-  }
-
-  const contacts = Object.values(found) as SnapContact[];
+  };
+  if (snapSettings.faceSnap && otherObjects.length > 0) snapFaces(false);
 
   // Smart inference on axes without a face contact: Flush / Centered / Inset.
   let alignments: Alignment[] = [];
   if (snapSettings.faceSnap && otherObjects.length > 0) {
-    // Horizontal drags keep their height: no flush-snapping up or down on Y.
-    const locked = vertical || found.y ? found : { ...found, y: true };
-    const inf = inferAlignments(activeObj, pos, otherObjects.filter((o) => !isScan(o)), locked);
-    const hy = activeObj.dimensions.height / 2;
-    if (snapSettings.floorCollision && inf.position.y - hy < -1e-6) {
+    const contactIds = new Set(Object.values(found).filter((c) => c && c.yaw === undefined).map((c) => c!.targetId));
+    // Parts within snap reach on every axis count as touching for levelling (a board an inch
+    // above the one it butts is "touching" to the user, even before the faces overlap).
+    const near = new Set(contactIds);
+    const mb = objectBox({ ...activeObj, position: pos });
+    for (const o of otherObjects) {
+      if (o.id === activeObj.id || o.visible === false || o.shape === 'group' || isScan(o)) continue;
+      const ob = objectBox(o);
+      const gapOn = (a: Axis) => Math.max(0, mb.min[a] - ob.max[a], ob.min[a] - mb.max[a]);
+      if ((['x', 'y', 'z'] as const).every((a) => gapOn(a) < SNAP_DIST)) near.add(o.id);
+    }
+    // Horizontal drags keep their height, except that a part touching another part's side may
+    // level its top or bottom with that part (tops flush / bottoms flush).
+    const sideContact = Boolean(found.x || found.z) && contactIds.size > 0;
+    const freeY = vertical || Boolean(found.y);
+    const locked = freeY || sideContact ? found : { ...found, y: true };
+    const inf = inferAlignments(activeObj, pos, otherObjects.filter((o) => !isScan(o)), locked, {
+      prefer: near,
+      flushOnly: !freeY && sideContact ? { y: true } : undefined,
+    });
+    if (floorOn && bottomAt(activeObj, inf.position) < -1e-6) {
       inf.position.y = pos.y;
       inf.alignments = inf.alignments.filter((a) => a.axis !== 'y');
     }
     if (inf.alignments.length) {
+      const movedY = Math.abs(inf.position.y - pos.y) > 1e-9;
       pos = inf.position;
       alignments = inf.alignments;
       isSnapped = true;
+      // Levelled with a neighbour: now its side may really touch; report (and seat) that contact.
+      if (movedY && !found.x && !found.z) snapFaces(true);
     }
   }
+
+  // Floor again, after every snap: nothing above may leave the part below y = 0.
+  if (liftToFloor()) {
+    isSnapped = true;
+    if (found.y?.side === 'min') delete found.y;
+    alignments = alignments.filter((a) => a.axis !== 'y');
+  }
+
+  const contacts = Object.values(found) as SnapContact[];
   const againstWall = contacts.some((c) => otherObjects.find((o) => o.id === c.targetId && isScan(o)));
   const hint = describeSnap(activeObj, pos, contacts, alignments, otherObjects, againstWall);
 

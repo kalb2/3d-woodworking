@@ -9,6 +9,7 @@ import { moveSet } from '../../state/groupTree';
 import { clearSnapHighlight, useSnapHighlight } from './SnapHighlight';
 import { GIZMO_AXIS, ROTATE_SPHERE_RADIUS } from '../../theme/gizmo';
 import { RotateDegreePill } from '../layout/SizeBar';
+import { axisTravel, pastSlop, ringDragAngle, ringRotation, screenAxis, startRingDrag, type RingDrag, type ScreenAxis, viewportOf } from '../../utils/handleDrag';
 import { AxisArrow, GizmoDepthClear, MoveHub, RotateRing, RotateRings, type FaceAxis } from './gizmoLook';
 
 interface TouchGizmo3DProps {
@@ -17,26 +18,28 @@ interface TouchGizmo3DProps {
 
 type DragAxis = 'x' | 'y' | 'z' | 'xz' | null;
 
+interface GizmoDrag {
+  axis: DragAxis;
+  /** The tool the gesture started in; a different tool ends it. */
+  mode: 'move' | 'rotate';
+  objectId: string;
+  pointerId: number;
+  startClient: { x: number; y: number };
+  startGrab: THREE.Vector3;
+  startPosition: { x: number; y: number; z: number };
+  startRotation: { x: number; y: number; z: number };
+  axisDir: THREE.Vector3 | null;
+  screen: ScreenAxis | null;
+  flat: { right: THREE.Vector3; fwd: THREE.Vector3; sRight: ScreenAxis; sFwd: ScreenAxis } | null;
+  floorPlane: THREE.Plane | null;
+  ring: RingDrag | null;
+  /** Past the touch slop. */
+  live: boolean;
+  changed: boolean;
+}
+
 const _readoutRight = new THREE.Vector3();
 const _readoutQuat = new THREE.Quaternion();
-
-/** Half-width of the catch on 0°, 45°, 90°, and the other 45° marks. */
-const MAJOR_DETENT_DEGREES = 2;
-/** Half-width of the catch on the older 5° stops (0, 5, 10, …, 50, …). */
-const MINOR_DETENT_DEGREES = 1;
-
-/**
- * Free rotation, rounded to a degree, with a light pull onto the old stops.
- * A drag inside either window lands on that stop. Anywhere else, including 47° or 52°, it stays put.
- * 50° is both a 5° stop and a place a drag can rest.
- */
-function rotateWithDetents(degrees: number): number {
-  const major = Math.round(degrees / 45) * 45;
-  if (Math.abs(degrees - major) < MAJOR_DETENT_DEGREES) return major;
-  const minor = Math.round(degrees / 5) * 5;
-  if (Math.abs(degrees - minor) < MINOR_DETENT_DEGREES) return minor;
-  return Math.round(degrees);
-}
 
 /** Screen-size degree pill parked just to the right of the rotate sphere. */
 const RotateReadout: React.FC<{
@@ -84,15 +87,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
   const [activeAxis, setActiveAxis] = useState<DragAxis>(null);
   const [readoutAxis, setReadoutAxis] = useState<'x' | 'y' | 'z' | null>(null);
 
-  const dragRef = useRef<{
-    axis: DragAxis;
-    startPoint: THREE.Vector3;
-    startPosition: { x: number; y: number; z: number };
-    startRotation: { x: number; y: number; z: number };
-    dragPlane: THREE.Plane;
-    objectCenter: THREE.Vector3;
-    axisDir: THREE.Vector3 | null;
-  } | null>(null);
+  const dragRef = useRef<GizmoDrag | null>(null);
 
   const currentProject = projects.find(p => p.id === activeProjectId);
   const isMove = activeGizmoMode === 'move';
@@ -106,42 +101,85 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
 
   const objectEuler = () => new THREE.Euler(objRot[0], objRot[1], objRot[2], 'XYZ');
 
-  const handleDragStart = (axis: DragAxis, startPoint: THREE.Vector3) => {
+  /** End the gesture: one undo step if anything changed, camera back on. Safe to call twice. */
+  const finishDrag = () => {
+    const session = dragRef.current;
+    dragRef.current = null;
+    clearSnapHighlight();
+    setActiveAxis(null);
+    if (controls) controls.enabled = true;
+    if (session?.changed) useProjectStore.getState().pushHistoryState();
+  };
+  const finishRef = useRef(finishDrag);
+  finishRef.current = finishDrag;
+
+  // Switching Move/Rotate (or to another part) ends any drag in progress; it never carries over.
+  useEffect(() => {
+    const s = dragRef.current;
+    if (s && (s.mode !== activeGizmoMode || s.objectId !== object.id)) finishRef.current();
+  }, [activeGizmoMode, object.id]);
+  useEffect(() => () => { if (dragRef.current) finishRef.current(); }, []);
+
+  const handleDragStart = (axis: DragAxis, event: any) => {
     if (!axis) return;
+    const mode = useProjectStore.getState().activeGizmoMode;
+    if (mode !== 'move' && mode !== 'rotate') return;
+    if (mode === 'rotate' && axis === 'xz') return;
+    if (dragRef.current) finishDrag();
+    const ne = (event.nativeEvent ?? event) as PointerEvent;
+    const startClient = { x: ne.clientX ?? 0, y: ne.clientY ?? 0 };
+    const vp = viewportOf(gl.domElement);
+    const center = new THREE.Vector3(object.position.x, object.position.y, object.position.z);
+    const grab: THREE.Vector3 = event.point?.clone?.() ?? center.clone();
 
-    if (controls) {
-      controls.enabled = false;
-    }
-
-    setActiveAxis(axis);
-
-    const objectCenter = new THREE.Vector3(object.position.x, object.position.y, object.position.z);
-    let dragPlane: THREE.Plane;
     let axisDir: THREE.Vector3 | null = null;
+    let screen: ScreenAxis | null = null;
+    let flat: { right: THREE.Vector3; fwd: THREE.Vector3; sRight: ScreenAxis; sFwd: ScreenAxis } | null = null;
+    let floorPlane: THREE.Plane | null = null;
+    let ring: RingDrag | null = null;
 
     if (axis === 'xz') {
-      dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -object.position.y);
+      const view = center.clone().sub(camera.position).normalize();
+      if (Math.abs(view.y) >= 0.25) {
+        // Looking down on it: the part follows the finger on its own floor-parallel plane.
+        floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -object.position.y);
+      } else {
+        // Camera near the part's height: that plane is edge-on and would fling the part
+        // to the horizon. Screen left/right and up/down map to the floor's right and away.
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0);
+        if (right.lengthSq() < 1e-8) right.set(1, 0, 0);
+        right.normalize();
+        const fwd = new THREE.Vector3(0, 1, 0).cross(right).normalize().negate();
+        flat = { right, fwd, sRight: screenAxis(center, right, camera, vp), sFwd: screenAxis(center, fwd, camera, vp) };
+      }
     } else {
       axisDir = new THREE.Vector3(
         axis === 'x' ? 1 : 0,
         axis === 'y' ? 1 : 0,
         axis === 'z' ? 1 : 0,
       ).applyEuler(objectEuler());
-
-      const cameraDir = new THREE.Vector3();
-      camera.getWorldDirection(cameraDir);
-      const planeNormal = cameraDir.clone().negate();
-      dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, startPoint);
+      if (mode === 'move') screen = screenAxis(center, axisDir, camera, vp);
+      else ring = startRingDrag(center, axisDir, grab, camera, vp);
     }
 
+    if (controls) controls.enabled = false;
+    setActiveAxis(axis);
     dragRef.current = {
       axis,
-      startPoint,
+      mode,
+      objectId: object.id,
+      pointerId: ne.pointerId ?? event.pointerId ?? 0,
+      startClient,
+      startGrab: grab,
       startPosition: { ...object.position },
       startRotation: { ...object.rotation },
-      dragPlane,
-      objectCenter,
       axisDir,
+      screen,
+      flat,
+      floorPlane,
+      ring,
+      live: false,
+      changed: false,
     };
   };
 
@@ -151,119 +189,101 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
     const handlePointerMove = (event: PointerEvent) => {
       const session = dragRef.current;
       if (!session || !session.axis) return;
+      // Another finger (pinch, palm) never drives the handle.
+      if ((event.pointerId ?? 0) !== session.pointerId) return;
+      const st = useProjectStore.getState();
+      if (st.activeGizmoMode !== session.mode) { finishRef.current(); return; }
 
-      const rect = gl.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1
-      );
+      const cur = { x: event.clientX, y: event.clientY };
+      if (!session.live) {
+        if (!pastSlop(session.startClient, cur)) return;
+        session.live = true;
+      }
 
-      raycaster.setFromCamera(mouse, camera);
+      const vp = viewportOf(gl.domElement);
+      if (vp.width < 1 || vp.height < 1) return;
+      raycaster.setFromCamera(new THREE.Vector2(
+        ((cur.x - vp.left) / vp.width) * 2 - 1,
+        -((cur.y - vp.top) / vp.height) * 2 + 1,
+      ), camera);
 
-      const currentIntersection = new THREE.Vector3();
-      if (!raycaster.ray.intersectPlane(session.dragPlane, currentIntersection)) return;
+      const live = st.projects.find((p) => p.id === st.activeProjectId)?.objects.find((o) => o.id === session.objectId);
+      if (!live) { finishRef.current(); return; }
 
-      const worldDelta = currentIntersection.clone().sub(session.startPoint);
-
-      if (isMove) {
+      if (session.mode === 'move') {
         let newPos: { x: number; y: number; z: number };
 
         if (session.axis === 'xz') {
-          newPos = {
-            x: session.startPosition.x + worldDelta.x,
-            y: session.startPosition.y,
-            z: session.startPosition.z + worldDelta.z,
-          };
+          let dx = 0, dz = 0;
+          if (session.floorPlane) {
+            const hit = new THREE.Vector3();
+            const startHit = new THREE.Vector3();
+            const startRay = new THREE.Raycaster();
+            startRay.setFromCamera(new THREE.Vector2(
+              ((session.startClient.x - vp.left) / vp.width) * 2 - 1,
+              -((session.startClient.y - vp.top) / vp.height) * 2 + 1,
+            ), camera);
+            if (!raycaster.ray.intersectPlane(session.floorPlane, hit) || !startRay.ray.intersectPlane(session.floorPlane, startHit)) return;
+            dx = hit.x - startHit.x;
+            dz = hit.z - startHit.z;
+          } else if (session.flat) {
+            const f = session.flat;
+            const r = axisTravel(f.sRight, session.startClient, cur);
+            const a = axisTravel(f.sFwd, session.startClient, cur);
+            dx = f.right.x * r + f.fwd.x * a;
+            dz = f.right.z * r + f.fwd.z * a;
+          }
+          newPos = { x: session.startPosition.x + dx, y: session.startPosition.y, z: session.startPosition.z + dz };
         } else {
           const axisDir = session.axisDir;
-          if (!axisDir) return;
-          const projected = worldDelta.dot(axisDir);
+          if (!axisDir || !session.screen) return;
+          const travel = axisTravel(session.screen, session.startClient, cur);
           newPos = {
-            x: session.startPosition.x + axisDir.x * projected,
-            y: session.startPosition.y + axisDir.y * projected,
-            z: session.startPosition.z + axisDir.z * projected,
+            x: session.startPosition.x + axisDir.x * travel,
+            y: session.startPosition.y + axisDir.y * travel,
+            z: session.startPosition.z + axisDir.z * travel,
           };
         }
 
-        if (currentProject?.snapSettings.floorCollision) {
-          const minY = object.dimensions.height / 2;
-          if (newPos.y < minY) {
-            newPos.y = minY;
-          }
-        }
+        // Floor: no clamp here. Snapping, updateObject and translateSelection all keep the
+        // part's real lowest point (rotation included) at or above y = 0.
 
         // Several things selected: they all move together by the same delta.
-        const multi = useProjectStore.getState().selectedObjectIds.length > 1;
+        const multi = st.selectedObjectIds.length > 1;
+        session.changed = true;
         if (multi) {
-          const cur = useProjectStore.getState().projects.find((p) => p.id === activeProjectId)?.objects.find((o) => o.id === object.id);
-          if (cur) {
-            useProjectStore.getState().translateSelection({ x: newPos.x - cur.position.x, y: newPos.y - cur.position.y, z: newPos.z - cur.position.z }, true);
-          }
+          st.translateSelection({ x: newPos.x - live.position.x, y: newPos.y - live.position.y, z: newPos.z - live.position.z }, true);
         } else if (currentProject) {
           const snapResult = calculateSnappedPosition(
-            object,
+            live,
             newPos,
             // Snap to parts, not group boxes (a part's own group would trap it).
             // ...and never to the mover's own contents (moving a whole module).
-            (() => { const own = moveSet(currentProject.objects, object.id); return currentProject.objects.filter((o) => o.shape !== 'group' && !own.has(o.id)); })(),
+            (() => { const own = moveSet(currentProject.objects, live.id); return currentProject.objects.filter((o) => o.shape !== 'group' && !own.has(o.id)); })(),
             currentProject.snapSettings,
             { dragAxis: session.axis === 'xz' ? 'xz' : (session.axisDir ? (Math.abs(session.axisDir.y) > 0.9 ? 'y' : 'x') : 'xz') }
           );
-          updateObject(object.id, { position: snapResult.position }, true);
-          useSnapHighlight.getState().set(object.id, snapResult.contacts, { alignments: snapResult.alignments, hint: snapResult.hint });
+          // Move only ever writes position.
+          updateObject(live.id, { position: snapResult.position }, true);
+          useSnapHighlight.getState().set(live.id, snapResult.contacts, { alignments: snapResult.alignments, hint: snapResult.hint });
         } else {
-          updateObject(object.id, { position: newPos }, true);
+          updateObject(live.id, { position: newPos }, true);
         }
       } else {
-        if (session.axis === 'xz') return;
-
-        const center = session.objectCenter;
-        const startVec = session.startPoint.clone().sub(center);
-        const curVec = currentIntersection.clone().sub(center);
-
-        const rotAxisWorld = session.axisDir ?? (() => {
-          switch (session.axis) {
-            case 'x': return new THREE.Vector3(1, 0, 0);
-            case 'y': return new THREE.Vector3(0, 1, 0);
-            case 'z': return new THREE.Vector3(0, 0, 1);
-            default: return new THREE.Vector3(0, 1, 0);
-          }
-        })();
-
-        const startProj = startVec.clone().sub(rotAxisWorld.clone().multiplyScalar(startVec.dot(rotAxisWorld)));
-        const curProj = curVec.clone().sub(rotAxisWorld.clone().multiplyScalar(curVec.dot(rotAxisWorld)));
-
-        if (startProj.length() < 0.001 || curProj.length() < 0.001) return;
-
-        startProj.normalize();
-        curProj.normalize();
-
-        let angle = Math.acos(THREE.MathUtils.clamp(startProj.dot(curProj), -1, 1));
-        const cross = startProj.clone().cross(curProj);
-        if (cross.dot(rotAxisWorld) < 0) angle = -angle;
-
-        const angleDeg = THREE.MathUtils.radToDeg(angle);
-        const newRotation = { ...session.startRotation };
-        switch (session.axis) {
-          case 'x': newRotation.x = rotateWithDetents(session.startRotation.x + angleDeg); break;
-          case 'y': newRotation.y = rotateWithDetents(session.startRotation.y + angleDeg); break;
-          case 'z': newRotation.z = rotateWithDetents(session.startRotation.z + angleDeg); break;
-        }
-
-        updateObject(object.id, { rotation: newRotation }, true);
+        if (session.axis === 'xz' || !session.ring) return;
+        const axis = session.axis;
+        const angleDeg = THREE.MathUtils.radToDeg(ringDragAngle(session.ring, raycaster.ray, session.startClient, cur));
+        const newRotation = ringRotation(session.startRotation, axis, angleDeg);
+        session.changed = true;
+        // Rotate only ever writes rotation.
+        updateObject(live.id, { rotation: newRotation }, true);
       }
     };
 
-    const handlePointerUp = () => {
-      clearSnapHighlight();
-      dragRef.current = null;
-      setActiveAxis(null);
-
-      if (controls) {
-        controls.enabled = true;
-      }
-
-      pushHistoryState();
+    const handlePointerUp = (event: PointerEvent) => {
+      const session = dragRef.current;
+      if (session && (event.pointerId ?? 0) !== session.pointerId) return;
+      finishRef.current();
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -274,11 +294,8 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
-      if (controls) {
-        controls.enabled = true;
-      }
     };
-  }, [activeAxis, activeProjectId, camera, gl, raycaster, controls, object, currentProject, isMove, updateObject, pushHistoryState]);
+  }, [activeAxis, camera, gl, raycaster, currentProject, updateObject]);
 
   if (activeGizmoMode === 'resize') return null;
   // Rotating a multi-selection isn't supported (each would spin alone): Group first.
@@ -286,7 +303,7 @@ export const TouchGizmo3D: React.FC<TouchGizmo3DProps> = ({ object }) => {
 
   const beginAxis = (axis: Exclude<DragAxis, null>) => (event: any) => {
     if (axis === 'x' || axis === 'y' || axis === 'z') setReadoutAxis(axis);
-    handleDragStart(axis, event.point.clone());
+    handleDragStart(axis, event);
   };
 
   const shownAxis = activeAxis === 'x' || activeAxis === 'y' || activeAxis === 'z' ? activeAxis : readoutAxis;
