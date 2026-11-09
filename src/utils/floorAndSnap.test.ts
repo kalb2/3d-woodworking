@@ -84,6 +84,17 @@ describe('floor: a rotated part never goes through the floor', () => {
   });
 });
 
+describe('floor: tipped parts use the rotated bounding box', () => {
+  it('a 10" cube tipped 45° on X is lifted by half its world height, not height/2', () => {
+    const tipped = part('t', [10, 10, 10], [0, 1, 0], { rotation: { x: 45, y: 0, z: 0 } });
+    const y = floorClampY(tipped);
+    expect(y).toBeCloseTo(5 * Math.SQRT2, 5);
+    expect(bottomOf({ ...tipped, position: { x: 0, y, z: 0 } })).toBeCloseTo(0, 5);
+    // The old half-height clamp (y = 5) would still leave the corners below the floor.
+    expect(bottomOf({ ...tipped, position: { x: 0, y: 5, z: 0 } })).toBeLessThan(-0.5);
+  });
+});
+
 describe('magnet: touching parts can be levelled top to top and bottom to bottom', () => {
   // Two 24 x 6 boards, 3/4" thick, end to end; the mover is raised a little.
   const board = (id: string, x: number, y = 0.375) => part(id, [24, 0.75, 6], [x, y, 0]);

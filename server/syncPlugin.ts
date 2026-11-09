@@ -5,6 +5,7 @@ import { FileSyncDb } from './fileSyncDb.ts';
 import { handleSyncRequest } from '../src/sync/handler.ts';
 import { createIdentityResolver } from '../src/sync/identity.ts';
 import { APPLE_AUDIENCE } from '../src/sync/types.ts';
+import { MemoryAuthAttemptStore } from '../src/sync/rateLimit.ts';
 import { mockDescribe } from '../src/ai/mock.ts';
 
 function headersFrom(req: IncomingMessage): Headers {
@@ -50,6 +51,7 @@ export function syncDevPlugin(): Plugin {
     return opening;
   };
   const identity = createIdentityResolver({ allowDev: true, appleAudience: APPLE_AUDIENCE });
+  const rateLimit = new MemoryAuthAttemptStore();
 
   return {
     name: 'workbench-sync-dev',
@@ -72,6 +74,7 @@ export function syncDevPlugin(): Plugin {
         db,
         identity,
         config: { devSignIn: true, mode: 'dev', appleAudience: APPLE_AUDIENCE },
+        rateLimit,
         // Describe it on the dev server: AI_API_KEY (and AI_BASE_URL/AI_MODEL) from the shell, or AI_MOCK=1.
         ai: {
           config: {

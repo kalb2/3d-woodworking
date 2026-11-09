@@ -1,6 +1,21 @@
 import { hashPassword, normalizeUsername, passwordProblem, verifyPassword } from './password.ts';
 import type { Account, AuthConfig, IdentityResolver, SyncDatabase, SyncRecord } from './types.ts';
 import { API_PREFIX } from './types.ts';
+import {
+  APPLE_MAX_FAILURES_PER_IP,
+  LOGIN_MAX_FAILURES_PER_IP,
+  LOGIN_MAX_FAILURES_PER_USERNAME,
+  RATE_LIMIT_ERROR,
+  SIGNUP_MAX_ATTEMPTS_PER_IP,
+  appleIpBucket,
+  checkLimit,
+  clientIp,
+  loginIpBucket,
+  loginUserBucket,
+  signupIpBucket,
+  type AuthAttemptStore,
+  type RateLimitDecision,
+} from './rateLimit.ts';
 import { handleAiDescribe, type AiConfig } from '../ai/aiHandler.ts';
 import type { AiSpec } from '../ai/spec.ts';
 import type { AppleRevokeResult } from './appleRevoke.ts';
@@ -17,9 +32,19 @@ export interface SyncHandlerOptions {
    * DELETE /me body. Absent (dev server): deletion skips revocation.
    */
   appleRevoke?: (account: Account, authorizationCode: string | undefined) => Promise<AppleRevokeResult>;
+  /** D1-backed (or in-memory) sliding window for login/signup/Apple guessing. */
+  rateLimit?: AuthAttemptStore;
+  /** Clock, for tests. */
+  now?: () => number;
 }
 
-function json(body: unknown, status = 200): Response {
+/** PUT /projects body larger than this is refused (413). */
+export const SYNC_PAYLOAD_MAX_CHARS = 2_000_000;
+
+/** Valid-looking hash so a missing account still runs PBKDF2 (timing). */
+const TIMING_PAD_HASH = 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+function json(body: unknown, status = 200, extra: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -27,8 +52,32 @@ function json(body: unknown, status = 200): Response {
       'access-control-allow-origin': '*',
       'access-control-allow-headers': 'authorization, content-type',
       'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      ...extra,
     },
   });
+}
+
+function tooMany(decision: RateLimitDecision): Response {
+  return json({ error: RATE_LIMIT_ERROR }, 429, { 'retry-after': String(decision.retryAfterSec) });
+}
+
+async function rejectIfLimited(
+  store: AuthAttemptStore | undefined,
+  checks: { bucket: string; max: number }[],
+  now: number,
+): Promise<Response | null> {
+  if (!store) return null;
+  for (const check of checks) {
+    const decision = await checkLimit(store, check.bucket, check.max, now);
+    if (decision.limited) return tooMany(decision);
+  }
+  return null;
+}
+
+async function passwordMatches(password: string, storedHash: string | null): Promise<boolean> {
+  if (storedHash) return verifyPassword(password, storedHash);
+  await verifyPassword(password, TIMING_PAD_HASH);
+  return false;
 }
 
 function bearer(request: Request): string | null {
@@ -91,7 +140,15 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     const passwordError = passwordProblem(password);
     if (passwordError) return json({ error: passwordError }, 400);
 
+    const now = (options.now ?? Date.now)();
+    const ip = clientIp(request);
+
     if (path === '/auth/signup') {
+      const blocked = await rejectIfLimited(options.rateLimit, [
+        { bucket: signupIpBucket(ip), max: SIGNUP_MAX_ATTEMPTS_PER_IP },
+      ], now);
+      if (blocked) return blocked;
+      if (options.rateLimit) await options.rateLimit.record(signupIpBucket(ip), now);
       const taken = await db.findAccountByUsername(username);
       if (taken) return json({ error: 'That username is taken.' }, 409);
       const account: Account = {
@@ -101,20 +158,35 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
         username,
         displayName: username,
         provider: 'password',
-        createdAt: Date.now(),
+        createdAt: now,
       };
       await db.createAccount(account, await hashPassword(password));
       const token = crypto.randomUUID();
-      await db.createSession(token, account.id, Date.now());
+      await db.createSession(token, account.id, now);
       return json({ token, account });
     }
 
+    const userBucket = loginUserBucket(username);
+    const ipBucket = loginIpBucket(ip);
+    const blocked = await rejectIfLimited(options.rateLimit, [
+      { bucket: userBucket, max: LOGIN_MAX_FAILURES_PER_USERNAME },
+      { bucket: ipBucket, max: LOGIN_MAX_FAILURES_PER_IP },
+    ], now);
+    if (blocked) return blocked;
+
     const account = await db.findAccountByUsername(username);
     const storedHash = account ? await db.passwordHashFor(account.id) : null;
-    const matches = storedHash ? await verifyPassword(password, storedHash) : false;
-    if (!account || !matches) return json({ error: 'Username or password is wrong.' }, 401);
+    const matches = await passwordMatches(password, storedHash);
+    if (!account || !matches) {
+      if (options.rateLimit) {
+        await options.rateLimit.record(userBucket, now);
+        await options.rateLimit.record(ipBucket, now);
+      }
+      return json({ error: 'Username or password is wrong.' }, 401);
+    }
+    if (options.rateLimit) await options.rateLimit.clear(userBucket);
     const token = crypto.randomUUID();
-    await db.createSession(token, account.id, Date.now());
+    await db.createSession(token, account.id, now);
     return json({ token, account });
   }
 
@@ -125,12 +197,22 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     } catch {
       return json({ error: 'Expected JSON.' }, 400);
     }
+    const now = (options.now ?? Date.now)();
+    const ip = clientIp(request);
+    const appleBucket = appleIpBucket(ip);
+    const blocked = await rejectIfLimited(options.rateLimit, [
+      { bucket: appleBucket, max: APPLE_MAX_FAILURES_PER_IP },
+    ], now);
+    if (blocked) return blocked;
     const resolved = await identity.resolve({
       identityToken: body.identityToken || '',
       email: body.email,
       displayName: body.displayName,
     });
-    if ('error' in resolved) return json({ error: resolved.error }, resolved.status);
+    if ('error' in resolved) {
+      if (resolved.status === 401 && options.rateLimit) await options.rateLimit.record(appleBucket, now);
+      return json({ error: resolved.error }, resolved.status);
+    }
     let account = await db.findAccountBySub(resolved.appleSub);
     if (!account) {
       if (!resolved.email) {
@@ -147,12 +229,12 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
         username: '',
         displayName: resolved.displayName,
         provider: resolved.provider,
-        createdAt: Date.now(),
+        createdAt: now,
       };
       await db.createAccount(account);
     }
     const token = crypto.randomUUID();
-    await db.createSession(token, account.id, Date.now());
+    await db.createSession(token, account.id, now);
     return json({ token, account });
   }
 
@@ -209,7 +291,7 @@ export async function handleSyncRequest(request: Request, options: SyncHandlerOp
     const account = await requireAccount(request, db);
     if (account instanceof Response) return account;
     const raw = await request.text();
-    if (raw.length > 2_000_000) return json({ error: 'Sync payload is too large.' }, 413);
+    if (raw.length > SYNC_PAYLOAD_MAX_CHARS) return json({ error: 'Sync payload is too large.' }, 413);
     let body: { records?: unknown };
     try {
       body = JSON.parse(raw) as { records?: unknown };

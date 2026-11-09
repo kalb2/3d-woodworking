@@ -32,3 +32,13 @@ CREATE TABLE IF NOT EXISTS project_records (
 -- ALTER TABLE accounts ADD COLUMN username TEXT NOT NULL DEFAULT '';
 -- ALTER TABLE accounts ADD COLUMN password_hash TEXT;
 -- then the unique index above.
+
+-- Sliding-window counters for login/signup/Apple rate limits (see src/sync/rateLimit.ts).
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bucket TEXT NOT NULL,
+  attempted_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS auth_attempts_bucket_time
+  ON auth_attempts(bucket, attempted_at);

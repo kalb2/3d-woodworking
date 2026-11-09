@@ -4,7 +4,7 @@ import type { FurnitureObject } from '../types/furniture';
 import { faceCenterWorld, faceNormalWorld, pushPull, rayAxisParam } from './pushPull';
 import { boxCorners } from '../state/groupTree';
 import {
-  MIN_FORESHORTEN, axisTravel, pastSlop, quatOf, ringDragAngle, ringRotation, rotateLocal, screenAxis, startRingDrag, toClient, worldPerPx, type Viewport,
+  DRAG_SLOP_PX, MIN_FORESHORTEN, axisTravel, pastSlop, quatOf, ringDragAngle, ringRotation, rotateLocal, screenAxis, startRingDrag, toClient, worldPerPx, type Viewport,
 } from './handleDrag';
 
 const vp: Viewport = { left: 0, top: 0, width: 390, height: 700 };
@@ -81,8 +81,25 @@ describe('resize drag mapping (face you look straight at)', () => {
   });
 
   it('a tap or a twitch is not a drag', () => {
+    expect(DRAG_SLOP_PX).toBe(6);
+    expect(MIN_FORESHORTEN).toBe(0.4);
     expect(pastSlop({ x: 0, y: 0 }, { x: 3, y: 3 })).toBe(false);
+    expect(pastSlop({ x: 0, y: 0 }, { x: 5, y: 0 })).toBe(false);
     expect(pastSlop({ x: 0, y: 0 }, { x: 6, y: 0 })).toBe(true);
+  });
+
+  it('straight-on: dragging up along the screen grows the face you are looking at', () => {
+    const c = cam([0, 30, 120]);
+    const P = faceCenterWorld(post, '+z');
+    const N = faceNormalWorld(post, '+z');
+    const ax = screenAxis(P, N, c, vp);
+    expect(ax.headOn).toBe(true);
+    const start = { x: 200, y: 350 };
+    const up = axisTravel(ax, start, { x: start.x, y: start.y - 20 });
+    expect(up).toBeGreaterThan(0);
+    const grown = pushPull(post, '+z', up, opts).dimensions.width;
+    expect(grown).toBeGreaterThan(post.dimensions.width);
+    expect(grown).toBeLessThan(post.dimensions.width + 6);
   });
 });
 

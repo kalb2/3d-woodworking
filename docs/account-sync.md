@@ -30,6 +30,10 @@ Prefix: `/api/v1`
 
 Username accounts: the username is stored lowercase, 3–32 characters, starting with a letter, then letters, numbers, or underscores. The password is 8–200 characters. The server stores PBKDF2-SHA256 (`pbkdf2$iterations$salt$hash`, 100,000 iterations) and never returns the hash on the account. A taken username is `409`. A wrong username or password is `401` with “Username or password is wrong.” Sessions are the same random bearer tokens as Apple sign-in. The account uses `provider: "password"`, `appleSub: "name:<username>"`, and an empty email.
 
+### Login rate limits
+
+A 15-minute sliding window in D1 (`auth_attempts`, see `worker/README.md`) slows password guessing and signup spam. Limits: **8 failed logins per username** and **30 failed logins per IP**; **10 signups per IP** (created or taken); **20 failed Sign in with Apple token checks per IP**. The IP key is `CF-Connecting-IP`. Over any of those the API returns `429` with `Retry-After` and “Too many attempts. Try again later.” A successful login clears that username’s failures. `PUT /projects` bodies larger than 2,000,000 characters are `413`.
+
 Apple identity tokens are verified with Apple’s JWKS (RS256, issuer `https://appleid.apple.com`, audience `com.k24corp.workbench`; the Worker also accepts the pre-rename bundle id `com.antigravity.furniture3d` so builds installed before the rename keep signing in). No Apple client secret is required. Dev tokens are `dev.` plus base64url JSON `{ email, displayName }` and are accepted only when `ALLOW_DEV_AUTH` is on. That path is not on the Profile screen. The same email maps to one account (`appleSub` `dev:<email>`).
 
 ## Environment
@@ -55,7 +59,7 @@ The shared file is `.data/sync-dev.json`. Password hashes live in that file unde
 
 ## Worker deploy from Kalb-Mini
 
-The D1 database already exists and the remote schema is applied (`accounts`, `sessions`, `project_records`, and `accounts_username_unique`).
+The D1 database already exists and the remote schema is applied (`accounts`, `sessions`, `project_records`, and `accounts_username_unique`). Login rate limits add `auth_attempts` via `worker/migrations/0001_auth_attempts.sql` — apply that migration before or with the Worker deploy that includes this code (do not apply it until that change is reviewed).
 
 | | |
 | --- | --- |

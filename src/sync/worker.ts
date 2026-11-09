@@ -1,5 +1,6 @@
 import { D1SyncDb, type D1Like } from './d1Db.ts';
 import { handleSyncRequest } from './handler.ts';
+import { D1AuthAttemptStore } from './rateLimit.ts';
 import { createIdentityResolver } from './identity.ts';
 import { APPLE_AUDIENCE, acceptedAppleAudiences } from './types.ts';
 import type { RateLimiter, WorkersAiBinding } from '../ai/aiHandler.ts';
@@ -76,6 +77,7 @@ export default {
       config: { devSignIn: allowDev, mode: 'cloud', appleAudience: audience },
       ai: aiOptions(env),
       appleRevoke: appleRevokeOption(env, audience),
+      rateLimit: new D1AuthAttemptStore(env.DB),
     });
   },
 };
