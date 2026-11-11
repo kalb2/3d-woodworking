@@ -15,6 +15,7 @@ enabled = true
 binding = "DB"
 database_name = "workbench"
 database_id = "e87ee84f-66b3-4e33-9aad-ca20e995534c"
+migrations_dir = "migrations"
 
 # Secrets (do not commit values):
 #   npx wrangler secret put ALLOW_DEV_AUTH   # "1" only on a private dev worker

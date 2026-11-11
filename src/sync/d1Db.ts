@@ -1,7 +1,7 @@
 import type { Account, SyncDatabase, SyncRecord } from './types.ts';
 import { SESSION_TTL_MS } from './types.ts';
 
-interface D1Statement {
+export interface D1Statement {
   bind(...values: unknown[]): D1Statement;
   first<T>(): Promise<T | null>;
   all<T>(): Promise<{ results: T[] }>;
